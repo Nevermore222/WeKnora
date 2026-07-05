@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/application/service"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/ratelimit"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/application/service"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/ratelimit"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 )

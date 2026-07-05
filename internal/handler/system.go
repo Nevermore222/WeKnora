@@ -13,17 +13,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/application/repository"
-	"github.com/Tencent/WeKnora/internal/application/service"
-	"github.com/Tencent/WeKnora/internal/application/service/file"
-	"github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/database"
-	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/runtime"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
-	secutils "github.com/Tencent/WeKnora/internal/utils"
+	"github.com/Tencent/Xelora/internal/application/repository"
+	"github.com/Tencent/Xelora/internal/application/service"
+	"github.com/Tencent/Xelora/internal/application/service/file"
+	"github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/database"
+	"github.com/Tencent/Xelora/internal/infrastructure/docparser"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/runtime"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
+	secutils "github.com/Tencent/Xelora/internal/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -234,11 +234,11 @@ func (h *SystemHandler) ListParserEngines(c *gin.Context) {
 			if tenant.ParserEngineConfig != nil {
 				overrides = tenant.ParserEngineConfig.ToOverridesMap()
 			}
-			if creds := tenant.Credentials.GetWeKnoraCloud(); creds != nil {
+			if creds := tenant.Credentials.GetXeloraCloud(); creds != nil {
 				if overrides == nil {
 					overrides = make(map[string]string)
 				}
-				overrides["weknoracloud_app_id"] = creds.AppID
+				overrides["xeloracloud_app_id"] = creds.AppID
 			}
 		}
 	}
@@ -296,11 +296,11 @@ func (h *SystemHandler) ReconnectDocReader(c *gin.Context) {
 			if tenant.ParserEngineConfig != nil {
 				overrides = tenant.ParserEngineConfig.ToOverridesMap()
 			}
-			if creds := tenant.Credentials.GetWeKnoraCloud(); creds != nil {
+			if creds := tenant.Credentials.GetXeloraCloud(); creds != nil {
 				if overrides == nil {
 					overrides = make(map[string]string)
 				}
-				overrides["weknoracloud_app_id"] = creds.AppID
+				overrides["xeloracloud_app_id"] = creds.AppID
 			}
 		}
 	}
@@ -329,11 +329,11 @@ func (h *SystemHandler) CheckParserEngines(c *gin.Context) {
 	overrides := body.ToOverridesMap()
 	if v, exists := c.Get(types.TenantInfoContextKey.String()); exists {
 		if tenant, ok := v.(*types.Tenant); ok && tenant != nil {
-			if creds := tenant.Credentials.GetWeKnoraCloud(); creds != nil {
+			if creds := tenant.Credentials.GetXeloraCloud(); creds != nil {
 				if overrides == nil {
 					overrides = make(map[string]string)
 				}
-				overrides["weknoracloud_app_id"] = creds.AppID
+				overrides["xeloracloud_app_id"] = creds.AppID
 			}
 		}
 	}
@@ -346,7 +346,7 @@ func (h *SystemHandler) CheckParserEngines(c *gin.Context) {
 
 func (h *SystemHandler) resolveDocReader(ctx context.Context, overrides map[string]string) (interfaces.DocumentReader, string, string) {
 	if len(overrides) > 0 {
-		if addr := strings.TrimSpace(overrides["docreader_addr"]); addr != "" && service.IsWeKnoraCloudDocReaderAddr(addr) {
+		if addr := strings.TrimSpace(overrides["docreader_addr"]); addr != "" && service.IsXeloraCloudDocReaderAddr(addr) {
 			reader := h.ResolveDocumentReader(ctx, addr)
 			return reader, addr, transportFromDocReaderAddr(addr)
 		}
@@ -1062,12 +1062,12 @@ func (h *SystemHandler) ResolveDocumentReader(ctx context.Context, addr string) 
 		return h.documentReader
 	}
 
-	if service.IsWeKnoraCloudDocReaderAddr(addr) {
-		creds := h.tenantSvc.GetWeKnoraCloudCredentials(ctx)
+	if service.IsXeloraCloudDocReaderAddr(addr) {
+		creds := h.tenantSvc.GetXeloraCloudCredentials(ctx)
 		if creds == nil {
 			return nil
 		}
-		reader, err := docparser.NewWeKnoraCloudSignedDocumentReader(creds.AppID, creds.AppSecret)
+		reader, err := docparser.NewXeloraCloudSignedDocumentReader(creds.AppID, creds.AppSecret)
 		if err != nil {
 			return nil
 		}
@@ -1512,7 +1512,7 @@ func (h *SystemHandler) ApplyDefaultStorageQuotaToAllTenants(c *gin.Context) {
 	gb := h.systemSettingSvc.GetInt(
 		ctx,
 		"tenant.default_storage_quota_gb",
-		"WEKNORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
+		"XELORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
 		10,
 	)
 	if gb <= 0 {

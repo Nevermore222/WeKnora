@@ -1,4 +1,4 @@
-// Package service provides business logic implementations for WeKnora application
+// Package service provides business logic implementations for Xelora application
 // This package contains service layer implementations that coordinate between
 // repositories and handlers, applying business rules and transaction management
 package service
@@ -7,10 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Tencent/WeKnora/internal/application/service/retriever"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/application/service/retriever"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 )
 
 // chunkService implements the ChunkService interface

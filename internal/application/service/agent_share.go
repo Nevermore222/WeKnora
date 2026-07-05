@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/agent/tools"
-	"github.com/Tencent/WeKnora/internal/application/repository"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/agent/tools"
+	"github.com/Tencent/Xelora/internal/application/repository"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/google/uuid"
 )
 

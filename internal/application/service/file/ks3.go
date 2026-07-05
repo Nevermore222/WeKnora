@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
-	"github.com/Tencent/WeKnora/internal/utils"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/utils"
 	"github.com/google/uuid"
 	ks3aws "github.com/ks3sdklib/aws-sdk-go/aws"
 	"github.com/ks3sdklib/aws-sdk-go/aws/credentials"

@@ -3,8 +3,8 @@ package session
 import (
 	"net/http"
 
-	"github.com/Tencent/WeKnora/internal/errors"
-	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/Xelora/internal/errors"
+	"github.com/Tencent/Xelora/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 

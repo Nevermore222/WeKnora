@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/redis/go-redis/v9"
 )
 
 // clientRegistrationName is sent as client_name during dynamic client
 // registration (RFC 7591).
-const clientRegistrationName = "WeKnora"
+const clientRegistrationName = "Xelora"
 
 // OAuthManager orchestrates the MCP OAuth2 authorization-code flow:
 // discovery, dynamic client registration, the authorize redirect, and the

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // TestMergeCitationsIntoItems_PopulatesSourceChunksOnCandidates verifies that

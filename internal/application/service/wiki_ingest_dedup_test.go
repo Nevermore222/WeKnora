@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // helper: build a minimal entity/concept WikiPage.

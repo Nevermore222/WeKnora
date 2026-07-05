@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
-	"github.com/Tencent/WeKnora/cli/internal/iostreams"
-	"github.com/Tencent/WeKnora/cli/internal/prompt"
-	sdk "github.com/Tencent/WeKnora/client"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/iostreams"
+	"github.com/Tencent/Xelora/cli/internal/prompt"
+	sdk "github.com/Tencent/Xelora/client"
 )
 
 // apiDryRunFactory builds a Factory whose Client closure panics if invoked —

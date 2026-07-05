@@ -12,8 +12,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/Tencent/WeKnora/internal/infrastructure/chunker"
-	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/Xelora/internal/infrastructure/chunker"
+	"github.com/Tencent/Xelora/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 

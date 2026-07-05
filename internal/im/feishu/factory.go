@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Tencent/WeKnora/internal/im"
-	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/Xelora/internal/im"
+	"github.com/Tencent/Xelora/internal/logger"
 )
 
 // NewFactory returns an im.AdapterFactory for Feishu (Lark) channels.

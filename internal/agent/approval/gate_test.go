@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/event"
+	"github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/event"
 	"github.com/stretchr/testify/require"
 )
 

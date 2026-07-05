@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	sdk "github.com/Tencent/WeKnora/client"
+	sdk "github.com/Tencent/Xelora/client"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
-	"github.com/Tencent/WeKnora/cli/internal/config"
-	"github.com/Tencent/WeKnora/cli/internal/iostreams"
-	"github.com/Tencent/WeKnora/cli/internal/prompt"
-	"github.com/Tencent/WeKnora/cli/internal/testutil"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/config"
+	"github.com/Tencent/Xelora/cli/internal/iostreams"
+	"github.com/Tencent/Xelora/cli/internal/prompt"
+	"github.com/Tencent/Xelora/cli/internal/testutil"
 )
 
 // fakeAllSvc implements AllService for --all mode tests.

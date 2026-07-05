@@ -1,0 +1,23 @@
+[Unit]
+Description=Xelora Lite - Knowledge Base Management System
+After=network.target
+
+[Service]
+Type=simple
+User=xelora
+Group=xelora
+WorkingDirectory=/opt/xelora
+EnvironmentFile=/opt/xelora/.env.lite
+ExecStart=/opt/xelora/Xelora-lite
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/xelora/data
+
+[Install]
+WantedBy=multi-user.target

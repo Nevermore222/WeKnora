@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/Xelora/internal/logger"
 )
 
 const defaultMaxDeadlockRetries = 3

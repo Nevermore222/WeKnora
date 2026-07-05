@@ -3,7 +3,7 @@ package interfaces
 import (
 	"context"
 
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // TenantService defines the tenant service interface
@@ -39,8 +39,8 @@ type TenantService interface {
 	SearchTenants(ctx context.Context, keyword string, tenantID uint64, page, pageSize int) ([]*types.Tenant, int64, error)
 	// GetTenantByIDForUser gets a tenant by ID with permission check
 	GetTenantByIDForUser(ctx context.Context, tenantID uint64, userID string) (*types.Tenant, error)
-	// GetWeKnoraCloudCredentials returns the decrypted WeKnoraCloud credentials for the current tenant.
-	GetWeKnoraCloudCredentials(ctx context.Context) *types.WeKnoraCloudCredentials
+	// GetXeloraCloudCredentials returns the decrypted XeloraCloud credentials for the current tenant.
+	GetXeloraCloudCredentials(ctx context.Context) *types.XeloraCloudCredentials
 }
 
 // TenantRepository defines the tenant repository interface

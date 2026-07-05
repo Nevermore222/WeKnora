@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Tencent/WeKnora/internal/models/chat"
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/models/chat"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 func TestSlugify(t *testing.T) {

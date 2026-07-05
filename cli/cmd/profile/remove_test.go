@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
-	"github.com/Tencent/WeKnora/cli/internal/config"
-	"github.com/Tencent/WeKnora/cli/internal/iostreams"
-	"github.com/Tencent/WeKnora/cli/internal/secrets"
-	"github.com/Tencent/WeKnora/cli/internal/testutil"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/config"
+	"github.com/Tencent/Xelora/cli/internal/iostreams"
+	"github.com/Tencent/Xelora/cli/internal/secrets"
+	"github.com/Tencent/Xelora/cli/internal/testutil"
 )
 
 // seedStore returns a MemStore pre-loaded with sentinel values for every

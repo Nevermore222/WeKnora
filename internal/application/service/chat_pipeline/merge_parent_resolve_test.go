@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/Tencent/WeKnora/internal/searchutil"
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/searchutil"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 func TestCollectScopedTextChildIDs(t *testing.T) {

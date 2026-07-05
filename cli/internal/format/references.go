@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	sdk "github.com/Tencent/WeKnora/client"
+	sdk "github.com/Tencent/Xelora/client"
 )
 
 // WriteReferences renders the compact references footer used by chat and

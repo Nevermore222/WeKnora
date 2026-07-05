@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
-	"github.com/Tencent/WeKnora/cli/internal/iostreams"
-	sdk "github.com/Tencent/WeKnora/client"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/iostreams"
+	sdk "github.com/Tencent/Xelora/client"
 )
 
 // CheckResult is the deep-verification response for `kb check <id>`.
@@ -37,7 +37,7 @@ var kbCheckFields = []string{
 	"is_processing", "processing_count", "failed_count",
 }
 
-// NewCmdCheck builds `weknora kb check <id>`.
+// NewCmdCheck builds `xelora kb check <id>`.
 func NewCmdCheck(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check <kb-id>",
@@ -48,11 +48,11 @@ Performs 1 + N HTTP calls:
   1   GET /kb/{id} — reachable + counts + processing state
   N   page-walk doc list with parse_status=failed — failed_count
 
-Use 'weknora kb status <id>' for a fast read-only health snapshot
+Use 'xelora kb status <id>' for a fast read-only health snapshot
 (1 HTTP call, no failed_count). Use 'kb check' when you need
 verification including failed-doc aggregation.`,
-		Example: `  weknora kb check kb_abc
-  weknora kb check kb_abc --format json`,
+		Example: `  xelora kb check kb_abc
+  xelora kb check kb_abc --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			fopts, err := cmdutil.CheckFormatFlag(c)
@@ -75,7 +75,7 @@ verification including failed-doc aggregation.`,
 	cmdutil.SetAgentHelp(cmd, cmdutil.AgentHelp{
 		UsedFor:       "verify a knowledge base end-to-end: status plus failed-doc aggregation",
 		RequiredFlags: []string{"<kb-id> (positional)"},
-		Examples:      []string{"weknora kb check kb_abc"},
+		Examples:      []string{"xelora kb check kb_abc"},
 		Output:        "envelope.data is {id, reachable, failed_count, ...}; deeper than `kb status`",
 	})
 	return cmd

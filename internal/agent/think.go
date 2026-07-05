@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	agenttools "github.com/Tencent/WeKnora/internal/agent/tools"
-	"github.com/Tencent/WeKnora/internal/common"
-	"github.com/Tencent/WeKnora/internal/event"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/models/chat"
-	"github.com/Tencent/WeKnora/internal/types"
+	agenttools "github.com/Tencent/Xelora/internal/agent/tools"
+	"github.com/Tencent/Xelora/internal/common"
+	"github.com/Tencent/Xelora/internal/event"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/models/chat"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // streamLLMResult holds accumulated output from a streaming LLM call.

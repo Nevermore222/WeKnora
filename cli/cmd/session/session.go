@@ -1,18 +1,18 @@
-// Package sessioncmd holds `weknora session` command tree (list / view /
+// Package sessioncmd holds `xelora session` command tree (list / view /
 // delete / ask / continue-stream / stop) for chat history and agent invocation.
 //
 // Package name `sessioncmd` (not `session`) so callers can `import sdk
-// "github.com/Tencent/WeKnora/client"` and use `sdk.Session` without
+// "github.com/Tencent/Xelora/client"` and use `sdk.Session` without
 // shadowing - same hygiene as `profilecmd`.
 package sessioncmd
 
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
 )
 
-// NewCmd builds the `weknora session` parent command.
+// NewCmd builds the `xelora session` parent command.
 func NewCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "session",

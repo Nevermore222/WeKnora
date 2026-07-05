@@ -3,7 +3,7 @@ package chatpipeline
 import (
 	"context"
 
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // expandShortContextWithNeighbors expands the short context with neighbors

@@ -25,10 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 )
@@ -76,7 +76,7 @@ func (h *HousekeepingService) Start(ctx context.Context) error {
 		return nil
 	}
 	if !housekeepingEnabled() {
-		logger.Infof(ctx, "[Housekeeping] disabled via WEKNORA_HOUSEKEEPING_ENABLED=false")
+		logger.Infof(ctx, "[Housekeeping] disabled via XELORA_HOUSEKEEPING_ENABLED=false")
 		return nil
 	}
 	// Every 5 minutes — frequent enough that user-visible recovery latency
@@ -186,7 +186,7 @@ func (h *HousekeepingService) runSweep(ctx context.Context) {
 	if queueSkipped > 0 {
 		// Visibility into "stale span heartbeat but tasks still queued"
 		// — i.e. backpressure, not a stuck row. Persistent counts here
-		// mean the queue is the bottleneck (raise WEKNORA_ASYNQ_CONCURRENCY
+		// mean the queue is the bottleneck (raise XELORA_ASYNQ_CONCURRENCY
 		// or document_process_timeout), not that housekeeping misfires.
 		logger.Infof(ctx,
 			"[Housekeeping] %d candidate(s) skipped — tasks still queued (backpressure, not stuck)",
@@ -339,7 +339,7 @@ func housekeepingEnabled() bool {
 	// Default-on: missing/empty env enables the sweep. Operators must
 	// explicitly set "false" to opt out, matching the plan's commitment
 	// that no env change is required for the safety net to engage.
-	v := strings.TrimSpace(os.Getenv("WEKNORA_HOUSEKEEPING_ENABLED"))
+	v := strings.TrimSpace(os.Getenv("XELORA_HOUSEKEEPING_ENABLED"))
 	if v == "" {
 		return true
 	}

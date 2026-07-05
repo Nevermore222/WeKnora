@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/searchutil"
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/searchutil"
+	"github.com/Tencent/Xelora/internal/types"
 	"gorm.io/gorm"
 )
 

@@ -3,11 +3,11 @@ package handler
 import (
 	"errors"
 
-	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
-	"github.com/Tencent/WeKnora/internal/application/service"
-	"github.com/Tencent/WeKnora/internal/middleware"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	apprepo "github.com/Tencent/Xelora/internal/application/repository"
+	"github.com/Tencent/Xelora/internal/application/service"
+	"github.com/Tencent/Xelora/internal/middleware"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/gin-gonic/gin"
 )
 

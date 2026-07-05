@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Tencent/WeKnora/internal/config"
-	apperrors "github.com/Tencent/WeKnora/internal/errors"
-	"github.com/Tencent/WeKnora/internal/event"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/models/chat"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/config"
+	apperrors "github.com/Tencent/Xelora/internal/errors"
+	"github.com/Tencent/Xelora/internal/event"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/models/chat"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/google/uuid"
 
-	chatpipeline "github.com/Tencent/WeKnora/internal/application/service/chat_pipeline"
+	chatpipeline "github.com/Tencent/Xelora/internal/application/service/chat_pipeline"
 )
 
 func sessionUserIDFromContext(ctx context.Context) string {

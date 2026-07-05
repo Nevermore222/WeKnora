@@ -28,15 +28,15 @@ temp/
 logs/
 *.pid
 
-WeKnora
-WeKnora-lite
+Xelora
+Xelora-lite
 cmd/desktop/build/bin/
 /models/
 test/data/mswag.txt
 data/files/
-data/weknora.db
-data/weknora.db-wal
-data/weknora.db-shm
+data/xelora.db
+data/xelora.db-wal
+data/xelora.db-shm
 skills-lock.json
 
 web/
@@ -46,7 +46,7 @@ web/
 /server
 frontend/.vite
 frontend/chrome-extension/
-WeKnora-Chrome-Extension
+Xelora-Chrome-Extension
 packages/protoc-3.19.4-linux-x86_64.zip
 
 Claude.md

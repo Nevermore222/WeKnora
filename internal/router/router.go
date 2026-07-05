@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	filesvc "github.com/Tencent/WeKnora/internal/application/service/file"
+	filesvc "github.com/Tencent/Xelora/internal/application/service/file"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -18,17 +18,17 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/dig"
 
-	"github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/handler"
-	"github.com/Tencent/WeKnora/internal/handler/session"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/middleware"
-	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
-	secutils "github.com/Tencent/WeKnora/internal/utils"
+	"github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/handler"
+	"github.com/Tencent/Xelora/internal/handler/session"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/middleware"
+	"github.com/Tencent/Xelora/internal/tracing/langfuse"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
+	secutils "github.com/Tencent/Xelora/internal/utils"
 
-	_ "github.com/Tencent/WeKnora/docs" // swagger docs
+	_ "github.com/Tencent/Xelora/docs" // swagger docs
 )
 
 // RouterParams 路由参数
@@ -84,7 +84,7 @@ type RouterParams struct {
 	RedisClient                  *redis.Client
 	DataSourceHandler            *handler.DataSourceHandler
 	DataSourceCredentialsHandler *handler.DataSourceCredentialsHandler
-	WeKnoraCloudHandler          *handler.WeKnoraCloudHandler
+	XeloraCloudHandler          *handler.XeloraCloudHandler
 	WikiPageHandler              *handler.WikiPageHandler
 }
 
@@ -98,7 +98,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 	// embed endpoints rate-limit per (channel, ClientIP), so a spoofed XFF would
 	// trivially bypass the limiter. Restrict to the fronting proxy network so
 	// only the real client IP (appended by nginx) is returned. Configurable via
-	// WEKNORA_TRUSTED_PROXIES (comma-separated CIDRs/IPs).
+	// XELORA_TRUSTED_PROXIES (comma-separated CIDRs/IPs).
 	if err := r.SetTrustedProxies(trustedProxies()); err != nil {
 		logger.Errorf(context.Background(), "[Router] failed to set trusted proxies: %v", err)
 	}
@@ -228,7 +228,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterIMChannelRoutes(v1, params.IMHandler, rbacGuards)
 		RegisterEmbedChannelRoutes(v1, params.EmbedChannelHandler, rbacGuards)
 		RegisterDataSourceRoutes(v1, params.DataSourceHandler, params.DataSourceCredentialsHandler, rbacGuards)
-		RegisterWeKnoraCloudRoutes(v1, params.WeKnoraCloudHandler, rbacGuards)
+		RegisterXeloraCloudRoutes(v1, params.XeloraCloudHandler, rbacGuards)
 		RegisterWikiPageRoutes(v1, params.WikiPageHandler, rbacGuards)
 		RegisterChunkerDebugRoutes(v1, rbacGuards)
 	}
@@ -840,7 +840,7 @@ func RegisterMCPServiceRoutes(
 	// MCP OAuth provider redirect. Registered OUTSIDE the /mcp-services group
 	// to avoid a static-vs-":id" route conflict, and left unauthenticated
 	// (allow-listed in middleware/auth.go) because the third-party browser
-	// redirect carries no WeKnora bearer — the single-use state authenticates.
+	// redirect carries no Xelora bearer — the single-use state authenticates.
 	r.GET("/mcp-oauth/callback", oauthHandler.Callback)
 
 	mcpServices := r.Group("/mcp-services")
@@ -1227,10 +1227,10 @@ func RegisterIMChannelRoutes(r *gin.RouterGroup, imHandler *handler.IMHandler, g
 // trustedProxies returns the proxy CIDRs/IPs whose X-Forwarded-For headers
 // gin should trust when resolving the client IP. Defaults to loopback and
 // private ranges (covers the bundled nginx in a container network); override
-// with WEKNORA_TRUSTED_PROXIES (comma-separated). An explicit empty value
+// with XELORA_TRUSTED_PROXIES (comma-separated). An explicit empty value
 // disables proxy trust entirely so ClientIP() returns the direct peer.
 func trustedProxies() []string {
-	raw, ok := os.LookupEnv("WEKNORA_TRUSTED_PROXIES")
+	raw, ok := os.LookupEnv("XELORA_TRUSTED_PROXIES")
 	if !ok {
 		return []string{
 			"127.0.0.0/8",
@@ -1314,7 +1314,7 @@ func embedFrameAncestorsMiddleware(svc interfaces.EmbedChannelService) gin.Handl
 // from the ./web directory if it exists. Must be called BEFORE auth middleware
 // so static files are served without authentication.
 func serveFrontendStatic(r *gin.Engine) {
-	webDir := os.Getenv("WEKNORA_WEB_DIR")
+	webDir := os.Getenv("XELORA_WEB_DIR")
 	if webDir == "" {
 		webDir = "./web"
 	}
@@ -1743,13 +1743,13 @@ func RegisterDataSourceRoutes(
 	}
 }
 
-// RegisterWeKnoraCloudRoutes 注册 WeKnoraCloud 初始化路由
-// RegisterWeKnoraCloudRoutes registers the WeKnoraCloud credential
+// RegisterXeloraCloudRoutes 注册 XeloraCloud 初始化路由
+// RegisterXeloraCloudRoutes registers the XeloraCloud credential
 // management endpoints. SaveCredentials persists external SaaS keys
 // for the tenant (Admin+), Status is a low-risk readiness probe (Viewer+).
-func RegisterWeKnoraCloudRoutes(r *gin.RouterGroup, handler *handler.WeKnoraCloudHandler, g *rbacGuards) {
-	r.POST("/weknoracloud/credentials", g.Admin(), handler.SaveCredentials)
-	r.GET("/models/weknoracloud/status", g.Viewer(), handler.Status)
+func RegisterXeloraCloudRoutes(r *gin.RouterGroup, handler *handler.XeloraCloudHandler, g *rbacGuards) {
+	r.POST("/xeloracloud/credentials", g.Admin(), handler.SaveCredentials)
+	r.GET("/models/xeloracloud/status", g.Viewer(), handler.Status)
 }
 
 // RegisterWikiPageRoutes registers wiki page related routes.

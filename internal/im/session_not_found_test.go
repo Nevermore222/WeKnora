@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	apperrors "github.com/Tencent/Xelora/internal/errors"
 	"gorm.io/gorm"
 )
 

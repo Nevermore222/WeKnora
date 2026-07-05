@@ -4,7 +4,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // VectorEmbedding defines the Elasticsearch document structure for vector embeddings

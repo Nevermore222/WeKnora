@@ -1,13 +1,13 @@
-// Package main is the main package for the WeKnora server
+// Package main is the main package for the Xelora server
 // It contains the main function and the entry point for the server
 //
-// @title           WeKnora API
+// @title           Xelora API
 // @version         1.0
-// @description     WeKnora 知识库管理系统 API 文档
+// @description     Xelora 知识库管理系统 API 文档
 // @termsOfService  http://swagger.io/terms/
 //
-// @contact.name   WeKnora Github
-// @contact.url    https://github.com/Tencent/WeKnora
+// @contact.name   Xelora Github
+// @contact.url    https://github.com/Tencent/Xelora
 //
 // @BasePath  /api/v1
 //
@@ -32,11 +32,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/container"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/runtime"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/container"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/runtime"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 )
 
 func main() {

@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/im"
-	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/Xelora/internal/im"
+	"github.com/Tencent/Xelora/internal/logger"
 )
 
 const (

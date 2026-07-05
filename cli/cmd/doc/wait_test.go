@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/Tencent/WeKnora/client"
+	sdk "github.com/Tencent/Xelora/client"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
 )
 
 func TestWaitCmd_Shape(t *testing.T) {

@@ -1,5 +1,5 @@
-{
-  "description": "WeKnora Mini Program plugin",
+﻿{
+  "description": "Xelora Mini Program plugin",
   "setting": {
     "urlCheck": true,
     "es6": true,
@@ -9,6 +9,7 @@
   },
   "compileType": "miniprogram",
   "libVersion": "latest",
-  "projectname": "WeKnora Mini Program",
+  "projectname": "Xelora Mini Program",
   "condition": {}
 }
+

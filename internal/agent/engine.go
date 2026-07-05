@@ -7,17 +7,17 @@ import (
 	"strings"
 	"time"
 
-	agentmemory "github.com/Tencent/WeKnora/internal/agent/memory"
-	"github.com/Tencent/WeKnora/internal/agent/skills"
-	agenttoken "github.com/Tencent/WeKnora/internal/agent/token"
-	agenttools "github.com/Tencent/WeKnora/internal/agent/tools"
-	"github.com/Tencent/WeKnora/internal/common"
-	appconfig "github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/event"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/models/chat"
-	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
-	"github.com/Tencent/WeKnora/internal/types"
+	agentmemory "github.com/Tencent/Xelora/internal/agent/memory"
+	"github.com/Tencent/Xelora/internal/agent/skills"
+	agenttoken "github.com/Tencent/Xelora/internal/agent/token"
+	agenttools "github.com/Tencent/Xelora/internal/agent/tools"
+	"github.com/Tencent/Xelora/internal/common"
+	appconfig "github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/event"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/models/chat"
+	"github.com/Tencent/Xelora/internal/tracing/langfuse"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // langfuseQueryPreview caps the query length we ship as the agent.execute

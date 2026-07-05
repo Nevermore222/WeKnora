@@ -33,55 +33,55 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/Tencent/WeKnora/internal/agent/approval"
-	"github.com/Tencent/WeKnora/internal/application/repository"
-	memoryRepo "github.com/Tencent/WeKnora/internal/application/repository/memory/neo4j"
-	dorisRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/doris"
-	elasticsearchRepoV7 "github.com/Tencent/WeKnora/internal/application/repository/retriever/elasticsearch/v7"
-	elasticsearchRepoV8 "github.com/Tencent/WeKnora/internal/application/repository/retriever/elasticsearch/v8"
-	milvusRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/milvus"
-	neo4jRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/neo4j"
-	openSearchRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/opensearch"
-	postgresRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/postgres"
-	qdrantRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/qdrant"
-	sqliteRetrieverRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/sqlite"
-	tencentVectorDBRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/tencentvectordb"
-	weaviateRepo "github.com/Tencent/WeKnora/internal/application/repository/retriever/weaviate"
-	"github.com/Tencent/WeKnora/internal/application/service"
-	chatpipeline "github.com/Tencent/WeKnora/internal/application/service/chat_pipeline"
-	"github.com/Tencent/WeKnora/internal/application/service/file"
-	memoryService "github.com/Tencent/WeKnora/internal/application/service/memory"
-	"github.com/Tencent/WeKnora/internal/application/service/retriever"
-	"github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/database"
-	"github.com/Tencent/WeKnora/internal/datasource"
-	feishuConnector "github.com/Tencent/WeKnora/internal/datasource/connector/feishu"
-	notionConnector "github.com/Tencent/WeKnora/internal/datasource/connector/notion"
-	yuqueConnector "github.com/Tencent/WeKnora/internal/datasource/connector/yuque"
-	"github.com/Tencent/WeKnora/internal/event"
-	"github.com/Tencent/WeKnora/internal/handler"
-	"github.com/Tencent/WeKnora/internal/handler/session"
-	imPkg "github.com/Tencent/WeKnora/internal/im"
-	"github.com/Tencent/WeKnora/internal/im/dingtalk"
-	"github.com/Tencent/WeKnora/internal/im/feishu"
-	"github.com/Tencent/WeKnora/internal/im/mattermost"
-	"github.com/Tencent/WeKnora/internal/im/slack"
-	"github.com/Tencent/WeKnora/internal/im/telegram"
-	"github.com/Tencent/WeKnora/internal/im/wechat"
-	"github.com/Tencent/WeKnora/internal/im/wecom"
-	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
-	infra_web_search "github.com/Tencent/WeKnora/internal/infrastructure/web_search"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/mcp"
-	"github.com/Tencent/WeKnora/internal/models/chat"
-	"github.com/Tencent/WeKnora/internal/models/embedding"
-	"github.com/Tencent/WeKnora/internal/models/utils/ollama"
-	"github.com/Tencent/WeKnora/internal/router"
-	"github.com/Tencent/WeKnora/internal/stream"
-	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
-	secutils "github.com/Tencent/WeKnora/internal/utils"
+	"github.com/Tencent/Xelora/internal/agent/approval"
+	"github.com/Tencent/Xelora/internal/application/repository"
+	memoryRepo "github.com/Tencent/Xelora/internal/application/repository/memory/neo4j"
+	dorisRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/doris"
+	elasticsearchRepoV7 "github.com/Tencent/Xelora/internal/application/repository/retriever/elasticsearch/v7"
+	elasticsearchRepoV8 "github.com/Tencent/Xelora/internal/application/repository/retriever/elasticsearch/v8"
+	milvusRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/milvus"
+	neo4jRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/neo4j"
+	openSearchRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/opensearch"
+	postgresRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/postgres"
+	qdrantRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/qdrant"
+	sqliteRetrieverRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/sqlite"
+	tencentVectorDBRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/tencentvectordb"
+	weaviateRepo "github.com/Tencent/Xelora/internal/application/repository/retriever/weaviate"
+	"github.com/Tencent/Xelora/internal/application/service"
+	chatpipeline "github.com/Tencent/Xelora/internal/application/service/chat_pipeline"
+	"github.com/Tencent/Xelora/internal/application/service/file"
+	memoryService "github.com/Tencent/Xelora/internal/application/service/memory"
+	"github.com/Tencent/Xelora/internal/application/service/retriever"
+	"github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/database"
+	"github.com/Tencent/Xelora/internal/datasource"
+	feishuConnector "github.com/Tencent/Xelora/internal/datasource/connector/feishu"
+	notionConnector "github.com/Tencent/Xelora/internal/datasource/connector/notion"
+	yuqueConnector "github.com/Tencent/Xelora/internal/datasource/connector/yuque"
+	"github.com/Tencent/Xelora/internal/event"
+	"github.com/Tencent/Xelora/internal/handler"
+	"github.com/Tencent/Xelora/internal/handler/session"
+	imPkg "github.com/Tencent/Xelora/internal/im"
+	"github.com/Tencent/Xelora/internal/im/dingtalk"
+	"github.com/Tencent/Xelora/internal/im/feishu"
+	"github.com/Tencent/Xelora/internal/im/mattermost"
+	"github.com/Tencent/Xelora/internal/im/slack"
+	"github.com/Tencent/Xelora/internal/im/telegram"
+	"github.com/Tencent/Xelora/internal/im/wechat"
+	"github.com/Tencent/Xelora/internal/im/wecom"
+	"github.com/Tencent/Xelora/internal/infrastructure/docparser"
+	infra_web_search "github.com/Tencent/Xelora/internal/infrastructure/web_search"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/mcp"
+	"github.com/Tencent/Xelora/internal/models/chat"
+	"github.com/Tencent/Xelora/internal/models/embedding"
+	"github.com/Tencent/Xelora/internal/models/utils/ollama"
+	"github.com/Tencent/Xelora/internal/router"
+	"github.com/Tencent/Xelora/internal/stream"
+	"github.com/Tencent/Xelora/internal/tracing/langfuse"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
+	secutils "github.com/Tencent/Xelora/internal/utils"
 	"github.com/tencent/vectordatabase-sdk-go/tcvectordb"
 	"github.com/weaviate/weaviate-go-client/v5/weaviate"
 	"github.com/weaviate/weaviate-go-client/v5/weaviate/auth"
@@ -195,7 +195,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(service.NewEvaluationService))
 	must(container.Provide(service.NewUserService))
 	must(container.Provide(service.NewSystemSettingService))
-	must(container.Provide(service.NewWeKnoraCloudService))
+	must(container.Provide(service.NewXeloraCloudService))
 
 	// Extract services - register individual extracters with names
 	must(container.Provide(service.NewChunkExtractService, dig.Name("chunkExtractor")))
@@ -350,7 +350,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Invoke(registerIMAdapterFactories))
 	must(container.Provide(handler.NewIMHandler))
 	must(container.Provide(handler.NewEmbedChannelHandler))
-	must(container.Provide(handler.NewWeKnoraCloudHandler))
+	must(container.Provide(handler.NewXeloraCloudHandler))
 	logger.Debugf(ctx, "[Container] HTTP handlers registered")
 
 	// Wire the chat package's local image resolver so multimodal chat can read
@@ -511,7 +511,7 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	case "sqlite":
 		dbPath := os.Getenv("DB_PATH")
 		if dbPath == "" {
-			dbPath = "./data/weknora.db"
+			dbPath = "./data/xelora.db"
 		}
 		if dir := filepath.Dir(dbPath); dir != "." && dir != "" {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -743,7 +743,7 @@ func initFileService(cfg *config.Config) (interfaces.FileService, error) {
 		}
 		pathPrefix := os.Getenv("S3_PATH_PREFIX")
 		if pathPrefix == "" {
-			pathPrefix = "weknora/"
+			pathPrefix = "xelora/"
 		}
 		return file.NewS3FileService(
 			os.Getenv("S3_ENDPOINT"),
@@ -763,7 +763,7 @@ func initFileService(cfg *config.Config) (interfaces.FileService, error) {
 		obsRegion := os.Getenv("OBS_REGION")
 		obsPathPrefix := os.Getenv("OBS_PATH_PREFIX")
 		if obsPathPrefix == "" {
-			obsPathPrefix = "weknora/"
+			obsPathPrefix = "xelora/"
 		}
 		return file.NewObsFileService(
 			os.Getenv("OBS_ENDPOINT"),
@@ -783,7 +783,7 @@ func initFileService(cfg *config.Config) (interfaces.FileService, error) {
 		}
 		pathPrefix := os.Getenv("OSS_PATH_PREFIX")
 		if pathPrefix == "" {
-			pathPrefix = "weknora/"
+			pathPrefix = "xelora/"
 		}
 		return file.NewOssFileServiceWithTempBucket(
 			os.Getenv("OSS_ENDPOINT"),
@@ -1052,7 +1052,7 @@ func initRetrieveEngineRegistry(
 		}
 		dorisDatabase := os.Getenv("DORIS_DATABASE")
 		if dorisDatabase == "" {
-			dorisDatabase = "weknora"
+			dorisDatabase = "xelora"
 		}
 		dorisUsername := os.Getenv("DORIS_USERNAME")
 		if dorisUsername == "" {

@@ -1,4 +1,4 @@
-# WeKnora 二开开发指南
+# Xelora 二开开发指南
 
 本文档是二开部署与开发的唯一参考,涵盖环境准备、源码构建、日常开发闭环和多机协作。
 分支与 PR 规范见 [WORKFLOW.md](./WORKFLOW.md),改动追踪见 [CHANGELOG-custom.md](./CHANGELOG-custom.md)。
@@ -6,9 +6,9 @@
 ## 仓库结构
 
 ```
-F:\Docker\WeKnora\WeKnora-main
-├─ origin    git@github.com:Nevermore222/WeKnora.git   (你的 fork, SSH)
-├─ upstream  https://github.com/Tencent/WeKnora.git     (只读, 拉上游更新)
+F:\Docker\Xelora\Xelora-main
+├─ origin    git@github.com:Nevermore222/Xelora.git   (你的 fork, SSH)
+├─ upstream  https://github.com/Tencent/Xelora.git     (只读, 拉上游更新)
 ├─ tag v0.6.2 @ fc98f00  (上游参考锚点)
 ├─ main              ← 上游同步层, 禁止直接改业务代码
 └─ custom/business   ← 业务主分支, 所有二开改动汇聚于此
@@ -28,9 +28,9 @@ F:\Docker\WeKnora\WeKnora-main
 
 ```powershell
 # 1. 克隆仓库
-git clone git@github.com:Nevermore222/WeKnora.git
-cd WeKnora
-git remote add upstream https://github.com/Tencent/WeKnora.git
+git clone git@github.com:Nevermore222/Xelora.git
+cd Xelora
+git remote add upstream https://github.com/Tencent/Xelora.git
 git checkout custom/business
 
 # 2. 配置环境变量
@@ -69,7 +69,7 @@ postgres 和 redis 用官方镜像,不涉及源码构建。
 ### 1. 同步并派生分支
 
 ```powershell
-cd F:\Docker\WeKnora\WeKnora-main
+cd F:\Docker\Xelora\Xelora-main
 git checkout custom/business
 git pull --rebase
 git checkout -b feature/<模块>-<动作>
@@ -164,9 +164,9 @@ GitHub 是唯一真相源, 本地只是工作副本。
 ## 新机器初始化
 
 ```powershell
-git clone git@github.com:Nevermore222/WeKnora.git
-cd WeKnora
-git remote add upstream https://github.com/Tencent/WeKnora.git
+git clone git@github.com:Nevermore222/Xelora.git
+cd Xelora
+git remote add upstream https://github.com/Tencent/Xelora.git
 git checkout custom/business
 cp .env.example .env
 # 编辑 .env
@@ -178,7 +178,7 @@ SSH key 需在新机器上单独配置 GitHub。
 
 ## 上游升级
 
-WeKnora 发新版时(本机 GitHub 直连不通, 需配镜像或开代理):
+Xelora 发新版时(本机 GitHub 直连不通, 需配镜像或开代理):
 
 ```powershell
 git checkout main
@@ -217,7 +217,7 @@ docker compose exec app sh
 docker compose exec docreader bash
 
 # 查看镜像构建历史
-docker image history wechatopenai/weknora-app:latest
+docker image history wechatopenai/xelora-app:latest
 ```
 
 ## 注意事项

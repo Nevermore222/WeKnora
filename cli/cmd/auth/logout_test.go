@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
-	"github.com/Tencent/WeKnora/cli/internal/config"
-	"github.com/Tencent/WeKnora/cli/internal/iostreams"
-	"github.com/Tencent/WeKnora/cli/internal/prompt"
-	"github.com/Tencent/WeKnora/cli/internal/secrets"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/config"
+	"github.com/Tencent/Xelora/cli/internal/iostreams"
+	"github.com/Tencent/Xelora/cli/internal/prompt"
+	"github.com/Tencent/Xelora/cli/internal/secrets"
 )
 
 // newLogoutFactory builds a Factory whose Config closure mutates the supplied

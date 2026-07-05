@@ -8,14 +8,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/google/uuid"
 )
 
 const (
-	defaultTableBaseName = "weknora_embeddings"
+	defaultTableBaseName = "xelora_embeddings"
 	envDorisTablePrefix  = "DORIS_TABLE_PREFIX"
 )
 

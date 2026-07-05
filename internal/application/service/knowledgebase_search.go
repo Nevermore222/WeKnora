@@ -3,13 +3,13 @@ package service
 import (
 	"context"
 
-	"github.com/Tencent/WeKnora/internal/application/service/retriever"
-	apperrors "github.com/Tencent/WeKnora/internal/errors"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/models/embedding"
-	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
-	"github.com/Tencent/WeKnora/internal/types"
-	secutils "github.com/Tencent/WeKnora/internal/utils"
+	"github.com/Tencent/Xelora/internal/application/service/retriever"
+	apperrors "github.com/Tencent/Xelora/internal/errors"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/models/embedding"
+	"github.com/Tencent/Xelora/internal/tracing/langfuse"
+	"github.com/Tencent/Xelora/internal/types"
+	secutils "github.com/Tencent/Xelora/internal/utils"
 )
 
 // GetQueryEmbedding computes the query embedding using the embedding model

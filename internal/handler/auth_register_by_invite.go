@@ -6,10 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	apperrors "github.com/Tencent/WeKnora/internal/errors"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
-	secutils "github.com/Tencent/WeKnora/internal/utils"
+	apperrors "github.com/Tencent/Xelora/internal/errors"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
+	secutils "github.com/Tencent/Xelora/internal/utils"
 )
 
 // registerByInviteRequest is the body for /auth/register-by-invite.

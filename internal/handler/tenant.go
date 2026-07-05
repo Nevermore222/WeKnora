@@ -8,12 +8,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/errors"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
-	secutils "github.com/Tencent/WeKnora/internal/utils"
+	"github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/errors"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
+	secutils "github.com/Tencent/Xelora/internal/utils"
 )
 
 // TenantHandler implements HTTP request handlers for tenant management
@@ -103,7 +103,7 @@ type updateTenantRequest struct {
 const defaultMaxOwnedTenantsPerUser = 10
 
 // resolveMaxOwnedTenantsPerUser returns the current cap, walking the
-// 3-tier resolver: system_settings DB row > WEKNORA_TENANT_MAX_OWNED_PER_USER
+// 3-tier resolver: system_settings DB row > XELORA_TENANT_MAX_OWNED_PER_USER
 // env > config.Tenant.MaxOwnedPerUser (yaml) > defaultMaxOwnedTenantsPerUser.
 // We pre-compute the cfg-derived fallback so the SystemSettingService
 // receives a single int64 default — its 3-tier resolver layers DB and
@@ -116,7 +116,7 @@ func (h *TenantHandler) resolveMaxOwnedTenantsPerUser(ctx context.Context) int {
 	return int(h.systemSettingSvc.GetInt(
 		ctx,
 		"tenant.max_owned_per_user",
-		"WEKNORA_TENANT_MAX_OWNED_PER_USER",
+		"XELORA_TENANT_MAX_OWNED_PER_USER",
 		fallback,
 	))
 }
@@ -229,7 +229,7 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 		gb := h.systemSettingSvc.GetInt(
 			ctx,
 			"tenant.default_storage_quota_gb",
-			"WEKNORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
+			"XELORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
 			10,
 		)
 		if gb <= 0 {

@@ -1,19 +1,19 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "WeKnora Lite",
-  "outputfilename": "WeKnora Lite",
+  "name": "Xelora Lite",
+  "outputfilename": "Xelora Lite",
   "frontend:dir": "../../frontend",
   "wailsjsdir": "../../frontend/src",
   "author": {
-    "name": "WeKnora Team",
+    "name": "Xelora Team",
     "email": ""
   },
   "info": {
     "companyName": "Tencent",
-    "productName": "WeKnora Lite",
+    "productName": "Xelora Lite",
     "productVersion": "1.0.0",
     "copyright": "Copyright 2026 Tencent",
-    "comments": "WeKnora Desktop Edition"
+    "comments": "Xelora Desktop Edition"
   },
   "mac": {
     "category": "public.app-category.productivity",

@@ -11,7 +11,7 @@ import (
 func main() {
 	app := NewApp()
 	_ = wails.Run(&options.App{
-		Title: "WeKnora Lite",
+		Title: "Xelora Lite",
 		Bind:  []interface{}{app},
 	})
 }

@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 func TestParseOutLinks(t *testing.T) {

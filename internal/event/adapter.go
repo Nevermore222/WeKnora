@@ -3,7 +3,7 @@ package event
 import (
 	"context"
 
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // EventBusAdapter adapts *EventBus to types.EventBusInterface

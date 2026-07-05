@@ -1,11 +1,11 @@
-{
+﻿{
   "pages": [
     "pages/index/index",
     "pages/chat/chat",
     "pages/settings/settings"
   ],
   "window": {
-    "navigationBarTitleText": "WeKnora",
+    "navigationBarTitleText": "Xelora",
     "navigationBarBackgroundColor": "#0d3b2a",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f3f3f3"
@@ -31,3 +31,4 @@
     ]
   }
 }
+

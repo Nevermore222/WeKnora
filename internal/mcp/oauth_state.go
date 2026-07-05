@@ -57,11 +57,11 @@ func newOAuthStateStore(rdb *redis.Client) *oauthStateStore {
 }
 
 func (s *oauthStateStore) key(state string) string {
-	ns := strings.TrimSpace(os.Getenv("WEKNORA_REDIS_NAMESPACE"))
+	ns := strings.TrimSpace(os.Getenv("XELORA_REDIS_NAMESPACE"))
 	if ns != "" {
-		return "weknora:mcp_oauth_state:" + ns + ":" + state
+		return "xelora:mcp_oauth_state:" + ns + ":" + state
 	}
-	return "weknora:mcp_oauth_state:" + state
+	return "xelora:mcp_oauth_state:" + state
 }
 
 // Put stores a state with a fixed TTL.

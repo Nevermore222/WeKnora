@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Tencent/WeKnora/cli/internal/config"
-	"github.com/Tencent/WeKnora/cli/internal/projectlink"
-	"github.com/Tencent/WeKnora/cli/internal/prompt"
-	"github.com/Tencent/WeKnora/cli/internal/secrets"
-	sdk "github.com/Tencent/WeKnora/client"
+	"github.com/Tencent/Xelora/cli/internal/config"
+	"github.com/Tencent/Xelora/cli/internal/projectlink"
+	"github.com/Tencent/Xelora/cli/internal/prompt"
+	"github.com/Tencent/Xelora/cli/internal/secrets"
+	sdk "github.com/Tencent/Xelora/client"
 )
 
 // TestFactory_Lazy ensures none of the closures execute work at construction
@@ -55,7 +55,7 @@ func TestFactory_Lazy(t *testing.T) {
 
 // TestNew_FoundationDefaults verifies the production New() returns a usable
 // Factory and that Client surfaces auth.unauthenticated when no current
-// profile is configured (the precondition for `weknora auth login`).
+// profile is configured (the precondition for `xelora auth login`).
 func TestNew_FoundationDefaults(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir()) // empty config → no current profile
 	f := New()
@@ -80,8 +80,8 @@ func TestFactory_ProfileOverride(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", dir)
 
 	// Seed config with two profiles; CurrentProfile = "default"
-	cfgPath := dir + "/weknora/config.yaml"
-	require.NoError(t, os.MkdirAll(dir+"/weknora", 0o700))
+	cfgPath := dir + "/xelora/config.yaml"
+	require.NoError(t, os.MkdirAll(dir+"/xelora", 0o700))
 	require.NoError(t, os.WriteFile(cfgPath, []byte(`
 current_profile: default
 profiles:
@@ -302,10 +302,10 @@ func fakeKBServer(t *testing.T, kbs []sdk.KnowledgeBase) *httptest.Server {
 	return srv
 }
 
-// TestFactory_ActiveProfile_EnvVarFallback verifies WEKNORA_PROFILE is honoured
+// TestFactory_ActiveProfile_EnvVarFallback verifies XELORA_PROFILE is honoured
 // when no override or config is present.
 func TestFactory_ActiveProfile_EnvVarFallback(t *testing.T) {
-	t.Setenv("WEKNORA_PROFILE", "staging")
+	t.Setenv("XELORA_PROFILE", "staging")
 	f := &Factory{} // no override, no config
 	if got := f.ActiveProfile(); got != "staging" {
 		t.Errorf("expected env fallback to staging; got %q", got)
@@ -313,9 +313,9 @@ func TestFactory_ActiveProfile_EnvVarFallback(t *testing.T) {
 }
 
 // TestFactory_ActiveProfile_OverrideWinsEnv verifies ProfileOverride takes
-// priority over the WEKNORA_PROFILE env var.
+// priority over the XELORA_PROFILE env var.
 func TestFactory_ActiveProfile_OverrideWinsEnv(t *testing.T) {
-	t.Setenv("WEKNORA_PROFILE", "staging")
+	t.Setenv("XELORA_PROFILE", "staging")
 	f := &Factory{ProfileOverride: "prod"}
 	if got := f.ActiveProfile(); got != "prod" {
 		t.Errorf("override should win over env; got %q", got)
@@ -327,11 +327,11 @@ func TestFactory_ActiveProfile_OverrideWinsEnv(t *testing.T) {
 func TestResolveKB_Chain(t *testing.T) {
 	t.Run("flag_kb_id_wins", func(t *testing.T) {
 		// UUID form on --kb → pass-through; no SDK call, no env, no disk.
-		t.Setenv("WEKNORA_KB_ID", "kb_env_should_lose")
+		t.Setenv("XELORA_KB_ID", "kb_env_should_lose")
 		dir := t.TempDir()
 		resolveKBChdir(t, dir)
 		// Drop a project link too - must be ignored.
-		require.NoError(t, projectlink.Save(filepath.Join(dir, ".weknora", "project.yaml"), &projectlink.Project{KBID: "kb_disk_should_lose"}))
+		require.NoError(t, projectlink.Save(filepath.Join(dir, ".xelora", "project.yaml"), &projectlink.Project{KBID: "kb_disk_should_lose"}))
 
 		clientCalls := 0
 		f := &Factory{
@@ -347,7 +347,7 @@ func TestResolveKB_Chain(t *testing.T) {
 	})
 
 	t.Run("flag_kb_name_resolves", func(t *testing.T) {
-		t.Setenv("WEKNORA_KB_ID", "")
+		t.Setenv("XELORA_KB_ID", "")
 		srv := fakeKBServer(t, []sdk.KnowledgeBase{
 			{ID: "kb_a", Name: "foo"},
 			{ID: "kb_b", Name: "bar"},
@@ -361,7 +361,7 @@ func TestResolveKB_Chain(t *testing.T) {
 	})
 
 	t.Run("flag_kb_name_not_found", func(t *testing.T) {
-		t.Setenv("WEKNORA_KB_ID", "")
+		t.Setenv("XELORA_KB_ID", "")
 		srv := fakeKBServer(t, []sdk.KnowledgeBase{{ID: "kb_a", Name: "foo"}})
 		f := &Factory{
 			Client: func() (*sdk.Client, error) { return sdk.NewClient(srv.URL), nil },
@@ -375,10 +375,10 @@ func TestResolveKB_Chain(t *testing.T) {
 
 	t.Run("env_var", func(t *testing.T) {
 		// No flag, env wins over disk.
-		t.Setenv("WEKNORA_KB_ID", "kb_env")
+		t.Setenv("XELORA_KB_ID", "kb_env")
 		dir := t.TempDir()
 		resolveKBChdir(t, dir)
-		require.NoError(t, projectlink.Save(filepath.Join(dir, ".weknora", "project.yaml"), &projectlink.Project{KBID: "kb_disk_should_lose"}))
+		require.NoError(t, projectlink.Save(filepath.Join(dir, ".xelora", "project.yaml"), &projectlink.Project{KBID: "kb_disk_should_lose"}))
 
 		f := &Factory{}
 		got, err := f.ResolveKB(makeResolveKBCmd(t, ""))
@@ -387,9 +387,9 @@ func TestResolveKB_Chain(t *testing.T) {
 	})
 
 	t.Run("project_link_walk_up", func(t *testing.T) {
-		t.Setenv("WEKNORA_KB_ID", "")
+		t.Setenv("XELORA_KB_ID", "")
 		root := t.TempDir()
-		require.NoError(t, projectlink.Save(filepath.Join(root, ".weknora", "project.yaml"), &projectlink.Project{KBID: "kb_proj"}))
+		require.NoError(t, projectlink.Save(filepath.Join(root, ".xelora", "project.yaml"), &projectlink.Project{KBID: "kb_proj"}))
 		// Run from a deep child to exercise walk-up.
 		deep := filepath.Join(root, "a", "b", "c")
 		require.NoError(t, os.MkdirAll(deep, 0o755))
@@ -403,7 +403,7 @@ func TestResolveKB_Chain(t *testing.T) {
 
 	t.Run("none", func(t *testing.T) {
 		// No flag, no env, no project link → CodeKBIDRequired.
-		t.Setenv("WEKNORA_KB_ID", "")
+		t.Setenv("XELORA_KB_ID", "")
 		dir := t.TempDir()
 		resolveKBChdir(t, dir)
 

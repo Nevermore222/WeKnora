@@ -12,13 +12,13 @@ func TestErrorToDetail_NilSafe(t *testing.T) {
 
 func TestError_WithRetryCommand(t *testing.T) {
 	err := NewError(CodeAuthUnauthenticated, "session expired").
-		WithHint("run `weknora auth login`").
-		WithRetryCommand("weknora auth login")
+		WithHint("run `xelora auth login`").
+		WithRetryCommand("xelora auth login")
 
-	if err.RetryCommand != "weknora auth login" {
+	if err.RetryCommand != "xelora auth login" {
 		t.Errorf("RetryCommand not set; got %q", err.RetryCommand)
 	}
-	if err.Hint != "run `weknora auth login`" {
+	if err.Hint != "run `xelora auth login`" {
 		t.Errorf("Hint changed unexpectedly; got %q", err.Hint)
 	}
 }

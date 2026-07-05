@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 func TestWithIMIdentity(t *testing.T) {

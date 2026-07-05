@@ -623,9 +623,9 @@ const clampFloatingToViewport = (selector: string, target: { value: Record<strin
 const CHROME_EXTENSION_URL =
   'https://chromewebstore.google.com/detail/jpemjbopikggjlmikmclgbmkhhopjdgd?utm_source=item-share-cb'
 
-const CLAWHUB_SKILL_URL = 'https://clawhub.ai/lyingbug/weknora'
+const CLAWHUB_SKILL_URL = 'https://clawhub.ai/lyingbug/xelora'
 
-// 打开 WeKnora Chrome 插件（Chrome应用商店）
+// 打开 Xelora Chrome 插件（Chrome应用商店）
 const openChromeExtension = () => {
   menuVisible.value = false
   window.open(CHROME_EXTENSION_URL, '_blank')
@@ -644,7 +644,7 @@ const reopenGuide = () => {
 // 打开 GitHub
 const openGithub = () => {
   menuVisible.value = false
-  window.open('https://github.com/Tencent/WeKnora', '_blank')
+  window.open('https://github.com/Tencent/Xelora', '_blank')
 }
 
 // 注销

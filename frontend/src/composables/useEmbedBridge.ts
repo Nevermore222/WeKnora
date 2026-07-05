@@ -19,7 +19,7 @@ import { applyEmbedLocale, readEmbedLocaleFromUrl, syncEmbedLocaleFromUrl } from
 
 // Persist the chat session id per channel so a page refresh resumes the same
 // conversation (and its history) instead of silently starting a new session.
-const EMBED_SESSION_STORAGE_PREFIX = 'weknora-embed-session:'
+const EMBED_SESSION_STORAGE_PREFIX = 'xelora-embed-session:'
 
 const sessionStorageKey = (channelId: string) => `${EMBED_SESSION_STORAGE_PREFIX}${channelId}`
 

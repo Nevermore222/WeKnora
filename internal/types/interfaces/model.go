@@ -3,12 +3,12 @@ package interfaces
 import (
 	"context"
 
-	"github.com/Tencent/WeKnora/internal/models/chat"
-	"github.com/Tencent/WeKnora/internal/models/embedding"
-	"github.com/Tencent/WeKnora/internal/models/rerank"
-	"github.com/Tencent/WeKnora/internal/models/asr"
-	"github.com/Tencent/WeKnora/internal/models/vlm"
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/models/chat"
+	"github.com/Tencent/Xelora/internal/models/embedding"
+	"github.com/Tencent/Xelora/internal/models/rerank"
+	"github.com/Tencent/Xelora/internal/models/asr"
+	"github.com/Tencent/Xelora/internal/models/vlm"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // ModelService defines the model service interface

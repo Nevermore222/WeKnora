@@ -1,8 +1,8 @@
 App({
   onLaunch() {
-    const settings = wx.getStorageSync("weknora_settings");
+    const settings = wx.getStorageSync("xelora_settings");
     if (!settings) {
-      wx.setStorageSync("weknora_settings", {
+      wx.setStorageSync("xelora_settings", {
         baseUrl: "http://localhost:8080",
         apiKey: "",
         selectedKnowledgeBaseId: ""

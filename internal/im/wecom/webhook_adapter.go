@@ -1,4 +1,4 @@
-// Package wecom implements the WeCom (企业微信) IM adapter for WeKnora.
+// Package wecom implements the WeCom (企业微信) IM adapter for Xelora.
 //
 // WeCom Smart Bot flow:
 // 1. User sends a message to the bot (direct or @mention in group)
@@ -31,9 +31,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/im"
-	"github.com/Tencent/WeKnora/internal/logger"
-	secutils "github.com/Tencent/WeKnora/internal/utils"
+	"github.com/Tencent/Xelora/internal/im"
+	"github.com/Tencent/Xelora/internal/logger"
+	secutils "github.com/Tencent/Xelora/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/event"
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/event"
+	"github.com/Tencent/Xelora/internal/types"
 	"github.com/google/uuid"
 )
 

@@ -1,6 +1,6 @@
-// Package notion implements the Notion data source connector for WeKnora.
+// Package notion implements the Notion data source connector for Xelora.
 //
-// It syncs pages, databases, and attachments from Notion workspaces into WeKnora knowledge bases.
+// It syncs pages, databases, and attachments from Notion workspaces into Xelora knowledge bases.
 //
 // Notion API docs:
 //   - Authentication: https://developers.notion.com/docs/authorization
@@ -15,8 +15,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/datasource"
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/datasource"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // NotionAPIVersion is the Notion API version used by this connector.

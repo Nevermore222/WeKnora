@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Tencent/WeKnora/internal/searchutil"
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/searchutil"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // filterHistoryResults retrieves history references and filters them by

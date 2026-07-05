@@ -17,24 +17,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/Tencent/WeKnora/internal/config"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
-	"github.com/Tencent/WeKnora/internal/utils"
+	"github.com/Tencent/Xelora/internal/config"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/utils"
 )
 
 // pubsubChannelBase is the Redis channel base for system_settings change
 // notifications. Mirrors the convention from approval/gate.go: optional
-// suffix WEKNORA_REDIS_NAMESPACE so two deployments sharing one Redis
+// suffix XELORA_REDIS_NAMESPACE so two deployments sharing one Redis
 // instance don't cross-talk.
-const pubsubChannelBase = "weknora:system_settings:changed"
+const pubsubChannelBase = "xelora:system_settings:changed"
 
 // pubsubChannel resolves the effective channel name (with optional
 // namespace suffix). Called both at publish time and inside the
 // subscriber loop — keep it pure.
 func pubsubChannel() string {
-	if ns := strings.TrimSpace(os.Getenv("WEKNORA_REDIS_NAMESPACE")); ns != "" {
+	if ns := strings.TrimSpace(os.Getenv("XELORA_REDIS_NAMESPACE")); ns != "" {
 		return pubsubChannelBase + ":" + ns
 	}
 	return pubsubChannelBase
@@ -137,13 +137,13 @@ var registry = map[string]settingSpec{
 	// tenant.max_owned_per_user caps how many tenants a single non-superuser
 	// can create (and Own) via self-service POST /tenants. Read on every
 	// request — UI edits take effect immediately, no restart required. The
-	// EnvName is the same WEKNORA_TENANT_MAX_OWNED_PER_USER that
+	// EnvName is the same XELORA_TENANT_MAX_OWNED_PER_USER that
 	// applyAuthAndTenantDefaults parses at boot, so a deployment that
 	// hasn't created a DB row keeps reading from env exactly as before.
 	// 0 = use the in-code default (10); negative = disable the cap entirely.
 	"tenant.max_owned_per_user": {
 		Type:     "int",
-		EnvName:  "WEKNORA_TENANT_MAX_OWNED_PER_USER",
+		EnvName:  "XELORA_TENANT_MAX_OWNED_PER_USER",
 		Default:  int64(10),
 		Category: "tenant",
 		Description: "每个非超管用户通过自助创建可拥有的最大租户数。每次创建租户时实时读取，" +
@@ -158,7 +158,7 @@ var registry = map[string]settingSpec{
 	// 0 or negative = use the in-code default (10 GB).
 	"tenant.default_storage_quota_gb": {
 		Type:     "int",
-		EnvName:  "WEKNORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
+		EnvName:  "XELORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
 		Default:  int64(10),
 		Category: "tenant",
 		Description: "新建租户时默认分配的存储配额（GB），包含向量、原文、文本、索引等。" +
@@ -168,10 +168,10 @@ var registry = map[string]settingSpec{
 	// asynq.concurrency is the asynq worker pool size (parallel in-flight
 	// tasks). Read once when the asynq server starts — changing it in the
 	// UI requires a process restart to take effect. Mirrors
-	// WEKNORA_ASYNQ_CONCURRENCY (default 32).
+	// XELORA_ASYNQ_CONCURRENCY (default 32).
 	"asynq.concurrency": {
 		Type:            "int",
-		EnvName:         "WEKNORA_ASYNQ_CONCURRENCY",
+		EnvName:         "XELORA_ASYNQ_CONCURRENCY",
 		Default:         int64(32),
 		Category:        "worker",
 		RequiresRestart: true,

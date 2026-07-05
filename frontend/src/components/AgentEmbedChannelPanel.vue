@@ -531,13 +531,13 @@ const drawerSnippetTab = ref<'iframe' | 'widget' | 'secure'>('iframe')
 const secureServerLangTab = ref<'node' | 'go'>('node')
 const sessionStats = ref<Record<string, number>>({})
 
-const EMBED_TOKEN_STORAGE = 'weknora_embed_publish_tokens'
-const WEKNORA_BRAND_COLOR = '#07C05F'
+const EMBED_TOKEN_STORAGE = 'xelora_embed_publish_tokens'
+const XELORA_BRAND_COLOR = '#07C05F'
 
 function getDefaultEmbedPrimaryColor(): string {
-  if (typeof window === 'undefined') return WEKNORA_BRAND_COLOR
+  if (typeof window === 'undefined') return XELORA_BRAND_COLOR
   const css = getComputedStyle(document.documentElement).getPropertyValue('--td-brand-color').trim()
-  return css || WEKNORA_BRAND_COLOR
+  return css || XELORA_BRAND_COLOR
 }
 
 const defaultPrimaryColor = getDefaultEmbedPrimaryColor()

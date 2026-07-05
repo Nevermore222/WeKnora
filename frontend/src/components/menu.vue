@@ -3,7 +3,7 @@
         <!-- 展开时：Logo + 搜索/折叠按钮同行 -->
         <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
             <div class="logo_box" @click="router.push('/platform/knowledge-bases')" style="cursor: pointer;">
-                <img class="logo" src="@/assets/img/weknora.png" alt="">
+                <img class="logo" :src="logoSrc" alt="">
                 <sup v-if="isLiteEdition" class="lite-badge">Lite</sup>
             </div>
             <div class="logo_actions">
@@ -290,6 +290,9 @@ import UserMenu from '@/components/UserMenu.vue';
 import TenantSelector from '@/components/TenantSelector.vue';
 import { useI18n } from 'vue-i18n';
 import { getSystemInfo } from '@/api/system';
+import { useTheme } from '@/composables/useTheme';
+import xeloraLogo from '@/assets/img/xelora.png';
+import xeloraDarkLogo from '@/assets/img/xelora-dark.png';
 
 const chatResources = useChatResourcesStore();
 // Platform logos reused from IMChannelsOverviewPanel — keeps the session list
@@ -315,11 +318,19 @@ const PLATFORM_LOGO: Record<string, string> = {
 const platformLogo = (p: string): string => (p ? PLATFORM_LOGO[p] || '' : '');
 
 const { t } = useI18n();
+const { currentTheme } = useTheme();
 const usemenuStore = useMenuStore();
 const authStore = useAuthStore();
 const orgStore = useOrganizationStore();
 const uiStore = useUIStore();
 const commandPaletteStore = useCommandPaletteStore();
+const systemDark = ref(
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+);
+const logoSrc = computed(() => {
+    const effectiveDark = currentTheme.value === 'dark' || (currentTheme.value === 'system' && systemDark.value);
+    return effectiveDark ? xeloraDarkLogo : xeloraLogo;
+});
 
 // Platform-aware label for the ⌘K hint. navigator.platform is deprecated but
 // the alternatives (userAgentData.platform) aren't universally available yet;
@@ -957,6 +968,10 @@ const handleSessionTitleUpdated = (event: Event) => {
     updateSessionInBuckets(detail.sessionId, { title: detail.title, isNoTitle: false });
 };
 
+const handleSystemThemeChange = (event: MediaQueryListEvent) => {
+    systemDark.value = event.matches;
+};
+
 onMounted(async () => {
     const routeName = typeof route.name === 'string' ? route.name : (route.name ? String(route.name) : '')
     currentpath.value = routeName;
@@ -965,6 +980,7 @@ onMounted(async () => {
     }
 
     window.addEventListener('session-title-updated', handleSessionTitleUpdated);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', handleSystemThemeChange);
 
     isLiteEdition.value = authStore.isLiteMode
     getSystemInfo().then(res => {
@@ -990,6 +1006,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
     window.removeEventListener('session-title-updated', handleSessionTitleUpdated);
+    window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', handleSystemThemeChange);
 });
 
 watch([() => route.name, () => route.params], (newvalue, oldvalue) => {
@@ -1261,7 +1278,7 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
         overflow: hidden;
 
         .logo {
-            width: 128px;
+            width: 108px;
             height: auto;
         }
 
@@ -1971,9 +1988,8 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
 }
 </style>
 <style lang="less">
-// Dark mode: invert dark logo to light
 html[theme-mode="dark"] .aside_box .logo_box .logo {
-    filter: invert(1) hue-rotate(180deg);
+    filter: none;
 }
 
 // Dark mode: 滚动条在深色背景下需要更亮的颜色才看得见

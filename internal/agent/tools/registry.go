@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/Tencent/WeKnora/internal/common"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/Xelora/internal/common"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/types"
 )
 
 // toolErrorHint is appended to tool error messages to guide the LLM to retry with a different approach.

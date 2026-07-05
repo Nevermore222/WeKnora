@@ -11,11 +11,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
-	"github.com/Tencent/WeKnora/cli/internal/iostreams"
-	"github.com/Tencent/WeKnora/cli/internal/output"
-	"github.com/Tencent/WeKnora/cli/internal/text"
-	sdk "github.com/Tencent/WeKnora/client"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/iostreams"
+	"github.com/Tencent/Xelora/cli/internal/output"
+	"github.com/Tencent/Xelora/cli/internal/text"
+	sdk "github.com/Tencent/Xelora/client"
 )
 
 // docListFields enumerates the fields surfaced for `--format json` discovery on
@@ -64,7 +64,7 @@ type ListService interface {
 	ListKnowledgeWithFilter(ctx context.Context, kbID string, page, pageSize int, filter sdk.KnowledgeListFilter) ([]sdk.Knowledge, int64, error)
 }
 
-// NewCmdList builds `weknora doc list`.
+// NewCmdList builds `xelora doc list`.
 func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 	opts := &ListOptions{}
 	cmd := &cobra.Command{
@@ -72,15 +72,15 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 		Short: "List documents in a knowledge base",
 		Long: `Lists documents (uploaded files / web pages / inline text) in the
 resolved knowledge base. KB resolution follows the standard 4-level chain:
---kb flag > WEKNORA_KB_ID env > .weknora/project.yaml > error. The --kb
+--kb flag > XELORA_KB_ID env > .xelora/project.yaml > error. The --kb
 flag accepts either a KB UUID (passed through) or a name (resolved via list).
 
 Default sort is updated_at desc so the most recent uploads surface first;
 backend storage order is not guaranteed and varies between deployments.`,
-		Example: `  weknora doc list                                                  # uses project link / env
-  weknora doc list --kb a32a63ff-fb36-4874-bcaa-30f48570a694        # explicit UUID
-  weknora doc list --kb my-kb                                       # resolved by name
-  weknora doc list --all-pages --format json                               # walk every page`,
+		Example: `  xelora doc list                                                  # uses project link / env
+  xelora doc list --kb a32a63ff-fb36-4874-bcaa-30f48570a694        # explicit UUID
+  xelora doc list --kb my-kb                                       # resolved by name
+  xelora doc list --all-pages --format json                               # walk every page`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			fopts, err := cmdutil.CheckFormatFlag(c)
@@ -113,7 +113,7 @@ backend storage order is not guaranteed and varies between deployments.`,
 	cmdutil.AddFormatFlag(cmd, docListFields...)
 	cmdutil.SetAgentHelp(cmd, cmdutil.AgentHelp{
 		UsedFor:  "List documents in the resolved knowledge base. Results come with meta.count; use --limit to cap, --all-pages to walk every server page, --status/--keyword to filter server-side.",
-		Examples: []string{"weknora doc list --format json", "weknora doc list --all-pages --limit 200 --format json"},
+		Examples: []string{"xelora doc list --format json", "xelora doc list --all-pages --limit 200 --format json"},
 		Output:   "envelope.data is an array of Knowledge objects with id, title, file_name, parse_status; meta.count is the total returned",
 	})
 	return cmd
@@ -195,7 +195,7 @@ func runList(ctx context.Context, opts *ListOptions, fopts *cmdutil.FormatOption
 	}
 	// Default sort: updated_at desc. Server return order is not guaranteed,
 	// so client-side sort makes output deterministic regardless of backend
-	// storage choices. Mirrors `weknora kb list`.
+	// storage choices. Mirrors `xelora kb list`.
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].UpdatedAt.After(items[j].UpdatedAt)
 	})

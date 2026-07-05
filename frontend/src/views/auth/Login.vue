@@ -96,13 +96,13 @@
     </div>
 
     <!-- Logo - Top Left -->
-    <a href="https://github.com/Tencent/WeKnora" target="_blank" class="header-logo" :title="$t('common.github')">
-      <img src="@/assets/img/weknora.png" alt="WeKnora" class="logo-image" />
+    <a href="https://github.com/Tencent/Xelora" target="_blank" class="header-logo" :title="$t('common.github')">
+      <img :src="logoSrc" alt="Xelora" class="logo-image" />
     </a>
 
     <!-- Header Links - Top Right -->
     <div class="header-links">
-      <a href="https://weknora.weixin.qq.com" target="_blank" class="header-link" :title="$t('common.website')">
+      <a href="https://xelora.weixin.qq.com" target="_blank" class="header-link" :title="$t('common.website')">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round">
           <circle cx="12" cy="12" r="10" />
@@ -112,7 +112,7 @@
         <span class="link-text">{{ $t('common.website') }}</span>
       </a>
 
-      <a href="https://github.com/Tencent/WeKnora" target="_blank" class="header-link" :title="$t('common.info')">
+      <a href="https://github.com/Tencent/Xelora" target="_blank" class="header-link" :title="$t('common.info')">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
           <path
             d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
@@ -347,8 +347,11 @@ import {
 } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
+import { useTheme } from '@/composables/useTheme'
 
 // Import screenshot images
+import xeloraLogo from '@/assets/img/xelora.png'
+import xeloraDarkLogo from '@/assets/img/xelora-dark.png'
 import screenshot1 from '@/assets/img/screenshot-1.svg'
 import screenshot2 from '@/assets/img/screenshot-2.svg'
 import screenshot3 from '@/assets/img/screenshot-3.svg'
@@ -358,7 +361,15 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const { t, tm, locale } = useI18n()
+const { currentTheme } = useTheme()
 const { formatRole, roleIcon } = useRoleLabel()
+const systemDark = ref(
+  typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+)
+const logoSrc = computed(() => {
+  const effectiveDark = currentTheme.value === 'dark' || (currentTheme.value === 'system' && systemDark.value)
+  return effectiveDark ? xeloraDarkLogo : xeloraLogo
+})
 
 // Swiper modules
 const modules = [Autoplay, EffectFade, Pagination]
@@ -523,13 +534,19 @@ const handleClickOutside = (event: MouseEvent) => {
   }
 }
 
+const handleSystemThemeChange = (event: MediaQueryListEvent) => {
+  systemDark.value = event.matches
+}
+
 // Add click outside listener
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', handleSystemThemeChange)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
+  window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', handleSystemThemeChange)
 })
 
 const persistLoginResponse = async (response: any) => {
@@ -751,7 +768,7 @@ onMounted(async () => {
     return
   }
 
-  const AUTO_SETUP_FAILED_KEY = 'weknora_auto_setup_failed'
+  const AUTO_SETUP_FAILED_KEY = 'xelora_auto_setup_failed'
   if (localStorage.getItem(AUTO_SETUP_FAILED_KEY) !== 'true') {
     try {
       const response = await autoSetup()
@@ -1771,7 +1788,7 @@ html[theme-mode="dark"] {
   }
 
   .header-logo .logo-image {
-    filter: invert(1) hue-rotate(180deg) brightness(1.1);
+    filter: none;
   }
 
   .header-link {

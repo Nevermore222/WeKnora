@@ -1,0 +1,21 @@
+[Unit]
+Description=Xelora (docker compose)
+Requires=docker.service xelora-firstboot.service
+After=docker.service network-online.target xelora-firstboot.service
+Wants=network-online.target
+# 关键: Requires=xelora-firstboot.service 让首启 init 失败时本服务也不启动,
+# 避免 firstboot 没成功生成随机密钥就用 .env.example 默认明文密码把 postgres
+# 数据卷初始化掉。xelora-firstboot.service 在已初始化的实例上由
+# ConditionPathExists=!/opt/Xelora/.firstboot.done 跳过, 跳过 = 成功,
+# 不会阻塞本服务后续重启。
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/Xelora
+ExecStart=@DOCKER_BIN@ compose up -d
+ExecStop=@DOCKER_BIN@ compose down
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

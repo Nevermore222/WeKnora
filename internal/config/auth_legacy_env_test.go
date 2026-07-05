@@ -29,8 +29,8 @@ func TestApplyAuthAndTenantDefaults_DisableRegistrationDrivesRegistrationMode(t 
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("DISABLE_REGISTRATION", tc.disable)
 			// Other tenant env vars must not leak between cases.
-			t.Setenv("WEKNORA_TENANT_ENABLE_RBAC", "")
-			t.Setenv("WEKNORA_TENANT_MAX_OWNED_PER_USER", "")
+			t.Setenv("XELORA_TENANT_ENABLE_RBAC", "")
+			t.Setenv("XELORA_TENANT_MAX_OWNED_PER_USER", "")
 
 			cfg := &Config{Auth: &AuthConfig{RegistrationMode: tc.cfgMode}}
 			applyAuthAndTenantDefaults(cfg)

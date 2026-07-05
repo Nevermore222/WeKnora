@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Tencent/WeKnora/cli/internal/format"
+	"github.com/Tencent/Xelora/cli/internal/format"
 )
 
 func TestWriteJSON_BareArray(t *testing.T) {

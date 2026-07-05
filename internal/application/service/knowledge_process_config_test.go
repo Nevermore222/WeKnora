@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	werrors "github.com/Tencent/WeKnora/internal/errors"
-	"github.com/Tencent/WeKnora/internal/types"
+	werrors "github.com/Tencent/Xelora/internal/errors"
+	"github.com/Tencent/Xelora/internal/types"
 	"github.com/stretchr/testify/require"
 )
 

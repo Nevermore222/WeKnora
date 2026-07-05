@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Tencent/WeKnora/cli/internal/cmdutil"
-	"github.com/Tencent/WeKnora/cli/internal/iostreams"
+	"github.com/Tencent/Xelora/cli/internal/cmdutil"
+	"github.com/Tencent/Xelora/cli/internal/iostreams"
 )
 
 // authTokenFields lists fields surfaced in `--help` as a hint for `--jq`
@@ -19,12 +19,12 @@ type tokenResult struct {
 	Profile string `json:"profile"`
 }
 
-// NewCmdToken builds `weknora auth token`. Prints the active profile's
+// NewCmdToken builds `xelora auth token`. Prints the active profile's
 // credential to stdout for use in shell pipelines, e.g.
 //
-//	WEKNORA_TOKEN=$(weknora auth token)
-//	curl -H "Authorization: Bearer $WEKNORA_TOKEN" ...     # JWT mode
-//	curl -H "X-API-Key: $WEKNORA_TOKEN" ...                # api-key mode
+//	XELORA_TOKEN=$(xelora auth token)
+//	curl -H "Authorization: Bearer $XELORA_TOKEN" ...     # JWT mode
+//	curl -H "X-API-Key: $XELORA_TOKEN" ...                # api-key mode
 //
 // The user is responsible for constructing the appropriate header -
 // `auth list` shows which mode each profile uses.
@@ -39,26 +39,26 @@ func NewCmdToken(f *cmdutil.Factory) *cobra.Command {
 newline, suitable for shell command substitution.
 
 The credential is the long-lived API key (mode: api-key) or the access JWT
-(mode: bearer), depending on how the profile was created. Run ` + "`weknora auth list`" + `
+(mode: bearer), depending on how the profile was created. Run ` + "`xelora auth list`" + `
 to see which mode each profile uses, and construct the matching HTTP header:
 
   Authorization: Bearer <token>    # bearer mode
   X-API-Key: <token>               # api-key mode
 
 ` + "`--profile <name>`" + ` (global flag) selects a non-active profile to read from.`,
-		Example: `  WEKNORA_TOKEN=$(weknora auth token)
-  weknora auth token --profile staging
-  weknora auth token --format json`,
+		Example: `  XELORA_TOKEN=$(xelora auth token)
+  xelora auth token --profile staging
+  xelora auth token --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			fopts, err := cmdutil.CheckFormatFlag(c)
 			if err != nil {
 				return err
 			}
-			// `auth token` is a scalar scripting helper (WEKNORA_TOKEN=$(...)),
+			// `auth token` is a scalar scripting helper (XELORA_TOKEN=$(...)),
 			// so it defaults to the raw token — overriding the global json
 			// default (gh auth token does the same; cf. doc download streaming
-			// raw bytes). Explicit --format json / WEKNORA_FORMAT=json still
+			// raw bytes). Explicit --format json / XELORA_FORMAT=json still
 			// emit the {token,mode,profile} envelope.
 			fopts.FromEnv()
 			if fopts.Mode == "" {
@@ -77,9 +77,9 @@ to see which mode each profile uses, and construct the matching HTTP header:
 	cmdutil.SetAgentHelp(cmd, cmdutil.AgentHelp{
 		UsedFor: "print the active profile's raw credential to stdout for shell capture",
 		Examples: []string{
-			"WEKNORA_TOKEN=$(weknora auth token)",
-			"weknora auth token --profile staging",
-			"weknora auth token --format json",
+			"XELORA_TOKEN=$(xelora auth token)",
+			"xelora auth token --profile staging",
+			"xelora auth token --format json",
 		},
 		Output: "raw token on stdout (no envelope, no trailing newline) by default; --format json emits {token, mode, profile}",
 		Warnings: []string{
@@ -132,19 +132,19 @@ func runToken(f *cmdutil.Factory, fopts *cmdutil.FormatOptions) error {
 		token, mode = v, ModeAPIKey
 	default:
 		return cmdutil.NewError(cmdutil.CodeAuthUnauthenticated,
-			fmt.Sprintf("profile %q has no stored credential; run `weknora auth login`", profileName))
+			fmt.Sprintf("profile %q has no stored credential; run `xelora auth login`", profileName))
 	}
 
 	if token == "" {
 		return cmdutil.NewError(cmdutil.CodeAuthUnauthenticated,
-			fmt.Sprintf("profile %q credential is empty in keyring; run `weknora auth login`", profileName))
+			fmt.Sprintf("profile %q credential is empty in keyring; run `xelora auth login`", profileName))
 	}
 
 	if fopts.WantsJSON() {
 		return fopts.Emit(iostreams.IO.Out, tokenResult{Token: token, Mode: mode, Profile: profileName}, nil)
 	}
 
-	// No trailing newline - clean $(weknora auth token) substitution.
+	// No trailing newline - clean $(xelora auth token) substitution.
 	fmt.Fprint(iostreams.IO.Out, token)
 	// Defensive hint to stderr when stdout is an interactive terminal:
 	// the user likely didn't mean to display the secret on screen.
@@ -153,7 +153,7 @@ func runToken(f *cmdutil.Factory, fopts *cmdutil.FormatOptions) error {
 	// recourse on leak - bearer tokens self-expire via refresh.
 	if iostreams.IO.IsStdoutTTY() {
 		fmt.Fprintln(iostreams.IO.Err)
-		fmt.Fprintln(iostreams.IO.Err, "hint: pipe to $(weknora auth token) to capture; this terminal scrollback now contains the secret")
+		fmt.Fprintln(iostreams.IO.Err, "hint: pipe to $(xelora auth token) to capture; this terminal scrollback now contains the secret")
 		if mode == ModeAPIKey {
 			fmt.Fprintln(iostreams.IO.Err, "note: api-key credentials are long-lived - rotate via your auth provider if exposed (no `auth refresh` path)")
 		}

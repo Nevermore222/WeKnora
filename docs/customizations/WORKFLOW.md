@@ -1,4 +1,4 @@
-# WeKnora 二开工作流
+# Xelora 二开工作流
 
 本文件定义多机轮流开发时的分支、同步、PR 规范。
 所有机器在开始工作前应先 `git pull`,结束工作前先 `git push`。
@@ -7,7 +7,7 @@
 
 | 分支 | 用途 | 规则 |
 |---|---|---|
-| `main` | 上游同步层 | 只跟 Tencent/WeKnora 同步,禁止直接改业务代码 |
+| `main` | 上游同步层 | 只跟 Tencent/Xelora 同步,禁止直接改业务代码 |
 | `custom/business` | 业务主分支 | 所有二开改动汇聚于此,多机共享,推前必拉 |
 | `feature/<模块>-<动作>` | 短期需求分支 | 一次只在一台机器上开发,改完即删 |
 | `hotfix/<问题>` | 紧急修复分支 | 从 custom/business 派生,改完即合回即删 |
@@ -57,12 +57,12 @@ PR 标题用 Conventional Commits:`feat:` / `fix:` / `refactor:` / `docs:` / `ch
    ```
 5. 构建部署:
    ```powershell
-   docker compose -f F:\Docker\WeKnora\WeKnora-main\docker-compose.yml up -d --build
+   docker compose -f F:\Docker\Xelora\Xelora-main\docker-compose.yml up -d --build
    ```
 
 ## 上游升级流程
 
-WeKnora 发新版时(注意本机 GitHub 直连不通,需配镜像或开代理):
+Xelora 发新版时(注意本机 GitHub 直连不通,需配镜像或开代理):
 
 1. 同步上游到 main:
    ```powershell

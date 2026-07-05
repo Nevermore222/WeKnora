@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/application/service"
-	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/middleware/asynqdl"
-	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/application/service"
+	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/middleware/asynqdl"
+	"github.com/Tencent/Xelora/internal/tracing/langfuse"
+	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/hibiken/asynq"
 	"go.uber.org/dig"
 )
@@ -43,11 +43,11 @@ type AsynqTaskParams struct {
 // raise the default to 500ms while still allowing operators to tune via env.
 const defaultRedisOpTimeoutMs = 500
 
-// readRedisOpTimeoutMs reads WEKNORA_REDIS_OP_TIMEOUT_MS, falling back to
+// readRedisOpTimeoutMs reads XELORA_REDIS_OP_TIMEOUT_MS, falling back to
 // defaultRedisOpTimeoutMs on missing/invalid input. Kept as a separate helper
 // so both ReadTimeout and WriteTimeout share the same source of truth.
 func readRedisOpTimeoutMs() int {
-	if v := strings.TrimSpace(os.Getenv("WEKNORA_REDIS_OP_TIMEOUT_MS")); v != "" {
+	if v := strings.TrimSpace(os.Getenv("XELORA_REDIS_OP_TIMEOUT_MS")); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
 			return parsed
 		}
@@ -111,7 +111,7 @@ func asynqRetryDelayFunc(n int, e error, t *asynq.Task) time.Duration {
 }
 
 // defaultAsynqConcurrency is the worker pool size used when
-// WEKNORA_ASYNQ_CONCURRENCY is unset. The asynq library defaults to
+// XELORA_ASYNQ_CONCURRENCY is unset. The asynq library defaults to
 // runtime.NumCPU(), which under-provisions during batch document uploads:
 // a single 4-core container can only process 4 documents in parallel even
 // when 100 are queued, so the queue wait time eats into each task's
@@ -124,7 +124,7 @@ func NewAsynqServer(svc interfaces.SystemSettingService) *asynq.Server {
 	opt := getAsynqRedisClientOpt()
 	concurrency := defaultAsynqConcurrency
 	if svc != nil {
-		n := svc.GetInt(context.Background(), "asynq.concurrency", "WEKNORA_ASYNQ_CONCURRENCY", defaultAsynqConcurrency)
+		n := svc.GetInt(context.Background(), "asynq.concurrency", "XELORA_ASYNQ_CONCURRENCY", defaultAsynqConcurrency)
 		if n > 0 {
 			concurrency = int(n)
 		}

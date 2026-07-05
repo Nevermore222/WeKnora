@@ -1,7 +1,7 @@
 package token
 
 import (
-	"github.com/Tencent/WeKnora/internal/models/chat"
+	"github.com/Tencent/Xelora/internal/models/chat"
 )
 
 // DefaultContextThresholdRatio is the ratio of context window usage that triggers compression.
