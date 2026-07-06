@@ -1,14 +1,11 @@
 #!/bin/bash
 set -e
 
-# ─── Fix ownership of bind-mounted directories ───
+# Fix ownership of bind-mounted directories.
 # When users bind-mount host directories (e.g. ./skills/preloaded),
-# the mount inherits the host UID/GID which may differ from the
-# container's appuser. This entrypoint runs as root, fixes ownership,
-# then drops privileges to appuser via gosu — the same pattern used
-# by official postgres/redis images.
+# the mount inherits the host UID/GID which may differ from appuser.
+# This entrypoint runs as root, fixes ownership, then drops privileges.
 
-# Directories that may be bind-mounted and need appuser access
 MOUNT_DIRS=(
     /app/skills/preloaded
     /data/files
@@ -20,10 +17,10 @@ for dir in "${MOUNT_DIRS[@]}"; do
     fi
 done
 
-# ─── Merge built-in skills into preloaded ───
+# Merge built-in skills into preloaded.
 # Built-in skills are backed up at /app/skills/_builtin during image build.
 # After a bind-mount replaces /app/skills/preloaded, copy back any
-# missing built-in skills (without overwriting user-provided ones).
+# missing built-in skills without overwriting user-provided ones.
 BUILTIN_DIR="/app/skills/_builtin"
 PRELOADED_DIR="/app/skills/preloaded"
 
@@ -39,5 +36,4 @@ if [ -d "$BUILTIN_DIR" ]; then
     chown -R appuser:appuser "$PRELOADED_DIR"
 fi
 
-# ─── Drop privileges and exec the main process ───
 exec gosu appuser "$@"
