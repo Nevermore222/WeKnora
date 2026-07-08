@@ -1,0 +1,8 @@
+{
+  ""default_integration"": ""codex"",
+  ""integration_settings"": {
+    ""codex"": {
+      ""invoke_separator"": ""-""
+    }
+  }
+}

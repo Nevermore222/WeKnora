@@ -4,6 +4,9 @@
 !.env.example
 !.gitignore
 !.github/
+!.specify/
+!.specify/**
+.specify/feature.json
 
 # 敏感文件
 *.pem

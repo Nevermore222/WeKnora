@@ -250,6 +250,16 @@ Detailed API documentation is available at: [API Docs](./docs/api/README.md)
 
 Product plans and upcoming features: [Roadmap](./docs/ROADMAP.md)
 
+## 🧱 Customization Docs
+
+Project-specific design, planning, and secondary-development documents are tracked under [`docs/customizations/`](./docs/customizations/).
+
+- Secondary development guide: [`docs/customizations/README-dev.md`](./docs/customizations/README-dev.md)
+- Collaboration workflow: [`docs/customizations/WORKFLOW.md`](./docs/customizations/WORKFLOW.md)
+- Custom change log: [`docs/customizations/CHANGELOG-custom.md`](./docs/customizations/CHANGELOG-custom.md)
+- File capability plan: [`docs/customizations/XELORA_FILE_CAPABILITY_PLAN.md`](./docs/customizations/XELORA_FILE_CAPABILITY_PLAN.md)
+- Skill usage governance spec: [`specs/001-skill-usage-governance/spec.md`](./specs/001-skill-usage-governance/spec.md)
+
 ## 🧭 Developer Guide
 
 ### ⚡ Fast Development Mode (Recommended)
