@@ -1,0 +1,319 @@
+openapi: 3.0.3
+info:
+  title: Xelora Executor Gateway API
+  version: 0.1.0
+  description: API contract for session workspaces, execution jobs, logs, and artifacts.
+servers:
+  - url: /api
+paths:
+  /executor/workspaces:
+    post:
+      summary: Create or get the default workspace for a chat session
+      operationId: createOrGetWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceRequest'
+      responses:
+        '200':
+          description: Workspace returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutorWorkspace'
+  /executor/workspaces/{workspace_id}:
+    get:
+      summary: Get workspace details
+      operationId: getWorkspace
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutorWorkspace'
+  /executor/jobs:
+    post:
+      summary: Create an execution job
+      operationId: createExecutorJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobRequest'
+      responses:
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutorJob'
+  /executor/jobs/{job_id}:
+    get:
+      summary: Get job status and summary
+      operationId: getExecutorJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutorJob'
+  /executor/jobs/{job_id}/logs:
+    get:
+      summary: Get captured job logs
+      operationId: getExecutorJobLogs
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - name: stream
+          in: query
+          schema:
+            type: string
+            enum: [stdout, stderr, combined]
+            default: combined
+      responses:
+        '200':
+          description: Job logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobLogs'
+  /executor/jobs/{job_id}/cancel:
+    post:
+      summary: Cancel a running or queued job
+      operationId: cancelExecutorJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '202':
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutorJob'
+  /executor/artifacts/{artifact_id}:
+    get:
+      summary: Get artifact metadata
+      operationId: getExecutorArtifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          description: Artifact metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutorArtifact'
+  /executor/artifacts/{artifact_id}/download:
+    get:
+      summary: Download artifact content
+      operationId: downloadExecutorArtifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          description: Artifact bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /executor/providers:
+    get:
+      summary: List execution provider capabilities
+      operationId: listExecutorProviders
+      responses:
+        '200':
+          description: Provider capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProviderCapability'
+components:
+  parameters:
+    WorkspaceId:
+      name: workspace_id
+      in: path
+      required: true
+      schema:
+        type: string
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: string
+    ArtifactId:
+      name: artifact_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    CreateWorkspaceRequest:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+        agent_id:
+          type: string
+        mode:
+          type: string
+          enum: [session]
+          default: session
+    ExecutorWorkspace:
+      type: object
+      required: [id, session_id, status, created_at]
+      properties:
+        id:
+          type: string
+        session_id:
+          type: string
+        agent_id:
+          type: string
+        status:
+          type: string
+          enum: [active, archived, locked, deleted]
+        quota_bytes:
+          type: integer
+          format: int64
+        used_bytes:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+    CreateJobRequest:
+      type: object
+      required: [workspace_id, command]
+      properties:
+        workspace_id:
+          type: string
+        mode:
+          type: string
+          enum: [session, one_off]
+          default: session
+        provider:
+          type: string
+          enum: [local, cubesandbox]
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        working_dir:
+          type: string
+          default: "."
+        timeout_seconds:
+          type: integer
+    ExecutorJob:
+      type: object
+      required: [id, workspace_id, status, created_at]
+      properties:
+        id:
+          type: string
+        workspace_id:
+          type: string
+        provider:
+          type: string
+        status:
+          type: string
+          enum: [queued, preparing, running, succeeded, failed, cancelled, timed_out, policy_blocked]
+        exit_code:
+          type: integer
+          nullable: true
+        error_code:
+          type: string
+        error_message:
+          type: string
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExecutorArtifact'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+    ExecutorArtifact:
+      type: object
+      required: [id, workspace_id, job_id, name, relative_path, kind]
+      properties:
+        id:
+          type: string
+        workspace_id:
+          type: string
+        job_id:
+          type: string
+        name:
+          type: string
+        relative_path:
+          type: string
+        mime_type:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+        kind:
+          type: string
+          enum: [markdown, spreadsheet, pdf, presentation, image, archive, other]
+        preview_state:
+          type: string
+          enum: [available, unsupported, failed, pending]
+    JobLogs:
+      type: object
+      properties:
+        job_id:
+          type: string
+        stdout:
+          type: string
+        stderr:
+          type: string
+        combined:
+          type: string
+    ProviderCapability:
+      type: object
+      required: [provider, status]
+      properties:
+        provider:
+          type: string
+        status:
+          type: string
+          enum: [available, degraded, unavailable]
+        supports_session_workspace:
+          type: boolean
+        supports_one_off_job:
+          type: boolean
+        supports_streaming_logs:
+          type: boolean
+        supports_file_mount:
+          type: boolean
+        supported_runtimes:
+          type: array
+          items:
+            type: string

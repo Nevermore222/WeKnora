@@ -30,6 +30,14 @@ tmp/
 temp/
 logs/
 *.pid
+tmp_*.json
+agent_*_test*.json
+agent_web_skill_*.json
+agent_web_skill_*_sse.txt
+skill*_sse.txt
+skills/preloaded/**/node_modules/
+skills/preloaded/**/generated-*.md
+skills/preloaded/**/*-overview.md
 
 Xelora
 Xelora-lite
