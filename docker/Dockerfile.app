@@ -76,6 +76,7 @@ RUN if [ -n "$APK_MIRROR_ARG" ]; then \
         ffmpeg && \
     npm install -g tsx && \
     python3 -m pip install --break-system-packages --upgrade pip setuptools wheel && \
+    python3 -m pip install --break-system-packages e2b-code-interpreter && \
     mkdir -p /home/appuser/.local/bin && \
     curl -LsSf https://astral.sh/uv/install.sh | CARGO_HOME=/home/appuser/.cargo UV_INSTALL_DIR=/home/appuser/.local/bin sh && \
     chown -R appuser:appuser /home/appuser && \

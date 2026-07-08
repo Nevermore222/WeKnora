@@ -16,6 +16,8 @@ import (
 
 type SkillExecutor interface {
 	GetSkillBasePath(ctx context.Context, skillName string) (string, error)
+	PrepareScriptExecution(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*skills.PreparedScriptExecution, error)
+	ExecutePreparedScript(ctx context.Context, prepared *skills.PreparedScriptExecution) (*skills.ScriptExecutionOutcome, error)
 	ExecuteScriptDetailed(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*skills.ScriptExecutionOutcome, error)
 }
 
@@ -33,7 +35,10 @@ type Gateway struct {
 }
 
 func NewGateway() *Gateway {
-	return NewGatewayWithProviders(NewLocalProvider())
+	return NewGatewayWithProviders(
+		NewLocalProvider(),
+		NewCubeSandboxProvider(),
+	)
 }
 
 func NewGatewayWithProviders(providers ...Provider) *Gateway {
@@ -83,7 +88,15 @@ func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, ex
 		StartedAt:          now,
 	}
 
-	outcome, err := provider.ExecuteSkillScript(ctx, req, executor)
+	prepared, err := executor.PrepareScriptExecution(ctx, req.SkillName, req.ScriptPath, req.Args, req.Input)
+	if err != nil {
+		return nil, err
+	}
+	if prepared.Cleanup != nil {
+		defer prepared.Cleanup()
+	}
+
+	outcome, err := provider.ExecuteSkillScript(ctx, req, prepared, executor)
 	if err != nil {
 		return nil, err
 	}

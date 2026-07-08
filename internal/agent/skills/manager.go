@@ -20,6 +20,15 @@ type ScriptExecutionOutcome struct {
 	MaterializedInputPaths []string
 }
 
+type PreparedScriptExecution struct {
+	BasePath               string
+	ScriptPath             string
+	Args                   []string
+	Stdin                  string
+	MaterializedInputPaths []string
+	Cleanup                func()
+}
+
 // Manager manages skills lifecycle including discovery, loading, and script execution
 // It coordinates between the Loader (filesystem operations) and Sandbox (script execution)
 type Manager struct {
@@ -206,6 +215,45 @@ func (m *Manager) ExecuteScript(ctx context.Context, skillName, scriptPath strin
 // ExecuteScriptDetailed executes a script and returns additional runtime metadata
 // needed by Xelora-owned gateway layers such as job and artifact tracking.
 func (m *Manager) ExecuteScriptDetailed(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*ScriptExecutionOutcome, error) {
+	prepared, err := m.PrepareScriptExecution(ctx, skillName, scriptPath, args, stdin)
+	if err != nil {
+		return nil, err
+	}
+	if prepared.Cleanup != nil {
+		defer prepared.Cleanup()
+	}
+
+	return m.ExecutePreparedScript(ctx, prepared)
+}
+
+// ExecutePreparedScript executes a prevalidated skill script request. It is used
+// by executor providers so preparation and execution can be split cleanly.
+func (m *Manager) ExecutePreparedScript(ctx context.Context, prepared *PreparedScriptExecution) (*ScriptExecutionOutcome, error) {
+	if prepared == nil {
+		return nil, fmt.Errorf("prepared script execution is required")
+	}
+
+	// Execute in sandbox
+	result, err := m.sandboxMgr.Execute(ctx, &sandbox.ExecuteConfig{
+		Script:  prepared.ScriptPath,
+		Args:    prepared.Args,
+		WorkDir: prepared.BasePath,
+		Stdin:   prepared.Stdin,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ScriptExecutionOutcome{
+		Result:                 result,
+		BasePath:               prepared.BasePath,
+		MaterializedInputPaths: prepared.MaterializedInputPaths,
+	}, nil
+}
+
+// PrepareScriptExecution validates a skill script request and materializes any
+// local inputs so multiple providers can share the same pre-execution step.
+func (m *Manager) PrepareScriptExecution(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*PreparedScriptExecution, error) {
 	if !m.enabled {
 		return nil, fmt.Errorf("skills are not enabled")
 	}
@@ -243,28 +291,13 @@ func (m *Manager) ExecuteScriptDetailed(ctx context.Context, skillName, scriptPa
 	if err != nil {
 		return nil, err
 	}
-	if cleanupInputFile != nil {
-		defer cleanupInputFile()
-	}
-
-	// Prepare execution config
-	config := &sandbox.ExecuteConfig{
-		Script:  file.Path,
-		Args:    args,
-		WorkDir: basePath,
-		Stdin:   stdin,
-	}
-
-	// Execute in sandbox
-	result, err := m.sandboxMgr.Execute(ctx, config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ScriptExecutionOutcome{
-		Result:                 result,
+	return &PreparedScriptExecution{
 		BasePath:               basePath,
+		ScriptPath:             file.Path,
+		Args:                   args,
+		Stdin:                  stdin,
 		MaterializedInputPaths: materializedPaths,
+		Cleanup:                cleanupInputFile,
 	}, nil
 }
 

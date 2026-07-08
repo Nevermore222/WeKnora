@@ -27,7 +27,7 @@ type ProviderCapability struct {
 
 type Provider interface {
 	Name() string
-	ExecuteSkillScript(ctx context.Context, req SkillJobRequest, executor SkillExecutor) (*skills.ScriptExecutionOutcome, error)
+	ExecuteSkillScript(ctx context.Context, req SkillJobRequest, prepared *skills.PreparedScriptExecution, executor SkillExecutor) (*skills.ScriptExecutionOutcome, error)
 	Capability(ctx context.Context) ProviderCapability
 }
 
@@ -41,8 +41,8 @@ func (p *LocalProvider) Name() string {
 	return LocalProviderName
 }
 
-func (p *LocalProvider) ExecuteSkillScript(ctx context.Context, req SkillJobRequest, executor SkillExecutor) (*skills.ScriptExecutionOutcome, error) {
-	return executor.ExecuteScriptDetailed(ctx, req.SkillName, req.ScriptPath, req.Args, req.Input)
+func (p *LocalProvider) ExecuteSkillScript(ctx context.Context, req SkillJobRequest, prepared *skills.PreparedScriptExecution, executor SkillExecutor) (*skills.ScriptExecutionOutcome, error) {
+	return executor.ExecutePreparedScript(ctx, prepared)
 }
 
 func (p *LocalProvider) Capability(ctx context.Context) ProviderCapability {

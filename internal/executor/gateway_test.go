@@ -12,6 +12,7 @@ import (
 
 type fakeSkillExecutor struct {
 	basePath string
+	prepared *skills.PreparedScriptExecution
 	outcome  *skills.ScriptExecutionOutcome
 	err      error
 }
@@ -21,6 +22,28 @@ func (f *fakeSkillExecutor) GetSkillBasePath(ctx context.Context, skillName stri
 }
 
 func (f *fakeSkillExecutor) ExecuteScriptDetailed(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*skills.ScriptExecutionOutcome, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.outcome, nil
+}
+
+func (f *fakeSkillExecutor) PrepareScriptExecution(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*skills.PreparedScriptExecution, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.prepared != nil {
+		return f.prepared, nil
+	}
+	return &skills.PreparedScriptExecution{
+		BasePath:   f.basePath,
+		ScriptPath: filepath.Join(f.basePath, scriptPath),
+		Args:       append([]string(nil), args...),
+		Stdin:      stdin,
+	}, nil
+}
+
+func (f *fakeSkillExecutor) ExecutePreparedScript(ctx context.Context, prepared *skills.PreparedScriptExecution) (*skills.ScriptExecutionOutcome, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -139,14 +162,29 @@ func TestRunSkillScriptJobRejectsUnknownProvider(t *testing.T) {
 	executor := &fakeSkillExecutor{basePath: basePath}
 
 	_, err := gateway.RunSkillScriptJob(context.Background(), SkillJobRequest{
-		Provider:   "cubesandbox",
+		Provider:   "missing-provider",
 		SkillName:  "demo-skill",
 		ScriptPath: "scripts/demo.py",
 	}, executor)
 	if err == nil {
 		t.Fatal("expected unknown provider error")
 	}
-	if got := err.Error(); got != "executor provider not configured: cubesandbox" {
+	if got := err.Error(); got != "executor provider not configured: missing-provider" {
 		t.Fatalf("unexpected error: %s", got)
+	}
+}
+
+func TestCubeSandboxProviderCapabilityUnavailableWithoutConfig(t *testing.T) {
+	t.Setenv("E2B_API_URL", "")
+	t.Setenv("E2B_API_KEY", "")
+	t.Setenv("CUBE_TEMPLATE_ID", "")
+
+	provider := NewCubeSandboxProvider()
+	capability := provider.Capability(context.Background())
+	if capability.Provider != CubeSandboxProviderName {
+		t.Fatalf("expected %s provider, got %s", CubeSandboxProviderName, capability.Provider)
+	}
+	if capability.Status != ProviderStatusUnavailable {
+		t.Fatalf("expected unavailable status, got %s", capability.Status)
 	}
 }
