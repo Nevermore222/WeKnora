@@ -22,15 +22,29 @@ type SkillExecutor interface {
 type SkillJobExecution struct {
 	Job              *SkillJob
 	Workspace        *WorkspaceRecord
+	Provider         ProviderCapability
 	Artifacts        []*ArtifactRecord
 	ArtifactDetected bool
 	Result           *sandbox.ExecuteResult
 }
 
-type Gateway struct{}
+type Gateway struct {
+	providers map[string]Provider
+}
 
 func NewGateway() *Gateway {
-	return &Gateway{}
+	return NewGatewayWithProviders(NewLocalProvider())
+}
+
+func NewGatewayWithProviders(providers ...Provider) *Gateway {
+	registry := make(map[string]Provider, len(providers))
+	for _, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		registry[provider.Name()] = provider
+	}
+	return &Gateway{providers: registry}
 }
 
 func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, executor SkillExecutor) (*SkillJobExecution, error) {
@@ -39,8 +53,14 @@ func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, ex
 		return nil, err
 	}
 
+	provider, err := selectProvider(req.Provider, g.providers)
+	if err != nil {
+		return nil, err
+	}
+	providerCapability := provider.Capability(ctx)
+
 	now := time.Now()
-	workspace := buildWorkspaceRecord(req, basePath, now)
+	workspace := buildWorkspaceRecord(req, basePath, provider.Name(), now)
 
 	preSnapshot, err := snapshotFiles(basePath)
 	if err != nil {
@@ -57,13 +77,13 @@ func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, ex
 		SkillName:          req.SkillName,
 		ScriptPath:         req.ScriptPath,
 		Args:               append([]string(nil), req.Args...),
-		Provider:           workspace.Provider,
+		Provider:           provider.Name(),
 		WorkingDir:         workspace.WorkingDir,
 		Status:             JobStatusRunning,
 		StartedAt:          now,
 	}
 
-	outcome, err := executor.ExecuteScriptDetailed(ctx, req.SkillName, req.ScriptPath, req.Args, req.Input)
+	outcome, err := provider.ExecuteSkillScript(ctx, req, executor)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +111,7 @@ func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, ex
 		return &SkillJobExecution{
 			Job:              job,
 			Workspace:        workspace,
+			Provider:         providerCapability,
 			Artifacts:        artifacts,
 			ArtifactDetected: len(artifacts) > 0,
 			Result:           outcome.Result,
@@ -117,6 +138,7 @@ func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, ex
 	return &SkillJobExecution{
 		Job:              job,
 		Workspace:        workspace,
+		Provider:         providerCapability,
 		Artifacts:        nil,
 		ArtifactDetected: false,
 		Result:           outcome.Result,
@@ -211,14 +233,14 @@ func detectArtifacts(basePath, workspaceID, jobID, sessionID string, pre, post m
 	return artifacts
 }
 
-func buildWorkspaceRecord(req SkillJobRequest, rootPath string, now time.Time) *WorkspaceRecord {
+func buildWorkspaceRecord(req SkillJobRequest, rootPath, providerName string, now time.Time) *WorkspaceRecord {
 	return &WorkspaceRecord{
 		ID:         buildWorkspaceID(req.SessionID, req.SkillName),
 		SessionID:  req.SessionID,
 		SkillName:  req.SkillName,
 		RootPath:   rootPath,
 		WorkingDir: ".",
-		Provider:   "local",
+		Provider:   providerName,
 		Status:     WorkspaceStatusActive,
 		CreatedAt:  now,
 		UpdatedAt:  now,

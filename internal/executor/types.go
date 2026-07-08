@@ -100,6 +100,7 @@ type SkillJobRequest struct {
 	AssistantMessageID string
 	RequestID          string
 	ToolCallID         string
+	Provider           string
 	SkillName          string
 	ScriptPath         string
 	Args               []string

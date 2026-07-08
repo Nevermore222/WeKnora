@@ -44,6 +44,7 @@ var executeSkillScriptTool = BaseTool{
 
 // ExecuteSkillScriptInput defines the input parameters for the execute_skill_script tool
 type ExecuteSkillScriptInput struct {
+	Provider   string   `json:"provider,omitempty" jsonschema:"Optional execution provider key. Defaults to local until CubeSandbox is integrated."`
 	SkillName  string   `json:"skill_name" jsonschema:"Name of the skill containing the script"`
 	ScriptPath string   `json:"script_path" jsonschema:"Relative path to the script within the skill directory (e.g. scripts/analyze.py)"`
 	Args       []string `json:"args,omitempty" jsonschema:"Optional command-line arguments to pass to the script. If the script works on a markdown/document file, include that relative file path as a normal positional argument. Flags like --no-quotes are not file paths."`
@@ -116,6 +117,7 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 		jobRequest.RequestID = meta.RequestID
 		jobRequest.ToolCallID = meta.ToolCallID
 	}
+	jobRequest.Provider = strings.TrimSpace(input.Provider)
 	jobRequest.SkillName = input.SkillName
 	jobRequest.ScriptPath = input.ScriptPath
 	jobRequest.Args = append([]string(nil), input.Args...)
@@ -194,6 +196,7 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 		"script_path":       input.ScriptPath,
 		"args":              input.Args,
 		"workspace":         jobExecution.Workspace,
+		"provider":          jobExecution.Provider,
 		"job":               jobExecution.Job,
 		"artifacts":         jobExecution.Artifacts,
 		"artifact_detected": jobExecution.ArtifactDetected,
@@ -228,6 +231,7 @@ func (t *ExecuteSkillScriptTool) Cleanup(ctx context.Context) error {
 }
 
 type executeSkillScriptInputLoose struct {
+	Provider   string          `json:"provider"`
 	SkillName  string          `json:"skill_name"`
 	ScriptPath string          `json:"script_path"`
 	Args       json.RawMessage `json:"args"`
@@ -246,6 +250,7 @@ func parseExecuteSkillScriptInput(raw json.RawMessage) (ExecuteSkillScriptInput,
 	}
 
 	return ExecuteSkillScriptInput{
+		Provider:   loose.Provider,
 		SkillName:  loose.SkillName,
 		ScriptPath: loose.ScriptPath,
 		Args:       normalizedArgs,
