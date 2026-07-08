@@ -177,6 +177,8 @@ func (s *LocalSandbox) getInterpreter(scriptPath string) string {
 		return "bash"
 	case ".js":
 		return "node"
+	case ".ts":
+		return "tsx"
 	case ".rb":
 		return "ruby"
 	case ".pl":

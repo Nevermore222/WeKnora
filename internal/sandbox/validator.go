@@ -147,20 +147,10 @@ func (v *ScriptValidator) ValidateArgs(args []string) *ValidationResult {
 
 // ValidateStdin validates stdin content for injection attempts
 func (v *ScriptValidator) ValidateStdin(stdin string) *ValidationResult {
-	result := &ValidationResult{Valid: true, Errors: make([]*ValidationError, 0)}
-
-	// Check for embedded shell commands
-	if v.hasEmbeddedShellCommands(stdin) {
-		result.Valid = false
-		result.Errors = append(result.Errors, &ValidationError{
-			Type:    "stdin_injection",
-			Pattern: "embedded shell commands",
-			Context: truncate(stdin, 100),
-			Message: "Stdin contains embedded shell command patterns",
-		})
-	}
-
-	return result
+	// Stdin is passed directly to the validated script process, not interpolated
+	// into a shell command line. Treat it as document data instead of trying to
+	// parse markdown/code samples as shell injection.
+	return &ValidationResult{Valid: true, Errors: make([]*ValidationError, 0)}
 }
 
 // ValidateAll performs comprehensive validation on script, args, and stdin
@@ -294,23 +284,6 @@ func (v *ScriptValidator) hasReverseShellPattern(content string) bool {
 
 	for _, pattern := range patterns {
 		if matched, _ := regexp.MatchString(`(?i)`+pattern, content); matched {
-			return true
-		}
-	}
-	return false
-}
-
-// hasEmbeddedShellCommands checks stdin for embedded shell commands
-func (v *ScriptValidator) hasEmbeddedShellCommands(content string) bool {
-	patterns := []string{
-		`\$\(.*\)`,   // Command substitution
-		"`.*`",       // Backtick substitution
-		`\n\s*[;&|]`, // Newline followed by shell operators
-		`\\n.*[;&|]`, // Escaped newline followed by shell operators
-	}
-
-	for _, pattern := range patterns {
-		if matched, _ := regexp.MatchString(pattern, content); matched {
 			return true
 		}
 	}

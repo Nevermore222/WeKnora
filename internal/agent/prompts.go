@@ -226,7 +226,8 @@ func formatSkillsMetadata(skillsMetadata []*skills.SkillMetadata) string {
 	builder.WriteString("1. **SCAN**: Read each skill's description and trigger conditions below\n")
 	builder.WriteString("2. **MATCH**: Check if the user's intent matches ANY skill's triggers (keywords, scenarios, or task types)\n")
 	builder.WriteString("3. **LOAD**: If a match is found, call `read_skill(skill_name=\"...\")` BEFORE generating your response\n")
-	builder.WriteString("4. **APPLY**: Follow the skill's instructions to provide a higher-quality, structured response\n\n")
+	builder.WriteString("4. **APPLY**: Follow the skill's instructions to provide a higher-quality, structured response\n")
+	builder.WriteString("5. **EXECUTE**: If the skill references scripts or says it creates/updates files, call `execute_skill_script(...)` and wait for a successful result before claiming completion\n\n")
 
 	builder.WriteString("**⚠️ CRITICAL**: Skill usage is MANDATORY when applicable. Do NOT skip skills to save time or tokens.\n\n")
 
@@ -239,8 +240,9 @@ func formatSkillsMetadata(skillsMetadata []*skills.SkillMetadata) string {
 	builder.WriteString("#### Tool Reference\n\n")
 	builder.WriteString("- `read_skill(skill_name)`: Load full skill instructions (MUST call before using a skill)\n")
 	builder.WriteString("- `execute_skill_script(skill_name, script_path, args, input)`: Run utility scripts bundled with a skill\n")
-	builder.WriteString("  - `input`: Pass data directly via stdin (use this when you have data in memory, e.g. JSON string)\n")
-	builder.WriteString("  - `args`: Command-line arguments (only use `--file` if you have an actual file path in the skill directory)\n")
+	builder.WriteString("  - `input`: Pass raw document content when the file does not already exist; the backend can materialize a real `.md` file for the script\n")
+	builder.WriteString("  - `args`: Include the relative document path as a normal positional argument for file-oriented scripts; flags like `--no-quotes` are not file paths\n")
+	builder.WriteString("  - Never say a file was generated unless the tool execution succeeded and you can name the real output path\n")
 
 	return builder.String()
 }

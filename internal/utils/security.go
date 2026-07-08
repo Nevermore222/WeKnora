@@ -578,6 +578,7 @@ func SanitizeForLogArray(input []string) []string {
 var AllowedStdioCommands = map[string]bool{
 	"uvx": true, // Python package runner (uv)
 	"npx": true, // Node.js package runner
+	"tsx": true, // TypeScript runner used by bundled skill scripts
 }
 
 // DangerousArgPatterns contains patterns that indicate potentially dangerous arguments
@@ -631,7 +632,7 @@ func ValidateStdioCommand(command string) error {
 
 	// Check against whitelist
 	if !AllowedStdioCommands[baseCommand] {
-		return fmt.Errorf("command '%s' is not in the allowed list. Allowed commands: uvx, npx, node, python, python3, deno, bun", baseCommand)
+		return fmt.Errorf("command '%s' is not in the allowed list. Allowed commands: uvx, npx, node, tsx, python, python3, deno, bun", baseCommand)
 	}
 
 	// Additional check: command should not contain path traversal

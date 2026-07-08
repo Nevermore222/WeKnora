@@ -195,6 +195,7 @@ func defaultAllowedCommands() []string {
 		"python",
 		"python3",
 		"node",
+		"tsx",
 		"bash",
 		"sh",
 		"cat",

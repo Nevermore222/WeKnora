@@ -7,6 +7,14 @@ import (
 	"testing"
 )
 
+func TestValidateStdioCommandAllowsTsx(t *testing.T) {
+	t.Parallel()
+
+	if err := ValidateStdioCommand("tsx"); err != nil {
+		t.Fatalf("expected tsx to be allowed, got error: %v", err)
+	}
+}
+
 func TestSSRFSafeURL(t *testing.T) {
 	t.Parallel()
 

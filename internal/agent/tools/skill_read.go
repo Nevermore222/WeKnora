@@ -143,6 +143,11 @@ func (t *ReadSkillTool) Execute(ctx context.Context, args json.RawMessage) (*typ
 			}
 		}
 
+		if hasExecutableSkillScript(files) {
+			builder.WriteString("\n\n## Execution Reminder\n\n")
+			builder.WriteString("If this skill's instructions say it creates or updates files, you must call `execute_skill_script` and wait for success before claiming the files were generated.\n")
+		}
+
 		resultData["skill_name"] = skill.Name
 		resultData["description"] = skill.Description
 		resultData["instructions"] = skill.Instructions
@@ -162,4 +167,13 @@ func (t *ReadSkillTool) Execute(ctx context.Context, args json.RawMessage) (*typ
 // Cleanup releases any resources (implements Tool interface if needed)
 func (t *ReadSkillTool) Cleanup(ctx context.Context) error {
 	return nil
+}
+
+func hasExecutableSkillScript(files []string) bool {
+	for _, file := range files {
+		if skills.IsScript(file) {
+			return true
+		}
+	}
+	return false
 }

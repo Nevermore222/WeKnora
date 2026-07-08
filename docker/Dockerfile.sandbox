@@ -12,7 +12,8 @@ FROM python:3.11-slim
 COPY --from=node-base /usr/local/bin/node /usr/local/bin/
 COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
-    ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+    ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
+    npm install -g tsx
 
 # Install minimal CLI tools (bash/grep/sed/coreutils already in slim image)
 RUN apt-get update && apt-get install -y --no-install-recommends \

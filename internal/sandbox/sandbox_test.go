@@ -273,3 +273,36 @@ print(f"Arguments: {sys.argv[1:]}")
 
 	t.Logf("Python script output: %s", result.Stdout)
 }
+
+func TestDockerSandboxBuildDockerArgsMountsWorkspaceWritable(t *testing.T) {
+	config := DefaultConfig()
+	config.Type = SandboxTypeDocker
+	sandbox := NewDockerSandbox(config)
+
+	args := sandbox.buildDockerArgs(&ExecuteConfig{
+		Script:  "/repo/skills/preloaded/demo/scripts/main.ts",
+		WorkDir: "/repo/skills/preloaded/demo",
+		Args:    []string{"input.md"},
+	})
+
+	foundMount := false
+	foundInterpreter := false
+	for i := 0; i < len(args); i++ {
+		if args[i] == "-v" && i+1 < len(args) {
+			foundMount = true
+			if got := args[i+1]; got != "/repo/skills/preloaded/demo:/workspace:rw" {
+				t.Fatalf("unexpected mount arg: %s", got)
+			}
+		}
+		if args[i] == "tsx" {
+			foundInterpreter = true
+		}
+	}
+
+	if !foundMount {
+		t.Fatal("expected writable workspace mount argument")
+	}
+	if !foundInterpreter {
+		t.Fatal("expected tsx interpreter for .ts scripts")
+	}
+}

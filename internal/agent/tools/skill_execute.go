@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/Tencent/Xelora/internal/agent/skills"
@@ -27,6 +28,7 @@ var executeSkillScriptTool = BaseTool{
 - When a skill's instructions reference a utility script (e.g., "Run scripts/analyze_form.py")
 - When automation or data processing is needed as part of skill workflow
 - For deterministic operations where script execution is more reliable than generating code
+- When a skill says it creates or updates files, you must actually run the script before claiming success
 
 ## Security
 - Scripts run in a sandboxed environment with limited permissions
@@ -43,8 +45,8 @@ var executeSkillScriptTool = BaseTool{
 type ExecuteSkillScriptInput struct {
 	SkillName  string   `json:"skill_name" jsonschema:"Name of the skill containing the script"`
 	ScriptPath string   `json:"script_path" jsonschema:"Relative path to the script within the skill directory (e.g. scripts/analyze.py)"`
-	Args       []string `json:"args,omitempty" jsonschema:"Optional command-line arguments to pass to the script. Note: if using --file flag, you must provide an actual file path that exists in the skill directory. If you have data in memory (not a file), use the 'input' parameter instead."`
-	Input      string   `json:"input,omitempty" jsonschema:"Optional input data to pass to the script via stdin. Use this when you have data in memory (e.g. JSON string) that the script should process. This is equivalent to piping data: echo 'data' | python script.py"`
+	Args       []string `json:"args,omitempty" jsonschema:"Optional command-line arguments to pass to the script. If the script works on a markdown/document file, include that relative file path as a normal positional argument. Flags like --no-quotes are not file paths."`
+	Input      string   `json:"input,omitempty" jsonschema:"Optional document content to materialize into a real file before execution when needed. Do not pass shell commands here. If no file path is provided in args, the backend will create a .md file automatically and pass its path to the script."`
 }
 
 // ExecuteSkillScriptTool allows the agent to execute skill scripts in a sandbox
@@ -68,11 +70,15 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 	// Parse input
 	var input ExecuteSkillScriptInput
 	if err := json.Unmarshal(args, &input); err != nil {
-		logger.Errorf(ctx, "[Tool][ExecuteSkillScript] Failed to parse args: %v", err)
-		return &types.ToolResult{
-			Success: false,
-			Error:   fmt.Sprintf("Failed to parse args: %v", err),
-		}, nil
+		var parseErr error
+		input, parseErr = parseExecuteSkillScriptInput(args)
+		if parseErr != nil {
+			logger.Errorf(ctx, "[Tool][ExecuteSkillScript] Failed to parse args: %v", parseErr)
+			return &types.ToolResult{
+				Success: false,
+				Error:   fmt.Sprintf("Failed to parse args: %v", parseErr),
+			}, nil
+		}
 	}
 
 	// Validate required fields
@@ -89,6 +95,8 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 			Error:   "script_path is required",
 		}, nil
 	}
+
+	input.Args, input.Input = normalizeExecuteSkillPayload(input.Args, input.Input)
 
 	// Check if skill manager is available
 	if t.skillManager == nil || !t.skillManager.IsEnabled() {
@@ -187,4 +195,137 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 // Cleanup releases any resources
 func (t *ExecuteSkillScriptTool) Cleanup(ctx context.Context) error {
 	return nil
+}
+
+type executeSkillScriptInputLoose struct {
+	SkillName  string          `json:"skill_name"`
+	ScriptPath string          `json:"script_path"`
+	Args       json.RawMessage `json:"args"`
+	Input      string          `json:"input"`
+}
+
+func parseExecuteSkillScriptInput(raw json.RawMessage) (ExecuteSkillScriptInput, error) {
+	var loose executeSkillScriptInputLoose
+	if err := json.Unmarshal(raw, &loose); err != nil {
+		return ExecuteSkillScriptInput{}, err
+	}
+
+	normalizedArgs, err := normalizeExecuteSkillArgs(loose.Args)
+	if err != nil {
+		return ExecuteSkillScriptInput{}, err
+	}
+
+	return ExecuteSkillScriptInput{
+		SkillName:  loose.SkillName,
+		ScriptPath: loose.ScriptPath,
+		Args:       normalizedArgs,
+		Input:      loose.Input,
+	}, nil
+}
+
+func normalizeExecuteSkillArgs(raw json.RawMessage) ([]string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+
+	var args []string
+	if err := json.Unmarshal(raw, &args); err == nil {
+		return args, nil
+	}
+
+	var stringArg string
+	if err := json.Unmarshal(raw, &stringArg); err != nil {
+		return nil, fmt.Errorf("args must be an array of strings or a JSON-encoded string array")
+	}
+
+	stringArg = strings.TrimSpace(stringArg)
+	if stringArg == "" {
+		return nil, nil
+	}
+
+	if strings.HasPrefix(stringArg, "[") {
+		if err := json.Unmarshal([]byte(stringArg), &args); err != nil {
+			return nil, fmt.Errorf("args string must contain a valid JSON string array: %w", err)
+		}
+		return args, nil
+	}
+
+	return []string{stringArg}, nil
+}
+
+type executeSkillInputEnvelope struct {
+	Content  string `json:"content"`
+	Text     string `json:"text"`
+	Markdown string `json:"markdown"`
+	Body     string `json:"body"`
+	FileName string `json:"file_name"`
+	Filename string `json:"filename"`
+	Path     string `json:"path"`
+}
+
+func normalizeExecuteSkillPayload(args []string, input string) ([]string, string) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" || !strings.HasPrefix(trimmed, "{") {
+		return args, input
+	}
+
+	var envelope executeSkillInputEnvelope
+	if err := json.Unmarshal([]byte(trimmed), &envelope); err != nil {
+		return args, input
+	}
+
+	content := firstNonEmptyString(envelope.Content, envelope.Text, envelope.Markdown, envelope.Body)
+	if content == "" {
+		return args, input
+	}
+
+	if firstPositionalArg(args) == "" {
+		if candidate := normalizeRelativeMarkdownPath(firstNonEmptyString(envelope.FileName, envelope.Filename, envelope.Path)); candidate != "" {
+			args = append([]string{candidate}, args...)
+		}
+	}
+
+	return args, content
+}
+
+func firstPositionalArg(args []string) string {
+	for _, arg := range args {
+		trimmed := strings.TrimSpace(arg)
+		if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+			continue
+		}
+		return trimmed
+	}
+	return ""
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func normalizeRelativeMarkdownPath(candidate string) string {
+	trimmed := strings.TrimSpace(candidate)
+	if trimmed == "" {
+		return ""
+	}
+
+	base := filepath.Base(trimmed)
+	if base == "." || base == string(filepath.Separator) || strings.HasPrefix(base, ".") {
+		return ""
+	}
+
+	if ext := strings.ToLower(filepath.Ext(base)); ext == "" {
+		base += ".md"
+	}
+
+	if strings.HasPrefix(base, "-") {
+		return ""
+	}
+
+	return base
 }

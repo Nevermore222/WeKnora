@@ -3,7 +3,13 @@ package skills
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/Tencent/Xelora/internal/sandbox"
 )
@@ -22,6 +28,7 @@ type Manager struct {
 	// Cache
 	metadataCache []*SkillMetadata
 	mu            sync.RWMutex
+	installMu     sync.Mutex
 }
 
 // ManagerConfig holds configuration for the skill manager
@@ -202,6 +209,18 @@ func (m *Manager) ExecuteScript(ctx context.Context, skillName, scriptPath strin
 		return nil, fmt.Errorf("file is not an executable script: %s", scriptPath)
 	}
 
+	if err := m.ensureScriptRuntimeDependencies(ctx, file.Path); err != nil {
+		return nil, err
+	}
+
+	args, cleanupInputFile, err := m.materializeScriptInput(basePath, args, stdin)
+	if err != nil {
+		return nil, err
+	}
+	if cleanupInputFile != nil {
+		defer cleanupInputFile()
+	}
+
 	// Prepare execution config
 	config := &sandbox.ExecuteConfig{
 		Script:  file.Path,
@@ -280,4 +299,107 @@ func (m *Manager) Cleanup(ctx context.Context) error {
 		return m.sandboxMgr.Cleanup(ctx)
 	}
 	return nil
+}
+
+func (m *Manager) ensureScriptRuntimeDependencies(ctx context.Context, scriptPath string) error {
+	ext := filepath.Ext(scriptPath)
+	if ext != ".ts" && ext != ".js" {
+		return nil
+	}
+
+	scriptDir := filepath.Dir(scriptPath)
+	packageJSON := filepath.Join(scriptDir, "package.json")
+	if _, err := os.Stat(packageJSON); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to inspect package.json: %w", err)
+	}
+
+	nodeModules := filepath.Join(scriptDir, "node_modules")
+	if info, err := os.Stat(nodeModules); err == nil && info.IsDir() {
+		return nil
+	}
+
+	m.installMu.Lock()
+	defer m.installMu.Unlock()
+
+	if info, err := os.Stat(nodeModules); err == nil && info.IsDir() {
+		return nil
+	}
+
+	lockFile := filepath.Join(scriptDir, "package-lock.json")
+	installArgs := []string{"install", "--omit=dev"}
+	if _, err := os.Stat(lockFile); err == nil {
+		installArgs = []string{"ci", "--omit=dev"}
+	}
+
+	cmd := exec.CommandContext(ctx, "npm", installArgs...)
+	cmd.Dir = scriptDir
+	cmd.Env = append(os.Environ(),
+		"NODE_ENV=production",
+		"NPM_CONFIG_FUND=false",
+		"NPM_CONFIG_AUDIT=false",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to install skill runtime dependencies in %s: %w\n%s", scriptDir, err, string(output))
+	}
+
+	return nil
+}
+
+func (m *Manager) materializeScriptInput(basePath string, args []string, stdin string) ([]string, func(), error) {
+	if strings.TrimSpace(stdin) == "" {
+		return args, nil, nil
+	}
+
+	if idx := firstPositionalArgIndex(args); idx >= 0 {
+		targetPath, err := resolveSkillRelativePath(basePath, args[idx])
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			return nil, nil, fmt.Errorf("failed to prepare input file directory: %w", err)
+		}
+		if err := os.WriteFile(targetPath, []byte(stdin), 0o644); err != nil {
+			return nil, nil, fmt.Errorf("failed to materialize skill input file: %w", err)
+		}
+		return args, nil, nil
+	}
+
+	fileName := buildGeneratedMarkdownName()
+	targetPath, err := resolveSkillRelativePath(basePath, fileName)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := os.WriteFile(targetPath, []byte(stdin), 0o644); err != nil {
+		return nil, nil, fmt.Errorf("failed to materialize generated markdown file: %w", err)
+	}
+
+	return append([]string{fileName}, args...), nil, nil
+}
+
+func firstPositionalArgIndex(args []string) int {
+	for i, arg := range args {
+		trimmed := strings.TrimSpace(arg)
+		if trimmed == "" || strings.HasPrefix(trimmed, "-") {
+			continue
+		}
+		return i
+	}
+	return -1
+}
+
+func resolveSkillRelativePath(basePath, candidate string) (string, error) {
+	cleaned := filepath.Clean(strings.TrimSpace(candidate))
+	if cleaned == "." || cleaned == "" || filepath.IsAbs(cleaned) || strings.HasPrefix(cleaned, "..") {
+		return "", fmt.Errorf("invalid skill file path: %s", candidate)
+	}
+	return filepath.Join(basePath, cleaned), nil
+}
+
+func buildGeneratedMarkdownName() string {
+	return "generated-" + time.Now().Format("20060102-150405") + "-" + strconv.FormatInt(time.Now().UnixNano()%1_000_000, 10) + ".md"
 }

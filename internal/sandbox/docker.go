@@ -144,9 +144,14 @@ func (s *DockerSandbox) buildDockerArgs(config *ExecuteConfig) []string {
 	args = append(args, "--pids-limit", "100")
 	args = append(args, "--security-opt", "no-new-privileges")
 
-	// Mount the script and working directory as read-only
-	scriptDir := filepath.Dir(config.Script)
-	args = append(args, "-v", fmt.Sprintf("%s:/workspace:ro", scriptDir))
+	// Mount the effective work directory so scripts can access sibling files
+	// referenced by relative paths and write real output artifacts back to the
+	// host workspace.
+	mountDir := config.WorkDir
+	if mountDir == "" {
+		mountDir = filepath.Dir(config.Script)
+	}
+	args = append(args, "-v", fmt.Sprintf("%s:/workspace:rw", mountDir))
 
 	// Working directory
 	args = append(args, "-w", "/workspace")
@@ -161,9 +166,13 @@ func (s *DockerSandbox) buildDockerArgs(config *ExecuteConfig) []string {
 
 	// Script execution command
 	scriptName := filepath.Base(config.Script)
+	scriptTarget := scriptName
+	if relScript, err := filepath.Rel(mountDir, config.Script); err == nil && relScript != "." {
+		scriptTarget = filepath.ToSlash(relScript)
+	}
 	interpreter := getInterpreter(scriptName)
 
-	args = append(args, interpreter, scriptName)
+	args = append(args, interpreter, scriptTarget)
 	args = append(args, config.Args...)
 
 	return args
@@ -179,6 +188,8 @@ func getInterpreter(scriptName string) string {
 		return "bash"
 	case ".js":
 		return "node"
+	case ".ts":
+		return "tsx"
 	case ".rb":
 		return "ruby"
 	case ".pl":
