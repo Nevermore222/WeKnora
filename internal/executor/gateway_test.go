@@ -32,11 +32,32 @@ func TestDetectArtifactsIgnoresMaterializedInput(t *testing.T) {
 		},
 	}
 
-	artifacts := detectArtifacts(basePath, "job-1", "session-1", pre, post, []string{filepath.Join(basePath, "input.md")})
+	artifacts := detectArtifacts(basePath, "workspace-1", "job-1", "session-1", pre, post, []string{filepath.Join(basePath, "input.md")})
 	if len(artifacts) != 1 {
 		t.Fatalf("expected 1 artifact, got %d", len(artifacts))
 	}
-	if artifacts[0].RelativePath != "generated.md" {
-		t.Fatalf("expected generated.md artifact, got %s", artifacts[0].RelativePath)
+	artifact := artifacts[0]
+	if artifact.RelativePath != "generated.md" {
+		t.Fatalf("expected generated.md artifact, got %s", artifact.RelativePath)
+	}
+	if artifact.WorkspaceID != "workspace-1" {
+		t.Fatalf("expected workspace-1, got %s", artifact.WorkspaceID)
+	}
+	if artifact.Kind != ArtifactKindMarkdown {
+		t.Fatalf("expected markdown kind, got %s", artifact.Kind)
+	}
+	if artifact.PreviewState != ArtifactPreviewAvailable {
+		t.Fatalf("expected available preview, got %s", artifact.PreviewState)
+	}
+	if artifact.ChangeType != ArtifactChangeCreated {
+		t.Fatalf("expected created change type, got %s", artifact.ChangeType)
+	}
+}
+
+func TestBuildWorkspaceIDUsesSessionAndSkill(t *testing.T) {
+	id := buildWorkspaceID("Session:123", "baoyu-format-markdown")
+	want := "session-session-123-skill-baoyu-format-markdown"
+	if id != want {
+		t.Fatalf("expected %s, got %s", want, id)
 	}
 }

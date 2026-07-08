@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Tencent/Xelora/internal/executor"
 	"github.com/Tencent/Xelora/internal/agent/skills"
+	"github.com/Tencent/Xelora/internal/executor"
 	"github.com/Tencent/Xelora/internal/logger"
 	"github.com/Tencent/Xelora/internal/types"
 	"github.com/Tencent/Xelora/internal/utils"
@@ -179,7 +179,7 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 	if len(jobExecution.Artifacts) > 0 {
 		builder.WriteString("\n## Artifacts\n\n")
 		for _, artifact := range jobExecution.Artifacts {
-			builder.WriteString(fmt.Sprintf("- `%s` (%d bytes)\n", artifact.RelativePath, artifact.Size))
+			builder.WriteString(fmt.Sprintf("- `%s` (%s, %s, %d bytes)\n", artifact.RelativePath, artifact.Kind, artifact.ChangeType, artifact.Size))
 		}
 	} else {
 		builder.WriteString("\n## Artifacts\n\n")
@@ -193,6 +193,7 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 		"skill_name":        input.SkillName,
 		"script_path":       input.ScriptPath,
 		"args":              input.Args,
+		"workspace":         jobExecution.Workspace,
 		"job":               jobExecution.Job,
 		"artifacts":         jobExecution.Artifacts,
 		"artifact_detected": jobExecution.ArtifactDetected,
