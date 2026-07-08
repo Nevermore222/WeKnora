@@ -258,6 +258,9 @@ Project-specific design, planning, and secondary-development documents are track
 - Collaboration workflow: [`docs/customizations/WORKFLOW.md`](./docs/customizations/WORKFLOW.md)
 - Custom change log: [`docs/customizations/CHANGELOG-custom.md`](./docs/customizations/CHANGELOG-custom.md)
 - File capability plan: [`docs/customizations/XELORA_FILE_CAPABILITY_PLAN.md`](./docs/customizations/XELORA_FILE_CAPABILITY_PLAN.md)
+- Runtime reference index: [`docs/customizations/runtime-reference/README.md`](./docs/customizations/runtime-reference/README.md)
+- Runtime reference spec: [`specs/001-agent-runtime-reference/spec.md`](./specs/001-agent-runtime-reference/spec.md)
+- Runtime reference execution tasks: [`specs/001-agent-runtime-reference/tasks.md`](./specs/001-agent-runtime-reference/tasks.md)
 - Skill usage governance spec: [`specs/001-skill-usage-governance/spec.md`](./specs/001-skill-usage-governance/spec.md)
 
 ## 🧭 Developer Guide

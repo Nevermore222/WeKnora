@@ -6,7 +6,7 @@
 # managed by this extension (e.g. CLAUDE.md, AGENTS.md,
 # .github/copilot-instructions.md). Set automatically from the active
 # integration and regenerated during `specify init` or integration switches.
-context_file: ""
+context_file: "AGENTS.md"
 
 # Optional list of project-relative coding agent context files managed by this
 # extension. When non-empty, this list takes precedence over `context_file`.
