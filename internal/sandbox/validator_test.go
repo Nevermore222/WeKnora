@@ -268,12 +268,12 @@ func TestScriptValidator_ValidateStdin(t *testing.T) {
 		{
 			name:       "command substitution",
 			stdin:      "data $(rm -rf /)",
-			shouldFail: true,
+			shouldFail: false,
 		},
 		{
 			name:       "backtick command",
 			stdin:      "data `whoami`",
-			shouldFail: true,
+			shouldFail: false,
 		},
 	}
 

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Tencent/Xelora/internal/executor"
 	"github.com/Tencent/Xelora/internal/agent/skills"
 	"github.com/Tencent/Xelora/internal/logger"
 	"github.com/Tencent/Xelora/internal/types"
@@ -53,6 +54,7 @@ type ExecuteSkillScriptInput struct {
 type ExecuteSkillScriptTool struct {
 	BaseTool
 	skillManager *skills.Manager
+	gateway      *executor.Gateway
 }
 
 // NewExecuteSkillScriptTool creates a new execute_skill_script tool instance
@@ -60,6 +62,7 @@ func NewExecuteSkillScriptTool(skillManager *skills.Manager) *ExecuteSkillScript
 	return &ExecuteSkillScriptTool{
 		BaseTool:     executeSkillScriptTool,
 		skillManager: skillManager,
+		gateway:      executor.NewGateway(),
 	}
 }
 
@@ -106,11 +109,23 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 		}, nil
 	}
 
-	// Execute the script in sandbox
+	var jobRequest executor.SkillJobRequest
+	if meta, ok := ToolExecFromContext(ctx); ok {
+		jobRequest.SessionID = meta.SessionID
+		jobRequest.AssistantMessageID = meta.AssistantMessageID
+		jobRequest.RequestID = meta.RequestID
+		jobRequest.ToolCallID = meta.ToolCallID
+	}
+	jobRequest.SkillName = input.SkillName
+	jobRequest.ScriptPath = input.ScriptPath
+	jobRequest.Args = append([]string(nil), input.Args...)
+	jobRequest.Input = input.Input
+
+	// Execute the script through the Xelora-owned gateway layer.
 	logger.Infof(ctx, "[Tool][ExecuteSkillScript] Executing script: %s/%s with args: %v, input length: %d",
 		input.SkillName, input.ScriptPath, input.Args, len(input.Input))
 
-	result, err := t.skillManager.ExecuteScript(ctx, input.SkillName, input.ScriptPath, input.Args, input.Input)
+	jobExecution, err := t.gateway.RunSkillScriptJob(ctx, jobRequest, t.skillManager)
 	if err != nil {
 		logger.Errorf(ctx, "[Tool][ExecuteSkillScript] Script execution failed: %v", err)
 		return &types.ToolResult{
@@ -118,6 +133,7 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 			Error:   fmt.Sprintf("Script execution failed: %v", err),
 		}, nil
 	}
+	result := jobExecution.Result
 
 	// Build output
 	var builder strings.Builder
@@ -160,18 +176,31 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 		builder.WriteString("\n")
 	}
 
+	if len(jobExecution.Artifacts) > 0 {
+		builder.WriteString("\n## Artifacts\n\n")
+		for _, artifact := range jobExecution.Artifacts {
+			builder.WriteString(fmt.Sprintf("- `%s` (%d bytes)\n", artifact.RelativePath, artifact.Size))
+		}
+	} else {
+		builder.WriteString("\n## Artifacts\n\n")
+		builder.WriteString("No output artifact was detected in the skill workspace.\n")
+	}
+
 	// Determine success based on exit code
 	success := result.IsSuccess()
 
 	resultData := map[string]interface{}{
-		"skill_name":  input.SkillName,
-		"script_path": input.ScriptPath,
-		"args":        input.Args,
-		"exit_code":   result.ExitCode,
-		"stdout":      result.Stdout,
-		"stderr":      result.Stderr,
-		"duration_ms": result.Duration.Milliseconds(),
-		"killed":      result.Killed,
+		"skill_name":        input.SkillName,
+		"script_path":       input.ScriptPath,
+		"args":              input.Args,
+		"job":               jobExecution.Job,
+		"artifacts":         jobExecution.Artifacts,
+		"artifact_detected": jobExecution.ArtifactDetected,
+		"exit_code":         result.ExitCode,
+		"stdout":            result.Stdout,
+		"stderr":            result.Stderr,
+		"duration_ms":       result.Duration.Milliseconds(),
+		"killed":            result.Killed,
 	}
 
 	logger.Infof(ctx, "[Tool][ExecuteSkillScript] Script completed with exit code: %d", result.ExitCode)

@@ -14,6 +14,12 @@ import (
 	"github.com/Tencent/Xelora/internal/sandbox"
 )
 
+type ScriptExecutionOutcome struct {
+	Result                 *sandbox.ExecuteResult
+	BasePath               string
+	MaterializedInputPaths []string
+}
+
 // Manager manages skills lifecycle including discovery, loading, and script execution
 // It coordinates between the Loader (filesystem operations) and Sandbox (script execution)
 type Manager struct {
@@ -178,8 +184,28 @@ func (m *Manager) ListSkillFiles(ctx context.Context, skillName string) ([]strin
 	return m.loader.ListSkillFiles(skillName)
 }
 
+func (m *Manager) GetSkillBasePath(ctx context.Context, skillName string) (string, error) {
+	if !m.enabled {
+		return "", fmt.Errorf("skills are not enabled")
+	}
+	if !m.isSkillAllowed(skillName) {
+		return "", fmt.Errorf("skill not allowed: %s", skillName)
+	}
+	return m.loader.GetSkillBasePath(skillName)
+}
+
 // ExecuteScript executes a script from a skill in the sandbox
 func (m *Manager) ExecuteScript(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*sandbox.ExecuteResult, error) {
+	outcome, err := m.ExecuteScriptDetailed(ctx, skillName, scriptPath, args, stdin)
+	if err != nil {
+		return nil, err
+	}
+	return outcome.Result, nil
+}
+
+// ExecuteScriptDetailed executes a script and returns additional runtime metadata
+// needed by Xelora-owned gateway layers such as job and artifact tracking.
+func (m *Manager) ExecuteScriptDetailed(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*ScriptExecutionOutcome, error) {
 	if !m.enabled {
 		return nil, fmt.Errorf("skills are not enabled")
 	}
@@ -213,7 +239,7 @@ func (m *Manager) ExecuteScript(ctx context.Context, skillName, scriptPath strin
 		return nil, err
 	}
 
-	args, cleanupInputFile, err := m.materializeScriptInput(basePath, args, stdin)
+	args, materializedPaths, cleanupInputFile, err := m.materializeScriptInput(basePath, args, stdin)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +256,16 @@ func (m *Manager) ExecuteScript(ctx context.Context, skillName, scriptPath strin
 	}
 
 	// Execute in sandbox
-	return m.sandboxMgr.Execute(ctx, config)
+	result, err := m.sandboxMgr.Execute(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ScriptExecutionOutcome{
+		Result:                 result,
+		BasePath:               basePath,
+		MaterializedInputPaths: materializedPaths,
+	}, nil
 }
 
 // GetSkillInfo returns detailed information about a skill
@@ -350,35 +385,35 @@ func (m *Manager) ensureScriptRuntimeDependencies(ctx context.Context, scriptPat
 	return nil
 }
 
-func (m *Manager) materializeScriptInput(basePath string, args []string, stdin string) ([]string, func(), error) {
+func (m *Manager) materializeScriptInput(basePath string, args []string, stdin string) ([]string, []string, func(), error) {
 	if strings.TrimSpace(stdin) == "" {
-		return args, nil, nil
+		return args, nil, nil, nil
 	}
 
 	if idx := firstPositionalArgIndex(args); idx >= 0 {
 		targetPath, err := resolveSkillRelativePath(basePath, args[idx])
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
-			return nil, nil, fmt.Errorf("failed to prepare input file directory: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to prepare input file directory: %w", err)
 		}
 		if err := os.WriteFile(targetPath, []byte(stdin), 0o644); err != nil {
-			return nil, nil, fmt.Errorf("failed to materialize skill input file: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to materialize skill input file: %w", err)
 		}
-		return args, nil, nil
+		return args, []string{targetPath}, nil, nil
 	}
 
 	fileName := buildGeneratedMarkdownName()
 	targetPath, err := resolveSkillRelativePath(basePath, fileName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := os.WriteFile(targetPath, []byte(stdin), 0o644); err != nil {
-		return nil, nil, fmt.Errorf("failed to materialize generated markdown file: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to materialize generated markdown file: %w", err)
 	}
 
-	return append([]string{fileName}, args...), nil, nil
+	return append([]string{fileName}, args...), []string{targetPath}, nil, nil
 }
 
 func firstPositionalArgIndex(args []string) int {
