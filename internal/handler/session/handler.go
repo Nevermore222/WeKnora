@@ -1,8 +1,10 @@
 package session
 
 import (
+	"encoding/json"
 	stderrors "errors"
 	"net/http"
+	"strings"
 
 	"github.com/Tencent/Xelora/internal/config"
 	"github.com/Tencent/Xelora/internal/errors"
@@ -120,11 +122,20 @@ func (h *Handler) CreateSession(c *gin.Context) {
 	if userID, ok := types.UserIDFromContext(ctx); ok {
 		createdSession.UserID = userID
 	}
+	if request.WorkspaceBinding != nil {
+		createdSession.WorkspaceBinding = &types.SessionWorkspaceBinding{
+			WorkspaceID: request.WorkspaceBinding.WorkspaceID,
+		}
+	}
 
 	// Call service to create session
 	logger.Infof(ctx, "Calling session service to create session")
 	createdSession, err := h.sessionService.CreateSession(ctx, createdSession)
 	if err != nil {
+		if isWorkspaceBindingValidationError(err) {
+			c.Error(errors.NewBadRequestError(err.Error()))
+			return
+		}
 		logger.ErrorWithFields(ctx, err, nil)
 		c.Error(errors.NewInternalServerError(err.Error()))
 		return
@@ -269,22 +280,52 @@ func (h *Handler) UpdateSession(c *gin.Context) {
 		return
 	}
 
-	// Parse request body to session object
-	var session types.Session
-	if err := c.ShouldBindJSON(&session); err != nil {
+	body, err := c.GetRawData()
+	if err != nil {
+		logger.Error(ctx, "Failed to read session update body", err)
+		c.Error(errors.NewBadRequestError(err.Error()))
+		return
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
 		logger.Error(ctx, "Failed to parse session data", err)
 		c.Error(errors.NewBadRequestError(err.Error()))
 		return
 	}
 
-	session.ID = id
-	session.TenantID = tenantID.(uint64)
+	var request UpdateSessionRequest
+	if err := json.Unmarshal(body, &request); err != nil {
+		logger.Error(ctx, "Failed to parse session data", err)
+		c.Error(errors.NewBadRequestError(err.Error()))
+		return
+	}
+
+	session := types.Session{
+		ID:          id,
+		TenantID:    tenantID.(uint64),
+		Title:       request.Title,
+		Description: request.Description,
+	}
+	if _, ok := raw["workspace_binding"]; ok {
+		if request.WorkspaceBinding != nil {
+			session.WorkspaceBinding = &types.SessionWorkspaceBinding{
+				WorkspaceID: request.WorkspaceBinding.WorkspaceID,
+			}
+		} else {
+			session.WorkspaceBinding = &types.SessionWorkspaceBinding{}
+		}
+	}
 
 	// Call service to update session
 	if err := h.sessionService.UpdateSession(ctx, &session); err != nil {
 		if stderrors.Is(err, errors.ErrSessionNotFound) {
 			logger.Warnf(ctx, "Session not found, ID: %s", id)
 			c.Error(errors.NewNotFoundError(err.Error()))
+			return
+		}
+		if isWorkspaceBindingValidationError(err) {
+			c.Error(errors.NewBadRequestError(err.Error()))
 			return
 		}
 		logger.ErrorWithFields(ctx, err, nil)
@@ -536,4 +577,14 @@ func (h *Handler) setSessionPinned(c *gin.Context, pinned bool) {
 		"success":   true,
 		"is_pinned": pinned,
 	})
+}
+
+func isWorkspaceBindingValidationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "workspace binding must match the active workspace") ||
+		strings.Contains(msg, "workspace not found or no longer available") ||
+		strings.Contains(msg, "workspace is no longer active")
 }

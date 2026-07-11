@@ -2170,6 +2170,19 @@ export default {
   createChat: {
     title: 'Hi, I am Xelora — your knowledge, within reach',
     newSessionTitle: 'New Session',
+    workspace: {
+      placeholder: 'Select local workspace',
+      refresh: 'Refresh workspaces',
+      create: 'Create workspace folder',
+      createTitle: 'Create workspace folder',
+      createConfirm: 'Create',
+      namePlaceholder: 'Folder name',
+      nameRequired: 'Please enter a folder name',
+      loadFailed: 'Failed to load workspaces',
+      createFailed: 'Failed to create workspace',
+      createSuccess: 'Workspace created',
+      unavailable: '{count} unavailable workspace(s) hidden',
+    },
     messages: {
       selectKnowledgeBase: 'Please select a knowledge base first',
       createFailed: 'Failed to create session',
@@ -3122,6 +3135,13 @@ export default {
     attachmentTooMany: 'Maximum {max} attachments allowed',
     attachmentTooLarge: 'File {name} exceeds {max}MB limit',
     attachmentTypeNotSupported: 'Unsupported file type: {name}',
+    workspaceBound: 'Workspace',
+    workspaceUnbound: 'No workspace bound',
+    workspaceBindingInvalid: 'Workspace binding is no longer valid. Please rebind.',
+    workspaceBindingAccessDenied: 'Access denied to this workspace',
+    workspaceBindingArchived: 'Workspace is archived. File outputs are disabled until rebind.',
+    workspaceOutputBlocked: 'File output is blocked. Workspace binding needs to be updated.',
+    workspaceRebindAction: 'Rebind workspace',
   },
   tenant: {
     title: 'Tenant Information',

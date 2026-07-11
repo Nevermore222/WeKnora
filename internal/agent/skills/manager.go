@@ -15,8 +15,12 @@ import (
 )
 
 type ScriptExecutionOutcome struct {
-	Result                 *sandbox.ExecuteResult
-	BasePath               string
+	Result   *sandbox.ExecuteResult
+	BasePath string
+	// WorkDir is the effective working directory for the script. When a
+	// conversation is bound to a workspace, this is the workspace root so
+	// file outputs land there instead of the skill-private base path.
+	WorkDir                string
 	MaterializedInputPaths []string
 }
 
@@ -27,6 +31,10 @@ type PreparedScriptExecution struct {
 	Stdin                  string
 	MaterializedInputPaths []string
 	Cleanup                func()
+	// WorkDir overrides the working directory for script execution. When
+	// empty, BasePath is used. Set by the gateway to the bound workspace
+	// root so generated files are created inside the conversation workspace.
+	WorkDir string
 }
 
 // Manager manages skills lifecycle including discovery, loading, and script execution
@@ -227,7 +235,8 @@ func (m *Manager) ExecuteScriptDetailed(ctx context.Context, skillName, scriptPa
 }
 
 // ExecutePreparedScript executes a prevalidated skill script request. It is used
-// by executor providers so preparation and execution can be split cleanly.
+// by executor providers so preparation and execution can be split cleanly while
+// Xelora retains artifact-first outcomes and provider-independent job semantics.
 func (m *Manager) ExecutePreparedScript(ctx context.Context, prepared *PreparedScriptExecution) (*ScriptExecutionOutcome, error) {
 	if prepared == nil {
 		return nil, fmt.Errorf("prepared script execution is required")
@@ -237,7 +246,7 @@ func (m *Manager) ExecutePreparedScript(ctx context.Context, prepared *PreparedS
 	result, err := m.sandboxMgr.Execute(ctx, &sandbox.ExecuteConfig{
 		Script:  prepared.ScriptPath,
 		Args:    prepared.Args,
-		WorkDir: prepared.BasePath,
+		WorkDir: effectiveWorkDir(prepared),
 		Stdin:   prepared.Stdin,
 	})
 	if err != nil {
@@ -247,12 +256,27 @@ func (m *Manager) ExecutePreparedScript(ctx context.Context, prepared *PreparedS
 	return &ScriptExecutionOutcome{
 		Result:                 result,
 		BasePath:               prepared.BasePath,
+		WorkDir:                effectiveWorkDir(prepared),
 		MaterializedInputPaths: prepared.MaterializedInputPaths,
 	}, nil
 }
 
+// effectiveWorkDir returns the working directory for script execution.
+// When the prepared execution has a WorkDir override (set by the gateway for
+// bound workspaces), that takes precedence. Otherwise BasePath is used.
+func effectiveWorkDir(prepared *PreparedScriptExecution) string {
+	if prepared != nil && prepared.WorkDir != "" {
+		return prepared.WorkDir
+	}
+	if prepared != nil {
+		return prepared.BasePath
+	}
+	return ""
+}
+
 // PrepareScriptExecution validates a skill script request and materializes any
-// local inputs so multiple providers can share the same pre-execution step.
+// local inputs so multiple providers can share the same pre-execution step
+// instead of duplicating Xelora-owned preparation rules per backend.
 func (m *Manager) PrepareScriptExecution(ctx context.Context, skillName, scriptPath string, args []string, stdin string) (*PreparedScriptExecution, error) {
 	if !m.enabled {
 		return nil, fmt.Errorf("skills are not enabled")

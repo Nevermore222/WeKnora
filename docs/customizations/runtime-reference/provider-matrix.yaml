@@ -1,0 +1,142 @@
+providers:
+  - module_id: sandbox-execution
+    primary:
+      name: Controlled Docker Executor
+      role: primary_baseline
+      adoption_mode: implement_adapter
+      deployment_shape: local_service_or_worker
+      replacement_risk: low
+      notes: First usable local provider for validating Xelora-owned workspace, job, log, and artifact contracts.
+    alternatives:
+      - name: OpenSandbox
+        role: experimental_provider
+        notes: Retained as a mature sandbox reference and future provider candidate; current Docker Desktop command-proxy smoke test returns 502.
+      - name: CubeSandbox
+        role: secondary_alternative
+        notes: Stronger isolation candidate for Linux/KVM-ready environments; not the current local-first path.
+      - name: E2B
+        role: api_reference
+        notes: Useful sandbox API and code-interpreter model reference; hosted usage may not match local self-managed goals.
+      - name: Daytona
+        role: workspace_provider_reference
+        notes: Useful reference for developer workspaces, snapshots, and programmable environments.
+      - name: gVisor
+        role: isolation_hardening_reference
+        notes: Candidate runtime hardening layer for Docker-based execution.
+      - name: Kata Containers
+        role: future_strong_isolation_reference
+        notes: Candidate for Linux/Kubernetes production-class isolation.
+      - name: Firecracker
+        role: future_strong_isolation_reference
+        notes: Candidate microVM reference for high-isolation execution services.
+    xelora_owned_concerns:
+      - session workspace identity
+      - job identity
+      - artifact identity
+      - policy decisions
+      - user-visible execution history
+    provider_owned_concerns:
+      - sandbox lifecycle
+      - low-level process execution
+      - runtime resource controls
+      - remote file mount mechanics
+    must_remain_stable:
+      - workspace ownership stays in Xelora
+      - artifact registration stays in Xelora
+      - provider replacement does not change user-visible job semantics
+  - module_id: execution-gateway
+    primary:
+      name: Xelora internal executor gateway
+      role: primary_baseline
+      adoption_mode: integrate
+      deployment_shape: library
+      replacement_risk: low
+      notes: Product-owned routing and orchestration layer.
+    alternatives: []
+    xelora_owned_concerns:
+      - provider selection
+      - policy enforcement
+      - execution logs
+      - artifact registration
+      - task lifecycle state
+    provider_owned_concerns:
+      - none
+    must_remain_stable:
+      - gateway remains the only product-facing execution entry point
+  - module_id: workspace-management
+    primary:
+      name: OpenHands Software Agent SDK semantics
+      role: semantic_reference
+      adoption_mode: reference_only
+      deployment_shape: mixed
+      replacement_risk: low
+      notes: Semantic reference for persistent workspaces and code-task flow.
+    alternatives: []
+    xelora_owned_concerns:
+      - workspace IDs
+      - session continuity
+      - workspace-to-job linkage
+    provider_owned_concerns:
+      - temporary runtime filesystem layout
+    must_remain_stable:
+      - workspace identity is provider-agnostic
+  - module_id: browser-automation
+    primary:
+      name: agent-browser
+      role: primary_baseline
+      adoption_mode: wrap
+      deployment_shape: cli
+      replacement_risk: medium
+      notes: Browser path should remain independent from sandbox substrate choice.
+    alternatives:
+      - name: MCP or CDP-based provider
+        role: secondary_alternative
+        notes: Future replacement path.
+    xelora_owned_concerns:
+      - task intent
+      - artifact capture
+      - session linkage
+    provider_owned_concerns:
+      - browser launch
+      - DOM interaction
+      - screenshot mechanics
+    must_remain_stable:
+      - browser outputs become Xelora artifacts
+  - module_id: file-capability
+    primary:
+      name: OfficeCLI
+      role: service_reference
+      adoption_mode: wrap
+      deployment_shape: sandbox_cli
+      replacement_risk: low
+      notes: Verified inside the controlled Docker sandbox for host-visible docx, xlsx, and pptx creation plus OpenXML validation.
+    alternatives: []
+    reference_projects:
+      - name: OfficeCLI
+        role: office_dom_cli
+        notes: Primary CLI candidate for agent-driven .docx, .xlsx, and .pptx read/write/validate flows without Microsoft Office.
+      - name: Gotenberg
+        role: pdf_conversion_service
+        notes: HTML, Markdown, Office, and PDF conversion service candidate.
+      - name: SheetJS
+        role: spreadsheet_processing_library
+        notes: Backend read/write path for xlsx, csv, and tabular data.
+      - name: Univer
+        role: embedded_spreadsheet_ui
+        notes: Frontend spreadsheet/document interaction reference.
+      - name: PptxGenJS
+        role: presentation_generation_library
+        notes: Programmatic PPTX creation path for skill and report outputs.
+      - name: ONLYOFFICE Document Server
+        role: advanced_office_editing_reference
+        notes: Mature but heavier online office editing option for later stages.
+    xelora_owned_concerns:
+      - artifact identity
+      - workflow integration
+      - authorization
+      - output history
+    provider_owned_concerns:
+      - format conversion
+      - format-specific editing mechanics
+    must_remain_stable:
+      - file outputs remain product-visible artifacts

@@ -43,6 +43,7 @@
                     </div>
                 </transition>
             </div>
+            <WorkspaceSelector v-model="selectedWorkspaceId" />
             <InputField ref="inputFieldRef" @send-msg="sendMsg"></InputField>
         </div>
     </div>
@@ -58,6 +59,7 @@
 import { ref, watch, onMounted, nextTick, computed } from 'vue';
 import ContextualGuide from '@/components/ContextualGuide.vue';
 import InputField from '@/components/Input-field.vue';
+import WorkspaceSelector from '@/components/WorkspaceSelector.vue';
 import { createSessions } from "@/api/chat/index";
 import { getSuggestedQuestions } from "@/api/agent/index";
 import type { SuggestedQuestion } from "@/api/agent/index";
@@ -77,6 +79,7 @@ const settingsStore = useSettingsStore();
 const uiStore = useUIStore();
 const { t } = useI18n();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
+const selectedWorkspaceId = ref('');
 
 const showChatContextualGuide = computed(() => {
     return route.name === 'globalCreatChat' || route.name === 'kbCreatChat';
@@ -202,6 +205,12 @@ async function createNewSession(value: string, modelId: string, mentionedItems: 
         knowledge_ids: selectedFiles,  // 所有选中的普通知识/文件
         allowed_tools: settingsStore.agentConfig.allowedTools
     };
+
+    if (selectedWorkspaceId.value) {
+        sessionData.workspace_binding = {
+            workspace_id: selectedWorkspaceId.value,
+        };
+    }
 
     try {
         const res = await createSessions(sessionData);

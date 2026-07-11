@@ -101,9 +101,10 @@ func (e *AgentEngine) streamLLMToEventBus(
 		chunkCount, len(result.Content), len(result.ToolCalls),
 		streamDuration.Milliseconds(), responseTypeCounts)
 
-	// If the stream produced an error and no usable content/tool calls,
-	// surface it as a Go error so the caller can retry or degrade gracefully.
-	if result.StreamError != "" && result.Content == "" && len(result.ToolCalls) == 0 {
+	// Any stream error means the final content or tool-call arguments may be
+	// incomplete. Surface it as a Go error so the caller can retry or fail
+	// visibly instead of accepting a partial "I'll do it" preamble as success.
+	if result.StreamError != "" {
 		return result, fmt.Errorf("LLM stream error: %s", result.StreamError)
 	}
 

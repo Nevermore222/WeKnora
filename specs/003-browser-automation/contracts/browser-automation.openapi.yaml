@@ -1,0 +1,160 @@
+﻿openapi: 3.0.3
+info:
+  title: Browser Automation Agent Tool Contract
+  version: "003"
+  description: >
+    Contract for the browser_navigate agent tool that dispatches browser
+    navigation tasks through the Xelora-owned executor gateway. The gateway
+    resolves workspace bindings, enforces boundary checks, and registers
+    browser-produced artifacts using the same artifact model as file-producing
+    skills. The browser provider sits behind a replaceable interface seam.
+
+paths:
+  /agent/browser-navigate:
+    post:
+      summary: Dispatch a browser navigation task
+      description: >
+        Invoked by the agent tool registry when the browser_navigate tool is
+        called. The gateway selects the browser provider, resolves the
+        conversation output context, dispatches the task, and returns the
+        job result with registered artifacts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrowserNavigateInput'
+      responses:
+        '200':
+          description: Browser task result with artifacts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrowserNavigateResult'
+
+components:
+  schemas:
+    BrowserNavigateInput:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: Target page URL
+        capture_mode:
+          type: string
+          enum: [screenshot, content, both]
+          default: screenshot
+          description: What to capture from the page
+        provider:
+          type: string
+          default: controlled-docker
+          description: Browser provider name
+
+    BrowserNavigateResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        job:
+          $ref: '#/components/schemas/BrowserJob'
+        workspace:
+          $ref: '#/components/schemas/WorkspaceRecord'
+        provider:
+          $ref: '#/components/schemas/ProviderCapability'
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtifactRecord'
+        artifact_detected:
+          type: boolean
+        error:
+          type: string
+
+    BrowserJob:
+      type: object
+      properties:
+        id:
+          type: string
+        session_id:
+          type: string
+        url:
+          type: string
+        capture_mode:
+          type: string
+        provider:
+          type: string
+        status:
+          type: string
+          enum: [running, succeeded, failed]
+        exit_code:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        duration_ms:
+          type: integer
+        artifact_count:
+          type: integer
+        error:
+          type: string
+
+    WorkspaceRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        session_id:
+          type: string
+        root_path:
+          type: string
+        working_dir:
+          type: string
+        provider:
+          type: string
+        status:
+          type: string
+
+    ProviderCapability:
+      type: object
+      properties:
+        provider:
+          type: string
+        status:
+          type: string
+          enum: [available, unavailable]
+        supports_session_workspace:
+          type: boolean
+        supports_streaming_logs:
+          type: boolean
+
+    ArtifactRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        workspace_id:
+          type: string
+        job_id:
+          type: string
+        session_id:
+          type: string
+        name:
+          type: string
+        relative_path:
+          type: string
+        kind:
+          type: string
+          enum: [image, markdown, other]
+        change_type:
+          type: string
+          enum: [created, modified]
+        size:
+          type: integer
+        modified_at:
+          type: string
+          format: date-time

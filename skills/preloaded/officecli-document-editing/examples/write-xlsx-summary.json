@@ -1,0 +1,14 @@
+{
+  "action": "write_xlsx",
+  "file": "knowledge-summary.xlsx",
+  "sheets": [
+    {
+      "name": "Summary",
+      "headers": ["Topic", "Status"],
+      "rows": [
+        ["Chrome DevTools MCP", "Ready"]
+      ]
+    }
+  ],
+  "force": true
+}

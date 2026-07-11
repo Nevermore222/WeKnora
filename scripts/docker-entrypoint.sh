@@ -17,6 +17,20 @@ for dir in "${MOUNT_DIRS[@]}"; do
     fi
 done
 
+# Allow appuser to call the mounted Docker socket for controlled child
+# sandboxes. The socket group id differs across Docker Desktop/Linux hosts, so
+# create or reuse a matching group dynamically.
+if [ -S /var/run/docker.sock ]; then
+    DOCKER_SOCK_GID="$(stat -c '%g' /var/run/docker.sock)"
+    if ! getent group "$DOCKER_SOCK_GID" >/dev/null 2>&1; then
+        groupadd -g "$DOCKER_SOCK_GID" dockerhost 2>/dev/null || true
+    fi
+    DOCKER_SOCK_GROUP="$(getent group "$DOCKER_SOCK_GID" | cut -d: -f1)"
+    if [ -n "$DOCKER_SOCK_GROUP" ]; then
+        usermod -aG "$DOCKER_SOCK_GROUP" appuser 2>/dev/null || true
+    fi
+fi
+
 # Merge built-in skills into preloaded.
 # Built-in skills are backed up at /app/skills/_builtin during image build.
 # After a bind-mount replaces /app/skills/preloaded, copy back any

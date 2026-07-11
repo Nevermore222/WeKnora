@@ -144,17 +144,24 @@ func (s *DockerSandbox) buildDockerArgs(config *ExecuteConfig) []string {
 	args = append(args, "--pids-limit", "100")
 	args = append(args, "--security-opt", "no-new-privileges")
 
-	// Mount the effective work directory so scripts can access sibling files
-	// referenced by relative paths and write real output artifacts back to the
-	// host workspace.
 	mountDir := config.WorkDir
 	if mountDir == "" {
 		mountDir = filepath.Dir(config.Script)
 	}
-	args = append(args, "-v", fmt.Sprintf("%s:/workspace:rw", mountDir))
+
+	containerWorkDir := "/workspace"
+	if s.config.DockerVolumesFrom != "" {
+		args = append(args, "--volumes-from", s.config.DockerVolumesFrom)
+		containerWorkDir = mountDir
+	} else {
+		// Mount the effective work directory so scripts can access sibling files
+		// referenced by relative paths and write real output artifacts back to the
+		// host workspace.
+		args = append(args, "-v", fmt.Sprintf("%s:/workspace:rw", mountDir))
+	}
 
 	// Working directory
-	args = append(args, "-w", "/workspace")
+	args = append(args, "-w", containerWorkDir)
 
 	// Environment variables
 	for key, value := range config.Env {

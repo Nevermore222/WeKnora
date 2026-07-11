@@ -1005,6 +1005,13 @@ export default {
     attachmentTooMany: "最多上传 {max} 个附件",
     attachmentTooLarge: "文件 {name} 超过 {max}MB 限制",
     attachmentTypeNotSupported: "不支持的文件类型：{name}",
+    workspaceBound: "工作区",
+    workspaceUnbound: "未绑定工作区",
+    workspaceBindingInvalid: "工作区绑定已失效，请重新绑定",
+    workspaceBindingAccessDenied: "无权访问该工作区",
+    workspaceBindingArchived: "工作区已归档，文件输出已禁用，需重新绑定。",
+    workspaceOutputBlocked: "文件输出被禁用，需要更新工作区绑定。",
+    workspaceRebindAction: "重新绑定工作区",
   },
   settings: {
     title: "设置",
@@ -3072,6 +3079,19 @@ export default {
   createChat: {
     title: "Hi，我是 Xelora，让你的知识触手可及",
     newSessionTitle: "新会话",
+    workspace: {
+      placeholder: "选择本地工作区",
+      refresh: "刷新工作区",
+      create: "新建工作区文件夹",
+      createTitle: "新建工作区文件夹",
+      createConfirm: "创建",
+      namePlaceholder: "文件夹名称",
+      nameRequired: "请输入文件夹名称",
+      loadFailed: "加载工作区失败",
+      createFailed: "创建工作区失败",
+      createSuccess: "工作区已创建",
+      unavailable: "已隐藏 {count} 个不可用工作区",
+    },
     messages: {
       selectKnowledgeBase: "请先选择知识库",
       createFailed: "创建会话失败",

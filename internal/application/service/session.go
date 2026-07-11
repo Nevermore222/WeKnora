@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Tencent/Xelora/internal/config"
 	apperrors "github.com/Tencent/Xelora/internal/errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/Tencent/Xelora/internal/models/chat"
 	"github.com/Tencent/Xelora/internal/types"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
+	"github.com/Tencent/Xelora/internal/workspace"
 	"github.com/google/uuid"
 
 	chatpipeline "github.com/Tencent/Xelora/internal/application/service/chat_pipeline"
@@ -47,6 +49,7 @@ type sessionService struct {
 	webSearchProviderRepo interfaces.WebSearchProviderRepository // Repository for web search provider entities
 	kbShareService        interfaces.KBShareService              // Service for KB sharing operations
 	memoryService         interfaces.MemoryService               // Service for memory operations
+	workspaceService      interfaces.WorkspaceService
 }
 
 // NewSessionService creates a new session service instance with all required dependencies
@@ -64,6 +67,7 @@ func NewSessionService(cfg *config.Config,
 	webSearchProviderRepo interfaces.WebSearchProviderRepository,
 	kbShareService interfaces.KBShareService,
 	memoryService interfaces.MemoryService,
+	workspaceService interfaces.WorkspaceService,
 ) interfaces.SessionService {
 	return &sessionService{
 		cfg:                   cfg,
@@ -80,6 +84,7 @@ func NewSessionService(cfg *config.Config,
 		webSearchProviderRepo: webSearchProviderRepo,
 		kbShareService:        kbShareService,
 		memoryService:         memoryService,
+		workspaceService:      workspaceService,
 	}
 }
 
@@ -94,6 +99,12 @@ func (s *sessionService) CreateSession(ctx context.Context, session *types.Sessi
 	}
 
 	logger.Infof(ctx, "Creating session, tenant ID: %d", session.TenantID)
+
+	if binding, err := s.normalizeWorkspaceBinding(ctx, session.UserID, session.WorkspaceBinding); err != nil {
+		return nil, err
+	} else {
+		session.WorkspaceBinding = binding
+	}
 
 	// Create session in repository
 	createdSession, err := s.sessionRepo.Create(ctx, session)
@@ -230,11 +241,22 @@ func (s *sessionService) UpdateSession(ctx context.Context, session *types.Sessi
 
 	// Update session in repository
 	userID := sessionUserIDFromContext(ctx)
-	if _, err := s.sessionRepo.Get(ctx, session.TenantID, userID, session.ID); err != nil {
+	existing, err := s.sessionRepo.Get(ctx, session.TenantID, userID, session.ID)
+	if err != nil {
 		return err
 	}
 
-	_, err := s.sessionRepo.Update(ctx, session, userID)
+	if session.WorkspaceBinding == nil {
+		session.WorkspaceBinding = existing.WorkspaceBinding
+	} else {
+		normalized, err := s.normalizeWorkspaceBinding(ctx, userID, session.WorkspaceBinding)
+		if err != nil {
+			return err
+		}
+		session.WorkspaceBinding = normalized
+	}
+
+	_, err = s.sessionRepo.Update(ctx, session, userID)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"session_id": session.ID,
@@ -245,6 +267,68 @@ func (s *sessionService) UpdateSession(ctx context.Context, session *types.Sessi
 
 	logger.Infof(ctx, "Session updated successfully, ID: %s", session.ID)
 	return nil
+}
+
+func (s *sessionService) normalizeWorkspaceBinding(
+	ctx context.Context,
+	userID string,
+	binding *types.SessionWorkspaceBinding,
+) (*types.SessionWorkspaceBinding, error) {
+	if binding == nil {
+		return nil, nil
+	}
+
+	workspaceID := strings.TrimSpace(binding.WorkspaceID)
+	if workspaceID == "" {
+		return nil, nil
+	}
+
+	now := time.Now()
+	if s.workspaceService == nil {
+		return nil, stderrors.New("workspace_not_configured: workspace service is unavailable")
+	}
+	entry, err := s.workspaceService.Resolve(ctx, workspaceID)
+	if err != nil {
+		status := types.SessionWorkspaceBindingStatusInvalid
+		code := "workspace_not_found"
+		message := "workspace not found or no longer available"
+		if stderrors.Is(err, workspace.ErrAccessDenied) {
+			status = types.SessionWorkspaceBindingStatusAccessDenied
+			code = "workspace_access_denied"
+			message = "workspace is not writable"
+		}
+		return &types.SessionWorkspaceBinding{
+			WorkspaceID:       workspaceID,
+			Status:            status,
+			ValidationMessage: message,
+			BoundByUserID:     userID,
+			BoundAt:           cloneTimePtr(binding.BoundAt, &now),
+			LastValidatedAt:   &now,
+		}, fmt.Errorf("%s: %w", code, err)
+	}
+
+	return &types.SessionWorkspaceBinding{
+		WorkspaceID:       entry.ID,
+		WorkspaceName:     entry.Name,
+		RootPath:          entry.RootPath,
+		Status:            types.SessionWorkspaceBindingStatusBound,
+		ValidationMessage: "",
+		BoundByUserID:     userID,
+		BoundAt:           cloneTimePtr(binding.BoundAt, &now),
+		LastValidatedAt:   &now,
+	}, nil
+}
+
+func cloneTimePtr(existing *time.Time, fallback *time.Time) *time.Time {
+	if existing != nil {
+		v := *existing
+		return &v
+	}
+	if fallback == nil {
+		return nil
+	}
+	v := *fallback
+	return &v
 }
 
 // UpdateSessionLastRequestState persists the input-bar state used by the most

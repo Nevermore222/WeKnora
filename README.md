@@ -57,6 +57,10 @@ The framework supports auto-syncing knowledge from Feishu, Notion, and Yuque (mo
 
 ## ✨ Latest Updates
 
+- **Secondary development: workspace-bound file output** — conversations can
+  bind a workspace and route generated Markdown, Word, Excel, and presentation
+  artifacts into that workspace through the local runtime gateway. See
+  [`docs/customizations/WORKSPACE_OFFICE_PROGRESS.md`](./docs/customizations/WORKSPACE_OFFICE_PROGRESS.md).
 - **v0.6.2** — Per-upload process configuration with upload-confirm dialog; document reparse with `process_config`; `xelora` CLI v0.9 (bundled Agent Skills, `session stop`, auth/profile harmonization); KB marquee multi-select; HNSW index for 1024-dim pgvector embeddings; chat resources store refactor; Langfuse-only tracing (Jaeger removed). See [`CHANGELOG.md`](./CHANGELOG.md).
 - **v0.6.1** — Document parsing trace timeline (Langfuse-style span tree with stage-by-stage progress + stop-parse); OpenSearch vector store driver; declarative built-in models via YAML; system admin & consolidated platform settings + audit log; new-user onboarding guide; settings UI redesign; `xelora` CLI v0.7 / v0.8 (agent-first wire contract, NDJSON, `--dry-run`); OpenDataLoader + PaddleOCR-VL parsers; MCP server multi-transport (stdio / SSE / HTTP); per-model thinking-mode config; Tencent LKEAP rerank + native Gemini embeddings + MiniMax-M3. See [`CHANGELOG.md`](./CHANGELOG.md).
 - **v0.6.0** — Tenant RBAC (4-tier role matrix `Owner` / `Admin` / `Contributor` / `Viewer` + per-KB ownership + per-tenant audit log), tenant member management & multi-workspace UX, self-service workspaces; `xelora` CLI v0.4 GA with `mcp serve`; KB retrieval fan-out across vector stores; AES-256-GCM credential encryption + docreader gRPC TLS + Token; Zhipu embedder + Huawei OBS; server-side user preferences; Go 1.26.0. See [`docs/RBAC说明.md`](./docs/RBAC说明.md) and [`CHANGELOG.md`](./CHANGELOG.md).
@@ -110,6 +114,7 @@ Fully modular pipeline from document parsing, vectorization, and retrieval to LL
 | Tool Calling | Built-in tools, MCP tools, web search |
 | Conversation Strategy | Online Prompt editing, retrieval threshold tuning, multi-turn context awareness |
 | Suggested Questions | Auto-generated question suggestions based on knowledge base content |
+| Workspace Binding | Bind a workspace to a conversation so generated files and artifacts default to a user-visible workspace directory instead of a hidden skill-private root |
 
 **Knowledge Management**
 
@@ -262,6 +267,7 @@ Project-specific design, planning, and secondary-development documents are track
 - Runtime reference spec: [`specs/001-agent-runtime-reference/spec.md`](./specs/001-agent-runtime-reference/spec.md)
 - Runtime reference execution tasks: [`specs/001-agent-runtime-reference/tasks.md`](./specs/001-agent-runtime-reference/tasks.md)
 - Skill usage governance spec: [`specs/001-skill-usage-governance/spec.md`](./specs/001-skill-usage-governance/spec.md)
+- Session workspace binding spec: [`specs/002-session-workspace-binding/spec.md`](./specs/002-session-workspace-binding/spec.md)
 
 ## 🧭 Developer Guide
 

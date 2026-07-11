@@ -45,6 +45,7 @@ cmd/desktop/build/bin/
 /models/
 test/data/mswag.txt
 data/files/
+data/workspaces-e2e/
 data/xelora.db
 data/xelora.db-wal
 data/xelora.db-shm

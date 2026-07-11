@@ -8,6 +8,8 @@ FROM node:20-slim AS node-base
 # Stage 2: Final image
 FROM python:3.11-slim
 
+ARG OFFICECLI_VERSION=1.0.135
+
 # Copy Node.js from node image (avoids NodeSource install overhead)
 COPY --from=node-base /usr/local/bin/node /usr/local/bin/
 COPY --from=node-base /usr/local/lib/node_modules /usr/local/lib/node_modules
@@ -18,10 +20,23 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
 # Install minimal CLI tools (bash/grep/sed/coreutils already in slim image)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     jq \
+    libicu-dev \
+    libssl3 \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
-# Note: Current preloaded skills only use Python stdlib
-# Add packages here when skills actually need them:
+RUN python -m pip install --no-cache-dir \
+    openpyxl \
+    pandas
+
+# OfficeCLI provides AI-friendly read/write operations for .docx, .xlsx, and
+# .pptx without requiring Microsoft Office. Keep it pinned for repeatable
+# sandbox behavior.
+RUN npm config set update-notifier false && \
+    npm install -g @officecli/officecli@${OFFICECLI_VERSION}
+
+# Spreadsheet skills rely on openpyxl/pandas for workbook creation and
+# formula/error scanning. Formula recalculation requires LibreOffice in
+# environments that enable formula-heavy spreadsheet workflows.
 
 # Create non-root user (UID 1000) for sandbox execution
 RUN groupadd -g 1000 sandbox && \

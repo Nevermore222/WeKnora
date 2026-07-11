@@ -1,8 +1,24 @@
 import { get, post, put, del, postChat } from "../../utils/request";
 
+export interface SessionWorkspaceBindingPayload {
+  workspace_id?: string;
+  workspace_name?: string;
+  root_path?: string;
+  status?: "bound" | "unbound" | "invalid" | "access_denied" | "archived";
+  validation_message?: string;
+  bound_at?: string;
+  last_validated_at?: string;
+}
 
+export interface SessionWorkspaceBindingInput {
+  workspace_id: string;
+}
 
-export async function createSessions(data = {}) {
+export async function createSessions(data: {
+  title?: string;
+  description?: string;
+  workspace_binding?: SessionWorkspaceBindingInput | null;
+} = {}) {
   return post("/api/v1/sessions", data);
 }
 

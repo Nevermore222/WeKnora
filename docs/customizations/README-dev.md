@@ -229,3 +229,57 @@ docker image history wechatopenai/xelora-app:latest
 - `.env` 中 `APK_MIRROR_ARG=mirrors.tencent.com` 已配腾讯镜像加速构建
 - 改了 `config/config.yaml` 后需重启 app(该文件通过 volume 挂载, 不需重建镜像): `docker compose restart app`
 - 改了 `skills/preloaded/` 下的 skill 后需重启 app(同样 volume 挂载): `docker compose restart app`
+
+## Runtime Planning Baseline
+
+Runtime execution planning is now anchored on the OpenSandbox-first design set:
+
+1. `specs/001-opensandbox-baseline/spec.md`
+2. `specs/001-opensandbox-baseline/plan.md`
+3. `specs/001-opensandbox-baseline/tasks.md`
+4. `docs/customizations/TASKS.md`
+5. `docs/customizations/WORKSPACE_OFFICE_PROGRESS.md`
+
+Use those files before touching executor-provider work, artifact workflows, or
+runtime-reference documents. The older `001-agent-runtime-reference` set is now
+historical context rather than the active implementation baseline.
+
+## Workspace-Bound File Output Progress
+
+The current status of conversation workspace binding, controlled Docker
+execution, Office document generation, and XLSX compatibility hardening is
+tracked in:
+
+```text
+docs/customizations/WORKSPACE_OFFICE_PROGRESS.md
+```
+
+Read it before changing `skills/preloaded/`, `internal/executor/`,
+`internal/agent/tools/skill_execute.go`, or workspace-bound file output flows.
+
+## OpenSandbox Service Management
+
+Xelora now supports a repo-managed local OpenSandbox server in the main
+`docker-compose.yml` stack. The intended local management entrypoint is:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\opensandbox-service.ps1 up
+powershell -ExecutionPolicy Bypass -File .\scripts\opensandbox-service.ps1 status
+powershell -ExecutionPolicy Bypass -File .\scripts\opensandbox-service.ps1 smoke
+```
+
+The compose service name is `opensandbox-server`, the default host health check
+is `http://127.0.0.1:8090/health`, and the app consumes the same `.env`
+contract through:
+
+- `XELORA_OPENSANDBOX_BASE_URL`
+- `XELORA_OPENSANDBOX_API_KEY`
+- `XELORA_OPENSANDBOX_TEMPLATE_ID`
+
+Server-side local defaults are also sourced from `.env` so the server and app
+stay aligned:
+
+- `XELORA_OPENSANDBOX_SERVER_PORT`
+- `XELORA_OPENSANDBOX_SERVER_HOST_IP`
+- `XELORA_OPENSANDBOX_EXECD_IMAGE`
+- `XELORA_OPENSANDBOX_EGRESS_IMAGE`

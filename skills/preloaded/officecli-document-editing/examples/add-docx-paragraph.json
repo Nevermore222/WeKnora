@@ -1,0 +1,10 @@
+{
+  "action": "add",
+  "file": "brief.docx",
+  "parent": "/body",
+  "type": "paragraph",
+  "props": {
+    "text": "Xelora weekly brief",
+    "style": "Heading1"
+  }
+}

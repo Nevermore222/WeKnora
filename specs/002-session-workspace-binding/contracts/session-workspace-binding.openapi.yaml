@@ -1,0 +1,160 @@
+openapi: 3.0.3
+info:
+  title: Xelora Session Workspace Binding API
+  version: 0.1.0
+  description: |
+    Contract additions for binding a workspace to a conversation at session creation time
+    and exposing that binding to later session reads and runtime consumers.
+paths:
+  /api/v1/sessions:
+    post:
+      summary: Create a new session with optional workspace binding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          description: Invalid workspace binding payload
+        "403":
+          description: User cannot bind the requested workspace
+  /api/v1/sessions/{session_id}:
+    get:
+      summary: Get session details including workspace binding state
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "404":
+          description: Session not found
+  /api/v1/sessions/{session_id}/workspace-binding:
+    put:
+      summary: Replace or clear the workspace binding for an existing session
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceBindingRequest"
+      responses:
+        "200":
+          description: Workspace binding updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceBindingResponse"
+        "400":
+          description: Invalid workspace binding update
+        "403":
+          description: User cannot bind the requested workspace
+        "404":
+          description: Session not found
+components:
+  schemas:
+    CreateSessionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        workspace_binding:
+          $ref: "#/components/schemas/WorkspaceBindingInput"
+    UpdateWorkspaceBindingRequest:
+      type: object
+      properties:
+        workspace_binding:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/WorkspaceBindingInput"
+      required:
+        - workspace_binding
+    WorkspaceBindingInput:
+      type: object
+      properties:
+        workspace_id:
+          type: string
+        root_path:
+          type: string
+      required:
+        - workspace_id
+    SessionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        last_request_state:
+          $ref: "#/components/schemas/LastRequestState"
+        workspace_binding:
+          $ref: "#/components/schemas/WorkspaceBindingResponse"
+    WorkspaceBindingResponse:
+      type: object
+      properties:
+        workspace_id:
+          type: string
+        workspace_name:
+          type: string
+        root_path:
+          type: string
+        status:
+          type: string
+          enum:
+            - bound
+            - unbound
+            - invalid
+            - access_denied
+            - archived
+        validation_message:
+          type: string
+        bound_at:
+          type: string
+          format: date-time
+        last_validated_at:
+          type: string
+          format: date-time
+    LastRequestState:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        agent_enabled:
+          type: boolean
+        model_id:
+          type: string
+        knowledge_base_ids:
+          type: array
+          items:
+            type: string
+        knowledge_ids:
+          type: array
+          items:
+            type: string
+        web_search_enabled:
+          type: boolean

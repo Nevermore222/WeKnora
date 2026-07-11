@@ -2,6 +2,8 @@ package executor
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"mime"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/Tencent/Xelora/internal/agent/skills"
 	"github.com/Tencent/Xelora/internal/sandbox"
+	"github.com/Tencent/Xelora/internal/types"
 	"github.com/google/uuid"
 )
 
@@ -31,12 +34,15 @@ type SkillJobExecution struct {
 }
 
 type Gateway struct {
-	providers map[string]Provider
+	providers        map[string]Provider
+	browserProviders map[string]BrowserProvider
 }
 
 func NewGateway() *Gateway {
 	return NewGatewayWithProviders(
+		NewControlledDockerProvider(),
 		NewLocalProvider(),
+		NewOpenSandboxProvider(),
 		NewCubeSandboxProvider(),
 	)
 }
@@ -49,31 +55,200 @@ func NewGatewayWithProviders(providers ...Provider) *Gateway {
 		}
 		registry[provider.Name()] = provider
 	}
-	return &Gateway{providers: registry}
+	browserRegistry := make(map[string]BrowserProvider)
+	gateway := &Gateway{providers: registry, browserProviders: browserRegistry}
+	gateway.RegisterBrowserProvider(NewControlledDockerBrowserProvider())
+	return gateway
 }
 
-func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, executor SkillExecutor) (*SkillJobExecution, error) {
-	basePath, err := executor.GetSkillBasePath(ctx, req.SkillName)
+// RegisterBrowserProvider adds a browser provider to the gateway's registry.
+func (g *Gateway) RegisterBrowserProvider(provider BrowserProvider) {
+	if provider == nil || g.browserProviders == nil {
+		g.browserProviders = make(map[string]BrowserProvider)
+	}
+	if provider != nil {
+		g.browserProviders[provider.Name()] = provider
+	}
+}
+
+// RunBrowserTaskJob dispatches a browser navigation task through the gateway.
+// It mirrors RunSkillScriptJob: resolve the conversation output context,
+// enforce boundary checks, select the browser provider, execute the task,
+// and detect/register artifacts via the same file-snapshot diffing.
+func (g *Gateway) RunBrowserTaskJob(ctx context.Context, req BrowserJobRequest, executor SkillExecutor) (*BrowserTaskExecution, error) {
+	provider, err := selectBrowserProvider(req.Provider, g.browserProviders)
 	if err != nil {
 		return nil, err
 	}
 
-	provider, err := selectProvider(req.Provider, g.providers)
+	outputCtx, err := requireWorkspaceOutputContext(req.SessionID, req.WorkspaceBinding)
 	if err != nil {
 		return nil, err
+	}
+	artifactBase := outputCtx.EffectiveRootDir
+	if err := validateWorkspaceRoot(artifactBase); err != nil {
+		return nil, err
+	}
+	if !outputCtx.IsWithinWorkspaceRoot(artifactBase) {
+		return nil, fmt.Errorf("workspace_path_escape: browser output root escapes bound workspace boundary")
 	}
 	providerCapability := provider.Capability(ctx)
 
 	now := time.Now()
-	workspace := buildWorkspaceRecord(req, basePath, provider.Name(), now)
+	workspace := &WorkspaceRecord{
+		ID:         outputCtx.WorkspaceID,
+		SessionID:  req.SessionID,
+		SkillName:  "browser-snapshot",
+		RootPath:   artifactBase,
+		WorkingDir: ".",
+		Provider:   provider.Name(),
+		Status:     WorkspaceStatusActive,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+		LastUsedAt: now,
+	}
+	workspace.RootPath = outputCtx.EffectiveRootDir
+	workspace.WorkingDir = outputCtx.EffectiveRootDir
 
-	preSnapshot, err := snapshotFiles(basePath)
+	preSnapshot, err := snapshotFiles(artifactBase)
 	if err != nil {
 		return nil, err
 	}
 
-	job := &SkillJob{
+	job := &BrowserJob{
 		ID:                 uuid.NewString(),
+		WorkspaceID:        workspace.ID,
+		SessionID:          req.SessionID,
+		AssistantMessageID: req.AssistantMessageID,
+		RequestID:          req.RequestID,
+		ToolCallID:         req.ToolCallID,
+		URL:                req.URL,
+		CaptureMode:        req.CaptureMode,
+		Provider:           provider.Name(),
+		WorkingDir:         workspace.WorkingDir,
+		Status:             JobStatusRunning,
+		StartedAt:          now,
+	}
+	if job.CaptureMode == "" {
+		job.CaptureMode = BrowserCaptureScreenshot
+	}
+
+	taskResult, err := provider.ExecuteBrowserTask(ctx, req, artifactBase, executor)
+	if err != nil {
+		return nil, err
+	}
+
+	postSnapshot, snapshotErr := snapshotFiles(artifactBase)
+	if snapshotErr == nil {
+		artifacts := detectArtifacts(artifactBase, workspace.ID, job.ID, req.SessionID, preSnapshot, postSnapshot, nil)
+		job.ArtifactCount = len(artifacts)
+		job.FinishedAt = job.StartedAt.Add(taskResult.Result.Duration)
+		job.DurationMs = taskResult.Result.Duration.Milliseconds()
+		job.ExitCode = taskResult.Result.ExitCode
+		job.StdoutSummary = summarizeOutput(taskResult.Result.Stdout)
+		job.StderrSummary = summarizeOutput(taskResult.Result.Stderr)
+		if taskResult.Result.Error != "" {
+			job.Error = taskResult.Result.Error
+		}
+		if taskResult.Result.IsSuccess() {
+			job.Status = JobStatusSucceeded
+		} else {
+			job.Status = JobStatusFailed
+			if job.Error == "" {
+				job.Error = "browser task failed"
+			}
+		}
+		return &BrowserTaskExecution{
+			Job:              job,
+			Workspace:        workspace,
+			Provider:         providerCapability,
+			Artifacts:        artifacts,
+			ArtifactDetected: len(artifacts) > 0,
+			Result:           taskResult.Result,
+		}, nil
+	}
+
+	job.FinishedAt = job.StartedAt.Add(taskResult.Result.Duration)
+	job.DurationMs = taskResult.Result.Duration.Milliseconds()
+	job.ExitCode = taskResult.Result.ExitCode
+	job.StdoutSummary = summarizeOutput(taskResult.Result.Stdout)
+	job.StderrSummary = summarizeOutput(taskResult.Result.Stderr)
+	if taskResult.Result.Error != "" {
+		job.Error = taskResult.Result.Error
+	}
+	if taskResult.Result.IsSuccess() {
+		job.Status = JobStatusSucceeded
+	} else {
+		job.Status = JobStatusFailed
+		if job.Error == "" {
+			job.Error = "browser task failed"
+		}
+	}
+
+	return &BrowserTaskExecution{
+		Job:              job,
+		Workspace:        workspace,
+		Provider:         providerCapability,
+		Artifacts:        nil,
+		ArtifactDetected: false,
+		Result:           taskResult.Result,
+	}, nil
+}
+
+func buildBrowserWorkspaceID(sessionID string) string {
+	if sessionID != "" {
+		return "session-" + sanitizeWorkspaceIDPart(sessionID) + "-browser"
+	}
+	return "browser-snapshot"
+}
+
+func selectBrowserProvider(providerName string, providers map[string]BrowserProvider) (BrowserProvider, error) {
+	name := providerName
+	if name == "" {
+		name = ControlledDockerBrowserProviderName
+	}
+	provider, ok := providers[name]
+	if !ok {
+		return nil, fmt.Errorf("browser provider not configured: %s", name)
+	}
+	return provider, nil
+}
+
+func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, executor SkillExecutor) (*SkillJobExecution, error) {
+	provider, err := selectProvider(req.Provider, g.providers)
+	if err != nil {
+		return nil, err
+	}
+	outputCtx, err := requireWorkspaceOutputContext(req.SessionID, req.WorkspaceBinding)
+	if err != nil {
+		return nil, err
+	}
+	artifactBase := outputCtx.EffectiveRootDir
+	if err := validateWorkspaceRoot(artifactBase); err != nil {
+		return nil, err
+	}
+	if !outputCtx.IsWithinWorkspaceRoot(artifactBase) {
+		return nil, fmt.Errorf("workspace_path_escape: output root escapes bound workspace boundary")
+	}
+	// Provider selection happens inside the gateway so Xelora retains ownership
+	// of workspace IDs, policy checks, job state, and artifact registration
+	// regardless of which sandbox backend is active.
+	providerCapability := provider.Capability(ctx)
+
+	now := time.Now()
+	workspace := buildWorkspaceRecord(req, artifactBase, provider.Name(), now)
+	workspace.ID = outputCtx.WorkspaceID
+	workspace.RootPath = outputCtx.EffectiveRootDir
+	workspace.WorkingDir = outputCtx.EffectiveRootDir
+
+	preSnapshot, err := snapshotFiles(artifactBase)
+	if err != nil {
+		return nil, err
+	}
+
+	jobID := uuid.NewString()
+	job := &SkillJob{
+		ID:                 jobID,
 		WorkspaceID:        workspace.ID,
 		SessionID:          req.SessionID,
 		AssistantMessageID: req.AssistantMessageID,
@@ -96,14 +271,23 @@ func (g *Gateway) RunSkillScriptJob(ctx context.Context, req SkillJobRequest, ex
 		defer prepared.Cleanup()
 	}
 
+	stagingCleanup, err := stagePreparedInputs(prepared, artifactBase, jobID)
+	if err != nil {
+		return nil, err
+	}
+	if stagingCleanup != nil {
+		defer stagingCleanup()
+	}
+	prepared.WorkDir = outputCtx.EffectiveRootDir
+
 	outcome, err := provider.ExecuteSkillScript(ctx, req, prepared, executor)
 	if err != nil {
 		return nil, err
 	}
 
-	postSnapshot, snapshotErr := snapshotFiles(basePath)
+	postSnapshot, snapshotErr := snapshotFiles(artifactBase)
 	if snapshotErr == nil {
-		artifacts := detectArtifacts(basePath, workspace.ID, job.ID, req.SessionID, preSnapshot, postSnapshot, outcome.MaterializedInputPaths)
+		artifacts := detectArtifacts(artifactBase, workspace.ID, job.ID, req.SessionID, preSnapshot, postSnapshot, outcome.MaterializedInputPaths)
 		job.ArtifactCount = len(artifacts)
 		job.FinishedAt = job.StartedAt.Add(outcome.Result.Duration)
 		job.DurationMs = outcome.Result.Duration.Milliseconds()
@@ -302,11 +486,101 @@ func sanitizeWorkspaceIDPart(value string) string {
 
 func shouldIgnoreDir(name string) bool {
 	switch name {
-	case "node_modules", "__pycache__", ".git":
+	case "node_modules", "__pycache__", ".git", ".xelora":
 		return true
 	default:
 		return false
 	}
+}
+
+func requireWorkspaceOutputContext(sessionID string, binding *types.SessionWorkspaceBinding) (ConversationOutputContext, error) {
+	outputCtx := ResolveConversationOutputContext(sessionID, binding)
+	if !outputCtx.WriteAllowed || outputCtx.EffectiveRootDir == "" {
+		code := string(outputCtx.FailureCode)
+		if code == "" || outputCtx.Mode == ConversationOutputModeUnbound {
+			code = string(ConversationOutputFailureWorkspaceRequired)
+		}
+		message := strings.TrimSpace(outputCtx.FailureMessage)
+		if message == "" {
+			message = "bind a workspace before running file tools"
+		}
+		return outputCtx, fmt.Errorf("%s: %s", code, message)
+	}
+	return outputCtx, nil
+}
+
+func validateWorkspaceRoot(root string) error {
+	info, err := os.Stat(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("workspace_not_found: bound workspace no longer exists")
+		}
+		return fmt.Errorf("workspace_access_denied: inspect workspace: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("workspace_not_found: bound workspace is not a directory")
+	}
+	return nil
+}
+
+func stagePreparedInputs(prepared *skills.PreparedScriptExecution, workspaceRoot, jobID string) (func(), error) {
+	if prepared == nil || len(prepared.MaterializedInputPaths) == 0 {
+		return nil, nil
+	}
+	stageDir := filepath.Join(workspaceRoot, ".xelora", "jobs", jobID)
+	if err := os.MkdirAll(stageDir, 0o700); err != nil {
+		return nil, fmt.Errorf("stage skill input: %w", err)
+	}
+	cleanup := func() { _ = os.RemoveAll(stageDir) }
+	replacements := make(map[string]string, len(prepared.MaterializedInputPaths)*3)
+	stagedPaths := make([]string, 0, len(prepared.MaterializedInputPaths))
+	for _, source := range prepared.MaterializedInputPaths {
+		target := filepath.Join(stageDir, filepath.Base(source))
+		if err := copyFile(source, target); err != nil {
+			cleanup()
+			return nil, err
+		}
+		relTarget, err := filepath.Rel(workspaceRoot, target)
+		if err != nil {
+			cleanup()
+			return nil, err
+		}
+		replacements[filepath.Clean(source)] = relTarget
+		replacements[filepath.Base(source)] = relTarget
+		if prepared.BasePath != "" {
+			if relSource, relErr := filepath.Rel(prepared.BasePath, source); relErr == nil {
+				replacements[filepath.Clean(relSource)] = relTarget
+			}
+		}
+		stagedPaths = append(stagedPaths, target)
+	}
+	for index, arg := range prepared.Args {
+		if replacement, ok := replacements[filepath.Clean(arg)]; ok {
+			prepared.Args[index] = replacement
+		}
+	}
+	prepared.MaterializedInputPaths = stagedPaths
+	return cleanup, nil
+}
+
+func copyFile(source, target string) error {
+	input, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("open staged input: %w", err)
+	}
+	defer input.Close()
+	output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("create staged input: %w", err)
+	}
+	if _, err := io.Copy(output, input); err != nil {
+		output.Close()
+		return fmt.Errorf("copy staged input: %w", err)
+	}
+	if err := output.Close(); err != nil {
+		return fmt.Errorf("close staged input: %w", err)
+	}
+	return nil
 }
 
 func shouldIgnoreFile(path string) bool {

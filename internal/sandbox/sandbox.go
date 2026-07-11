@@ -163,6 +163,11 @@ type Config struct {
 	// DockerImage is the Docker image to use (Docker sandbox only)
 	DockerImage string
 
+	// DockerVolumesFrom reuses volumes from an existing container. This is used
+	// when the app itself runs in Docker and child sandboxes need to see the
+	// same bind-mounted skill workspace.
+	DockerVolumesFrom string
+
 	// AllowedCommands is the default list of allowed commands
 	AllowedCommands []string
 

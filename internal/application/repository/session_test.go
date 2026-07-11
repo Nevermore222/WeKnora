@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
 
 	apperrors "github.com/Tencent/Xelora/internal/errors"
 	"github.com/Tencent/Xelora/internal/types"
@@ -160,6 +161,37 @@ func TestSessionRepositoryDeleteAllHonorsUserScope(t *testing.T) {
 	require.Zero(t, countActiveSessionsForTest(t, db, bobSession.ID))
 	require.Zero(t, countActiveSessionsForTest(t, db, legacySession.ID))
 	require.EqualValues(t, 1, countActiveSessionsForTest(t, db, otherTenantSession.ID))
+}
+
+func TestSessionRepositoryUpdatePersistsWorkspaceBinding(t *testing.T) {
+	repo, db := newSessionRepositoryForTest(t)
+	ctx := context.Background()
+	session := createSessionForTest(t, db, 1, "alice")
+	now := time.Now().UTC().Truncate(time.Second)
+
+	rows, err := repo.Update(ctx, &types.Session{
+		ID:       session.ID,
+		TenantID: session.TenantID,
+		Title:    session.Title,
+		WorkspaceBinding: &types.SessionWorkspaceBinding{
+			WorkspaceID:     "tenant:1",
+			WorkspaceName:   "Alpha",
+			RootPath:        "/tmp/workspaces/tenant-1",
+			Status:          types.SessionWorkspaceBindingStatusBound,
+			BoundAt:         &now,
+			LastValidatedAt: &now,
+			BoundByUserID:   "alice",
+		},
+	}, "alice")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, rows)
+
+	var stored types.Session
+	require.NoError(t, db.First(&stored, "id = ?", session.ID).Error)
+	require.NotNil(t, stored.WorkspaceBinding)
+	require.Equal(t, "tenant:1", stored.WorkspaceBinding.WorkspaceID)
+	require.Equal(t, "Alpha", stored.WorkspaceBinding.WorkspaceName)
+	require.Equal(t, types.SessionWorkspaceBindingStatusBound, stored.WorkspaceBinding.Status)
 }
 
 // im_channel_sessions row for QueryPaged source-filter tests. Mirrors the columns

@@ -28,6 +28,16 @@ RECALCULATE_MACRO = """<?xml version="1.0" encoding="UTF-8"?>
     End Sub
 </script:module>"""
 
+EXCEL_ERRORS = [
+    "#VALUE!",
+    "#DIV/0!",
+    "#REF!",
+    "#NAME?",
+    "#NULL!",
+    "#NUM!",
+    "#N/A",
+]
+
 
 def has_gtimeout():
     try:
@@ -67,15 +77,82 @@ def setup_libreoffice_macro():
         return False
 
 
+def count_formulas(filename):
+    wb = load_workbook(filename, data_only=False)
+    try:
+        formula_count = 0
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            for row in ws.iter_rows():
+                for cell in row:
+                    if (
+                        cell.value
+                        and isinstance(cell.value, str)
+                        and cell.value.startswith("=")
+                    ):
+                        formula_count += 1
+        return formula_count
+    finally:
+        wb.close()
+
+
+def scan_excel_errors(filename):
+    wb = load_workbook(filename, data_only=True)
+    try:
+        error_details = {err: [] for err in EXCEL_ERRORS}
+        total_errors = 0
+
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.value is not None and isinstance(cell.value, str):
+                        for err in EXCEL_ERRORS:
+                            if err in cell.value:
+                                location = f"{sheet_name}!{cell.coordinate}"
+                                error_details[err].append(location)
+                                total_errors += 1
+                                break
+
+        return total_errors, error_details
+    finally:
+        wb.close()
+
+
+def build_result(total_errors, error_details, formula_count):
+    result = {
+        "status": "success" if total_errors == 0 else "errors_found",
+        "total_errors": total_errors,
+        "error_summary": {},
+        "total_formulas": formula_count,
+    }
+
+    for err_type, locations in error_details.items():
+        if locations:
+            result["error_summary"][err_type] = {
+                "count": len(locations),
+                "locations": locations[:20],
+            }
+
+    return result
+
+
 def recalc(filename, timeout=30):
     if not Path(filename).exists():
         return {"error": f"File {filename} does not exist"}
 
-    abs_path = str(Path(filename).absolute())
+    try:
+        formula_count = count_formulas(filename)
+        if formula_count == 0:
+            total_errors, error_details = scan_excel_errors(filename)
+            return build_result(total_errors, error_details, formula_count)
+    except Exception as e:
+        return {"error": str(e)}
 
     if not setup_libreoffice_macro():
         return {"error": "Failed to setup LibreOffice macro"}
 
+    abs_path = str(Path(filename).absolute())
     cmd = [
         "soffice",
         "--headless",
@@ -98,64 +175,8 @@ def recalc(filename, timeout=30):
         return {"error": error_msg}
 
     try:
-        wb = load_workbook(filename, data_only=True)
-
-        excel_errors = [
-            "#VALUE!",
-            "#DIV/0!",
-            "#REF!",
-            "#NAME?",
-            "#NULL!",
-            "#NUM!",
-            "#N/A",
-        ]
-        error_details = {err: [] for err in excel_errors}
-        total_errors = 0
-
-        for sheet_name in wb.sheetnames:
-            ws = wb[sheet_name]
-            for row in ws.iter_rows():
-                for cell in row:
-                    if cell.value is not None and isinstance(cell.value, str):
-                        for err in excel_errors:
-                            if err in cell.value:
-                                location = f"{sheet_name}!{cell.coordinate}"
-                                error_details[err].append(location)
-                                total_errors += 1
-                                break
-
-        wb.close()
-
-        result = {
-            "status": "success" if total_errors == 0 else "errors_found",
-            "total_errors": total_errors,
-            "error_summary": {},
-        }
-
-        for err_type, locations in error_details.items():
-            if locations:
-                result["error_summary"][err_type] = {
-                    "count": len(locations),
-                    "locations": locations[:20],  
-                }
-
-        wb_formulas = load_workbook(filename, data_only=False)
-        formula_count = 0
-        for sheet_name in wb_formulas.sheetnames:
-            ws = wb_formulas[sheet_name]
-            for row in ws.iter_rows():
-                for cell in row:
-                    if (
-                        cell.value
-                        and isinstance(cell.value, str)
-                        and cell.value.startswith("=")
-                    ):
-                        formula_count += 1
-        wb_formulas.close()
-
-        result["total_formulas"] = formula_count
-
-        return result
+        total_errors, error_details = scan_excel_errors(filename)
+        return build_result(total_errors, error_details, formula_count)
 
     except Exception as e:
         return {"error": str(e)}

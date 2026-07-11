@@ -98,7 +98,24 @@
             </div>
         </transition>
         <div class="input-container" :class="{ 'is-embedded': embeddedMode }">
-            <InputField ref="inputFieldRef"
+           <!-- Workspace binding context bar -->
+           <div v-if="!embeddedMode && workspaceBinding" class="workspace-binding-bar"
+               :class="{ 'is-bound': isWorkspaceBound, 'is-warning': !!workspaceBindingWarning }">
+               <t-icon :name="isWorkspaceBound ? 'folder' : 'folder-open'" size="14px" />
+               <span v-if="isWorkspaceBound" class="workspace-binding-text">
+                   {{ t('chat.workspaceBound') }}: {{ workspaceBinding.workspace_name || workspaceBinding.workspace_id }}
+               </span>
+               <span v-else-if="workspaceBindingWarning" class="workspace-binding-text">
+                   {{ workspaceBindingWarning }}
+               </span>
+               <span v-else class="workspace-binding-text">{{ t('chat.workspaceUnbound') }}</span>
+           </div>
+            <!-- Workspace binding recovery banner for invalid/access_denied/archived -->
+            <div v-if="!embeddedMode && workspaceBindingError" class="workspace-binding-recovery">
+                <t-icon name="error-circle" size="14px" />
+                <span class="recovery-text">{{ workspaceBindingError }}</span>
+            </div>
+           <InputField ref="inputFieldRef"
                 @send-msg="(query, modelId, mentionedItems, imageFiles, attachmentFiles) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles)"
                 @stop-generation="handleStopGeneration" :isReplying="isReplying" :sessionId="session_id"
                 :assistantMessageId="currentAssistantMessageId" :embeddedMode="embeddedMode"></InputField>
@@ -150,6 +167,28 @@ const isAgentStreamSession = () => {
 const uiStore = useUIStore();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 const { t } = useI18n();
+
+// Workspace binding context for the current conversation.
+const workspaceBinding = computed(() => useSettingsStoreInstance.activeSessionWorkspaceBinding);
+const isWorkspaceBound = computed(() => useSettingsStoreInstance.isSessionWorkspaceBound);
+const workspaceBindingWarning = computed(() => {
+    const b = workspaceBinding.value;
+    if (!b || !b.workspace_id) return null;
+    if (b.status === 'invalid' || b.status === 'archived') return b.validation_message || t('chat.workspaceBindingInvalid');
+    if (b.status === 'access_denied') return b.validation_message || t('chat.workspaceBindingAccessDenied');
+    return null;
+});
+// Stronger recovery banner shown when file outputs are actively blocked.
+// Distinct from workspaceBindingWarning (info bar) so the user sees a
+// clear call-to-action rather than just a label change.
+const workspaceBindingError = computed(() => {
+    const b = workspaceBinding.value;
+    if (!b || !b.workspace_id) return null;
+    if (b.status === 'archived') return t('chat.workspaceBindingArchived');
+    if (b.status === 'access_denied') return t('chat.workspaceOutputBlocked');
+    if (b.status === 'invalid') return t('chat.workspaceOutputBlocked');
+    return null;
+});
 const { firstQuery, firstMentionedItems, firstModelId, firstImageFiles, firstAttachmentFiles } = storeToRefs(usemenuStore);
 const { onChunk, error, startStream, stopStream, lastStreamRequest } = useStream();
 /** Snapshot of the in-flight HTTP request for attaching to the next assistant message. */
@@ -189,6 +228,10 @@ const loadSessionAndHydrate = async (sid) => {
         const sessionRes = await getSession(sid);
         if (sessionRes?.data) {
             const lastState = sessionRes.data.last_request_state;
+            // Hydrate the session workspace binding so the chat context can
+            // show bound/unbound status and so file-producing turns know the
+            // default output root.
+            useSettingsStoreInstance.applySessionWorkspaceBinding(sessionRes.data.workspace_binding);
             if (lastState) {
                 // 先把当前的"全局默认"快照下来，再用 session 状态覆盖；
                 // 离开会话时会从快照还原，避免本会话的状态污染新建对话。
@@ -841,10 +884,12 @@ onBeforeRouteLeave((to, from, next) => {
     clearData()
     // 离开聊天会话 → 还原"用户全局默认"，避免旧会话的请求态泄漏到新建对话。
     useSettingsStoreInstance.restoreDefaultsIfSnapshotted();
+    useSettingsStoreInstance.clearSessionWorkspaceBinding();
     next()
 })
 onBeforeRouteUpdate((to, from, next) => {
     clearData()
+    useSettingsStoreInstance.clearSessionWorkspaceBinding();
     // 仅"会话 → 会话"会落到这里；跨会话覆盖的还原放到 route.params 的 watch 里，
     // 因为新会话的 getSession 也在那边触发，便于保证 restore→snapshot→apply 顺序。
     next()
@@ -1023,6 +1068,56 @@ onBeforeRouteUpdate((to, from, next) => {
     width: 100%;
     max-width: 800px;
     box-sizing: border-box;
+
+    .workspace-binding-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        margin-bottom: 6px;
+        font-size: 12px;
+        line-height: 20px;
+        border-radius: 6px;
+        background: var(--td-bg-color-container);
+        color: var(--td-text-color-secondary);
+        width: fit-content;
+        max-width: 100%;
+
+        .workspace-binding-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        &.is-bound {
+            color: var(--td-success-color);
+        }
+
+        &.is-warning {
+            color: var(--td-warning-color);
+            background: var(--td-warning-color-1);
+        }
+    }
+    .workspace-binding-recovery {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        margin-bottom: 6px;
+        font-size: 12px;
+        line-height: 20px;
+        border-radius: 6px;
+        background: var(--td-error-color-1);
+        color: var(--td-error-color);
+        width: fit-content;
+        max-width: 100%;
+
+        .recovery-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
 
     &.is-embedded {
         max-width: 100%;

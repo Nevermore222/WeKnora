@@ -256,9 +256,10 @@ func (r *sessionRepository) Update(ctx context.Context, session *types.Session, 
 		Model(&types.Session{}).
 		Where("tenant_id = ? AND id = ?", session.TenantID, session.ID), userID).
 		Updates(map[string]interface{}{
-			"title":       session.Title,
-			"description": session.Description,
-			"updated_at":  session.UpdatedAt,
+			"title":             session.Title,
+			"description":       session.Description,
+			"workspace_binding": session.WorkspaceBinding,
+			"updated_at":        session.UpdatedAt,
 		})
 	return res.RowsAffected, res.Error
 }

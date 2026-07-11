@@ -331,12 +331,33 @@ func (s *agentService) initializeSkillsManager(
 	logger.Infof(ctx, "Registered read_skill tool")
 
 	if sandboxMode != "disabled" {
-		executeSkillTool := tools.NewExecuteSkillScriptTool(skillsManager)
+		executeSkillTool := tools.NewExecuteSkillScriptTool(skillsManager).
+			WithSessionWorkspaceResolver(s.resolveSessionWorkspaceBinding)
 		toolRegistry.RegisterTool(executeSkillTool)
-		logger.Infof(ctx, "Registered execute_skill_script tool")
+		logger.Infof(ctx, "Registered execute_skill_script tool with session workspace resolver")
+
+		browserTool := tools.NewBrowserNavigateTool().
+			WithSkillManager(skillsManager).
+			WithSessionWorkspaceResolver(s.resolveSessionWorkspaceBinding)
+		toolRegistry.RegisterTool(browserTool)
+		logger.Infof(ctx, "Registered browser_navigate tool with session workspace resolver")
 	}
 
 	return skillsManager, nil
+}
+
+// resolveSessionWorkspaceBinding looks up the durable workspace binding for a
+// session so file-producing skills can route outputs to the bound workspace.
+// Returns nil for unbound or legacy sessions.
+func (s *agentService) resolveSessionWorkspaceBinding(sessionID string) *types.SessionWorkspaceBinding {
+	if sessionID == "" {
+		return nil
+	}
+	var session types.Session
+	if err := s.db.Where("id = ?", sessionID).Select("workspace_binding").First(&session).Error; err != nil {
+		return nil
+	}
+	return session.WorkspaceBinding
 }
 
 // registerTools registers tools based on the agent configuration

@@ -219,6 +219,26 @@ func TestStreamThinkingToEventBus_PropagatesFinishReason(t *testing.T) {
 	}
 }
 
+func TestStreamLLMToEventBus_StreamErrorWithPartialContentReturnsError(t *testing.T) {
+	mock := &mockChat{
+		responses: []mockResponse{
+			{chunks: []types.StreamResponse{
+				{ResponseType: types.ResponseTypeAnswer, Content: "Now I'll create the document."},
+				{ResponseType: types.ResponseTypeError, Content: "context deadline exceeded"},
+			}},
+		},
+	}
+
+	engine := newTestEngine(t, mock)
+	result, err := engine.streamLLMToEventBus(context.Background(), emptyMessages(), &chat.ChatOptions{}, nil)
+
+	require.Error(t, err)
+	require.NotNil(t, result)
+	assert.Contains(t, err.Error(), "context deadline exceeded")
+	assert.Equal(t, "Now I'll create the document.", result.Content)
+	assert.Empty(t, result.ToolCalls)
+}
+
 // TestStreamThinkingToEventBus_RoutesReasoningAndAnswerSeparately is the
 // regression guard for the "answer first shows under Thinking, then jumps to
 // the answer area" UX bug. A natural-stop response that carries reasoning in

@@ -12,6 +12,17 @@ type CreateSessionRequest struct {
 	Title string `json:"title"`
 	// Description for the session (optional)
 	Description string `json:"description"`
+	// WorkspaceBinding optionally binds a default file-output workspace for
+	// the conversation from the first turn onward.
+	WorkspaceBinding *types.SessionWorkspaceBindingInput `json:"workspace_binding,omitempty"`
+}
+
+// UpdateSessionRequest keeps PATCH-like update semantics for workspace_binding:
+// an omitted field preserves the existing binding, while null or {} clears it.
+type UpdateSessionRequest struct {
+	Title            string                              `json:"title"`
+	Description      string                              `json:"description"`
+	WorkspaceBinding *types.SessionWorkspaceBindingInput `json:"workspace_binding"`
 }
 
 // GenerateTitleRequest defines the request structure for generating a session title

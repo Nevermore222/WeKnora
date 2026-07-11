@@ -1,0 +1,11 @@
+{
+  "action": "add",
+  "file": "metrics.xlsx",
+  "parent": "/Sheet1",
+  "type": "cell",
+  "props": {
+    "ref": "A1",
+    "value": "Revenue",
+    "bold": "true"
+  }
+}

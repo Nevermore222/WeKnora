@@ -306,3 +306,42 @@ func TestDockerSandboxBuildDockerArgsMountsWorkspaceWritable(t *testing.T) {
 		t.Fatal("expected tsx interpreter for .ts scripts")
 	}
 }
+
+func TestDockerSandboxBuildDockerArgsCanReuseContainerVolumes(t *testing.T) {
+	config := DefaultConfig()
+	config.Type = SandboxTypeDocker
+	config.DockerVolumesFrom = "Xelora-app"
+	sandbox := NewDockerSandbox(config)
+
+	args := sandbox.buildDockerArgs(&ExecuteConfig{
+		Script:  "/app/skills/preloaded/demo/scripts/main.py",
+		WorkDir: "/app/skills/preloaded/demo",
+		Args:    []string{"input.md"},
+	})
+
+	foundVolumesFrom := false
+	foundDirectMount := false
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--volumes-from" && i+1 < len(args) {
+			foundVolumesFrom = true
+			if got := args[i+1]; got != "Xelora-app" {
+				t.Fatalf("unexpected volumes-from target: %s", got)
+			}
+		}
+		if args[i] == "-v" {
+			foundDirectMount = true
+		}
+		if args[i] == "-w" && i+1 < len(args) {
+			if got := args[i+1]; got != "/app/skills/preloaded/demo" {
+				t.Fatalf("unexpected workdir: %s", got)
+			}
+		}
+	}
+
+	if !foundVolumesFrom {
+		t.Fatal("expected volumes-from argument")
+	}
+	if foundDirectMount {
+		t.Fatal("did not expect direct bind mount when reusing container volumes")
+	}
+}

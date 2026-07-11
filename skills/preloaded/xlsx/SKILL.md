@@ -69,6 +69,21 @@ Unless otherwise stated by the user or existing template
 
 A user may ask you to create, edit, or analyze the contents of an .xlsx file. You have different tools and workflows available for different tasks.
 
+## Xelora workspace output shortcut
+
+When running inside Xelora with `execute_skill_script`, prefer the
+`officecli-document-editing` skill for new generated workbooks:
+
+- `skill_name`: `officecli-document-editing`
+- `script_path`: `scripts/officecli_bridge.py`
+- `args`: `["request.json"]`
+- `input`: JSON with `"action": "write_xlsx"`, `"file"`, `"sheets"`,
+  `"headers"`, and `"rows"`
+
+Use `xlsx/scripts/create_xlsx.py` only as a compatibility wrapper when this
+skill has already been selected. It accepts the same structured JSON and will
+delegate to `write_xlsx`; do not invent other creation script names.
+
 ## Important Requirements
 
 **LibreOffice Required for Formula Recalculation**: You can assume LibreOffice is installed for recalculating formula values using the `scripts/recalc.py` script. The script automatically configures LibreOffice on first run, including in sandboxed environments where Unix sockets are restricted (handled by `scripts/office/soffice.py`)

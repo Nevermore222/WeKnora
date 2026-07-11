@@ -96,6 +96,10 @@ type Session struct {
 	// the chat UI. Stored in the legacy sessions.agent_config JSONB column to
 	// avoid a new migration; the shape used today is `SessionLastRequestState`.
 	LastRequestState *SessionLastRequestState `json:"last_request_state,omitempty" gorm:"column:agent_config;type:jsonb"`
+	// WorkspaceBinding captures the durable default file-output workspace for
+	// this conversation. Unlike LastRequestState, this field changes backend
+	// behaviour by deciding where generated artifacts are promoted by default.
+	WorkspaceBinding *SessionWorkspaceBinding `json:"workspace_binding,omitempty" gorm:"column:workspace_binding;type:jsonb"`
 
 	// // Strategy configuration
 	// KnowledgeBaseID   string              `json:"knowledge_base_id"`                    // 关联的知识库ID
@@ -207,6 +211,34 @@ type SessionLastRequestState struct {
 	WebSearchEnabled bool     `json:"web_search_enabled"`
 }
 
+type SessionWorkspaceBindingStatus string
+
+const (
+	SessionWorkspaceBindingStatusBound        SessionWorkspaceBindingStatus = "bound"
+	SessionWorkspaceBindingStatusUnbound      SessionWorkspaceBindingStatus = "unbound"
+	SessionWorkspaceBindingStatusInvalid      SessionWorkspaceBindingStatus = "invalid"
+	SessionWorkspaceBindingStatusAccessDenied SessionWorkspaceBindingStatus = "access_denied"
+	SessionWorkspaceBindingStatusArchived     SessionWorkspaceBindingStatus = "archived"
+)
+
+// SessionWorkspaceBindingInput is the client-facing payload used when a chat
+// binds or rebinds its default workspace.
+type SessionWorkspaceBindingInput struct {
+	WorkspaceID string `json:"workspace_id,omitempty"`
+}
+
+// SessionWorkspaceBinding stores the durable binding state for a conversation.
+type SessionWorkspaceBinding struct {
+	WorkspaceID       string                        `json:"workspace_id,omitempty"`
+	WorkspaceName     string                        `json:"workspace_name,omitempty"`
+	RootPath          string                        `json:"root_path,omitempty"`
+	Status            SessionWorkspaceBindingStatus `json:"status,omitempty"`
+	ValidationMessage string                        `json:"validation_message,omitempty"`
+	BoundAt           *time.Time                    `json:"bound_at,omitempty"`
+	BoundByUserID     string                        `json:"bound_by_user_id,omitempty"`
+	LastValidatedAt   *time.Time                    `json:"last_validated_at,omitempty"`
+}
+
 // Value implements driver.Valuer for SessionLastRequestState (JSONB).
 func (s *SessionLastRequestState) Value() (driver.Value, error) {
 	if s == nil {
@@ -236,6 +268,37 @@ func (s *SessionLastRequestState) Scan(value interface{}) error {
 	}
 	if err := json.Unmarshal(b, s); err != nil {
 		// Tolerate legacy shapes from before this column was repurposed.
+		return nil
+	}
+	return nil
+}
+
+// Value implements driver.Valuer for SessionWorkspaceBinding (JSONB).
+func (s *SessionWorkspaceBinding) Value() (driver.Value, error) {
+	if s == nil {
+		return nil, nil
+	}
+	return json.Marshal(s)
+}
+
+// Scan implements sql.Scanner for SessionWorkspaceBinding (JSONB).
+func (s *SessionWorkspaceBinding) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	var b []byte
+	switch v := value.(type) {
+	case []byte:
+		b = v
+	case string:
+		b = []byte(v)
+	default:
+		return nil
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(b, s); err != nil {
 		return nil
 	}
 	return nil

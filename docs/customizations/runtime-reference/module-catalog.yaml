@@ -1,0 +1,57 @@
+modules:
+  - id: sandbox-execution
+    name: Sandbox Execution
+    stage: baseline
+    owner_scope: shared_contract
+    status: selected
+    primary_reference: Controlled Docker Executor
+    purpose: Provide the first usable local execution substrate for Xelora agent tasks while stronger sandbox providers remain replaceable.
+  - id: execution-gateway
+    name: Execution Gateway
+    stage: baseline
+    owner_scope: xelora
+    status: planned
+    primary_reference: Xelora internal executor gateway
+    purpose: Own provider routing, policy checks, job state, and artifact registration.
+  - id: workspace-management
+    name: Workspace Management
+    stage: baseline
+    owner_scope: xelora
+    status: planned
+    primary_reference: OpenHands Software Agent SDK semantics
+    purpose: Preserve session workspace identity across provider calls.
+  - id: artifact-management
+    name: Artifact Management
+    stage: baseline
+    owner_scope: xelora
+    status: planned
+    primary_reference: Xelora artifact registry
+    purpose: Keep file outputs and execution history as first-class product outcomes.
+  - id: browser-automation
+    name: Browser Automation
+    stage: follow_up
+    owner_scope: shared_contract
+    status: planned
+    primary_reference: agent-browser
+    purpose: Support agent-driven browser tasks without coupling them to one sandbox implementation.
+  - id: file-capability
+    name: File Capability Services
+    stage: follow_up
+    owner_scope: shared_contract
+    status: in_progress
+    primary_reference: OfficeCLI, Gotenberg, SheetJS, Univer
+    purpose: Support real Markdown, spreadsheet, PDF, and presentation artifacts.
+  - id: observability-audit
+    name: Observability And Audit
+    stage: future
+    owner_scope: xelora
+    status: planned
+    primary_reference: Xelora tracing and audit surfaces
+    purpose: Correlate provider health, job history, artifacts, and policy decisions.
+  - id: experimental-sandbox-provider
+    name: Experimental Sandbox Provider
+    stage: evaluation
+    owner_scope: shared_contract
+    status: experimental
+    primary_reference: OpenSandbox
+    purpose: Preserve OpenSandbox as a mature reference and future provider candidate without blocking the first usable runtime path.

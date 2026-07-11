@@ -1,0 +1,211 @@
+openapi: 3.0.3
+info:
+  title: Xelora OpenSandbox Runtime Baseline API
+  version: 0.1.0
+  description: Contract for exposing runtime module families, baseline providers, ownership boundaries, and staged adoption data for the OpenSandbox-based Xelora runtime plan.
+servers:
+  - url: /api
+paths:
+  /runtime-baseline/modules:
+    get:
+      summary: List runtime module families
+      operationId: listRuntimeModuleFamilies
+      responses:
+        '200':
+          description: Runtime module families
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RuntimeModuleFamily'
+  /runtime-baseline/modules/{module_id}:
+    get:
+      summary: Get one runtime module family
+      operationId: getRuntimeModuleFamily
+      parameters:
+        - $ref: '#/components/parameters/ModuleId'
+      responses:
+        '200':
+          description: Runtime module family
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeModuleFamilyDetail'
+  /runtime-baseline/projects:
+    get:
+      summary: List reference projects
+      operationId: listReferenceProjects
+      parameters:
+        - name: module_id
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reference projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReferenceProject'
+  /runtime-baseline/boundaries:
+    get:
+      summary: List ownership boundaries
+      operationId: listOwnershipBoundaries
+      responses:
+        '200':
+          description: Ownership boundaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  boundaries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OwnershipBoundary'
+  /runtime-baseline/stages:
+    get:
+      summary: List adoption stages
+      operationId: listAdoptionStages
+      responses:
+        '200':
+          description: Adoption stages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdoptionStage'
+components:
+  parameters:
+    ModuleId:
+      name: module_id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    RuntimeModuleFamily:
+      type: object
+      required: [id, name, purpose, stage, owner_scope, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        purpose:
+          type: string
+        stage:
+          type: string
+          enum: [baseline, follow_up, future]
+        owner_scope:
+          type: string
+          enum: [xelora, provider, shared_contract]
+        status:
+          type: string
+          enum: [planned, selected, integrating, replaceable]
+    RuntimeModuleFamilyDetail:
+      allOf:
+        - $ref: '#/components/schemas/RuntimeModuleFamily'
+        - type: object
+          properties:
+            contract_invariants:
+              type: array
+              items:
+                type: string
+            primary_project:
+              $ref: '#/components/schemas/ReferenceProject'
+            secondary_projects:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReferenceProject'
+            ownership_boundary:
+              $ref: '#/components/schemas/OwnershipBoundary'
+    ReferenceProject:
+      type: object
+      required: [id, name, role, module_family_id, adoption_mode, deployment_shape, replacement_risk]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [primary_baseline, secondary_alternative, semantic_reference, service_reference, embedded_reference]
+        module_family_id:
+          type: string
+        adoption_mode:
+          type: string
+          enum: [wrap, integrate, reference_only, evaluate_later]
+        deployment_shape:
+          type: string
+          enum: [independent_service, library, cli, embedded_sdk, mixed]
+        replacement_risk:
+          type: string
+          enum: [low, medium, high]
+        notes:
+          type: string
+        ownership_model:
+          type: string
+          description: Short statement clarifying whether the provider is wrapped, integrated, or reference-only under Xelora-owned contracts.
+    OwnershipBoundary:
+      type: object
+      required: [id, module_family_id, xelora_owned_concerns, provider_owned_concerns, must_remain_stable]
+      properties:
+        id:
+          type: string
+        module_family_id:
+          type: string
+        xelora_owned_concerns:
+          type: array
+          items:
+            type: string
+        provider_owned_concerns:
+          type: array
+          items:
+            type: string
+        must_remain_stable:
+          type: array
+          items:
+            type: string
+        replacement_policy:
+          type: string
+          description: Summary of which product-facing behaviors must remain unchanged when providers are swapped.
+    AdoptionStage:
+      type: object
+      required: [id, name, goal, included_module_families, entry_criteria, exit_criteria]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        goal:
+          type: string
+        included_module_families:
+          type: array
+          items:
+            type: string
+        entry_criteria:
+          type: array
+          items:
+            type: string
+        exit_criteria:
+          type: array
+          items:
+            type: string

@@ -3,6 +3,7 @@ import { nextTick } from "vue";
 import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent";
 import { getApiBaseUrl } from "@/utils/api-base";
 import { updateMyPreferences, type UserPreferences } from "@/api/auth";
+import type { SessionWorkspaceBindingPayload } from "@/api/chat/index";
 
 // 定义设置接口
 interface Settings {
@@ -111,6 +112,9 @@ export const useSettingsStore = defineStore("settings", {
     _defaultsSnapshot: null as Settings | null,
     /** 正在从 session.last_request_state 恢复输入栏，避免 agent 切换 watch 覆盖 KB 选择 */
     _isApplyingSessionState: false,
+    // 当前会话的工作区绑定快照。非持久化：进入会话时从 session API 灌入，
+    // 离开会话时清空。与 _defaultsSnapshot 同属会话级临时状态。
+    activeSessionWorkspaceBinding: null as SessionWorkspaceBindingPayload | null,
   }),
 
   getters: {
@@ -160,6 +164,21 @@ export const useSettingsStore = defineStore("settings", {
     selectedAgentId: (state) => state.settings.selectedAgentId || BUILTIN_QUICK_ANSWER_ID,
     // 共享智能体来源租户 ID（可选）
     selectedAgentSourceTenantId: (state) => state.settings.selectedAgentSourceTenantId ?? null,
+
+    // 当前会话的工作区绑定状态。null = 未加载/无绑定。
+    activeSessionWorkspaceBinding: (state): SessionWorkspaceBindingPayload | null =>
+      state.activeSessionWorkspaceBinding ?? null,
+
+    // 当前会话是否已绑定工作区。
+    isSessionWorkspaceBound: (state): boolean => {
+      const b = state.activeSessionWorkspaceBinding;
+      return !!b && b.status === "bound" && !!b.workspace_id;
+    },
+    isSessionWorkspaceBindingBlocked: (state): boolean => {
+      const b = state.activeSessionWorkspaceBinding;
+      if (!b || !b.workspace_id) return false;
+      return b.status !== "bound" && b.status !== "unbound";
+    },
   },
 
   actions: {
@@ -492,6 +511,20 @@ export const useSettingsStore = defineStore("settings", {
       // 离开会话时 restoreDefaultsIfSnapshotted 会把 localStorage 里那份完整
       // 的默认值再次同步回 this.settings。
     },
+    // Session API workspace_binding -> active session binding snapshot.
+    // Not persisted to localStorage; only valid during the current session route.
+    applySessionWorkspaceBinding(binding: SessionWorkspaceBindingPayload | null | undefined) {
+      if (!binding || !binding.workspace_id) {
+        this.activeSessionWorkspaceBinding = null;
+        return;
+      }
+      this.activeSessionWorkspaceBinding = { ...binding };
+    },
+
+    // Clear workspace binding snapshot when leaving a session.
+    clearSessionWorkspaceBinding() {
+      this.activeSessionWorkspaceBinding = null;
+    },
   },
 });
 
@@ -505,4 +538,3 @@ export interface SessionLastRequestStatePayload {
   knowledge_ids?: string[];
   web_search_enabled?: boolean;
 }
- 

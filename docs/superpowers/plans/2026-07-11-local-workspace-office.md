@@ -17,6 +17,15 @@
 - Keep OfficeCLI as the only Office provider in this implementation; do not add Python Office SDK dependencies yet.
 - Preserve unrelated changes in the dirty worktree and commit only files belonging to each task.
 
+## Current Status
+
+As of 2026-07-11, Tasks 1-7 are implemented and verified for the requested
+host-backed conversation workspace flow. The historical step checkboxes below
+show the original execution plan; the authoritative completion evidence is the
+`Evidence recorded 2026-07-11` section and `docs/customizations/TASKS.md`.
+Commit-only steps remain intentionally separate from runtime completion because
+this checkout contains unrelated dirty worktree changes.
+
 ---
 
 ### Task 1: Host Workspace Registry
@@ -479,7 +488,7 @@ git commit -m "feat: make file skills workspace aware"
 - Consumes: Task 2 workspace API and Task 3 `workspace_binding: {workspace_id}` request shape.
 - Produces: required workspace selection in the first-message session creation flow and persisted recent selection in local storage.
 
-- [ ] **Step 1: Add API types and a component testable contract**
+- [x] **Step 1: Add API types and a component testable contract**
 
 ```ts
 export interface WorkspaceEntry {
@@ -497,7 +506,7 @@ Run: `npm run type-check`
 
 Expected: FAIL until component state and chat payload types are updated; record unrelated pre-existing TypeScript failures separately.
 
-- [ ] **Step 2: Implement `WorkspaceSelector.vue`**
+- [x] **Step 2: Implement `WorkspaceSelector.vue`**
 
 ```vue
 <t-select v-model="selectedId" :placeholder="t('workspace.select')" @change="emitSelection">
@@ -510,7 +519,7 @@ Expected: FAIL until component state and chat payload types are updated; record 
 
 The create dialog accepts one folder name, calls `createWorkspace`, selects the result, and shows backend errors through `MessagePlugin`. Emit `update:modelValue` only for `available` entries. Store the last successful ID as `xelora:last-workspace-id` and ignore it if it is no longer listed.
 
-- [ ] **Step 3: Replace automatic `tenant:<id>` binding**
+- [x] **Step 3: Replace automatic `tenant:<id>` binding**
 
 ```ts
 const selectedWorkspaceId = ref<string>('');
@@ -522,7 +531,7 @@ if (selectedWorkspaceId.value) {
 
 Render `WorkspaceSelector` beside the agent/model controls. Do not send `workspace_name` or `root_path`. Keep plain chat creation possible without selection; file tools enforce the requirement later.
 
-- [ ] **Step 4: Build and inspect responsive UI**
+- [x] **Step 4: Build and inspect responsive UI**
 
 Run: `npm run build-only`
 
@@ -548,7 +557,7 @@ git commit -m "feat: select workspace for new conversations"
 - Consumes: all prior tasks.
 - Produces: a reproducible Windows Docker Desktop deployment and end-to-end proof.
 
-- [ ] **Step 1: Add Compose configuration and validate interpolation**
+- [x] **Step 1: Add Compose configuration and validate interpolation**
 
 ```yaml
 services:
@@ -570,7 +579,7 @@ Run: `docker compose config --quiet`
 
 Expected: exit code 0 and the app service contains exactly one `/workspaces` mount.
 
-- [ ] **Step 2: Add a live smoke script**
+- [x] **Step 2: Add a live smoke script**
 
 ```powershell
 param([string]$HostRoot = (Join-Path $PSScriptRoot '..\data\workspaces-e2e'))
@@ -588,7 +597,7 @@ Write-Host "Host workspace mount passed: $resolvedRoot"
 
 This script proves the bidirectional Docker Desktop mount without depending on browser authentication. The authenticated conversation and Office workflow remains the explicit Chrome acceptance step below.
 
-- [ ] **Step 3: Run backend, frontend, and Python suites**
+- [x] **Step 3: Run backend, frontend, and Python suites**
 
 Run: `docker run --rm -v "${PWD}:/src" -w /src golang:1.26 go test ./internal/workspace ./internal/handler ./internal/handler/session ./internal/application/service ./internal/application/repository ./internal/executor ./internal/agent/skills ./internal/sandbox`
 
@@ -600,11 +609,11 @@ Run: `python -m unittest discover -s skills/preloaded/officecli-document-editing
 
 Expected: all targeted suites and frontend build PASS.
 
-- [ ] **Step 4: Perform browser acceptance using the existing Chrome login session**
+- [x] **Step 4: Perform browser acceptance using the existing Chrome login session**
 
 Create a workspace folder, create a new conversation bound to it, create and edit a Markdown file, then create and edit one `.docx`, `.xlsx`, and `.pptx`. Reopen the conversation and modify an existing Office file. Verify every file exists under the Windows host root and no output appears under a skill-private directory. Attempt `../escape.md` and an unbound file-producing request and verify `workspace_path_escape` and `workspace_required` respectively.
 
-- [ ] **Step 5: Update docs and task board with evidence**
+- [x] **Step 5: Update docs and task board with evidence**
 
 Document the workspace API request/response shape, Docker variables, legacy binding behavior, smoke command, and exact test results. Mark the related task complete only after browser and host-filesystem evidence both pass.
 
@@ -614,6 +623,16 @@ Document the workspace API request/response shape, Docker variables, legacy bind
 git add .env.example docker-compose.yml scripts/host-workspace-mount-smoke.ps1 docs/api/session.md docs/customizations/TASKS.md
 git commit -m "docs: add host workspace deployment and smoke test"
 ```
+
+**Evidence recorded 2026-07-11:**
+- `docker compose config --quiet` passed.
+- `scripts/host-workspace-mount-smoke.ps1` passed and proved host visibility at `data/workspaces-e2e`.
+- Targeted Go packages passed in `golang:1.26-bookworm`; workspace writer and OfficeCLI Python unit suites passed.
+- `npm run build-only` passed; `npm run type-check` still has unrelated pre-existing TypeScript failures outside the new workspace selector/API files.
+- Chrome acceptance created workspace `Browser E2E 20260711` with server ID `8b16c0bf-5591-432b-9f2c-220a282398a0`, bound session `90a848be-de2b-4aa8-8e21-fbcb8e4c14f7`, and produced host files `browser-e2e-report.md`, `browser-e2e-brief.docx`, `browser-e2e-sheet.xlsx`, and `browser-e2e-slides.pptx`.
+- Reopened-conversation edit added `Reopened conversation edit` to `browser-e2e-brief.docx`; all Office files passed zip validation.
+- Path traversal `../escape.md` was rejected and no `escape.md` was created.
+- Unbound session `b6b9e257-f54b-4eec-aaf8-bfcf6937b411` returned `workspace_required: bind a workspace before running file tools`; no `unbound-should-fail.md` or skill-private E2E output was created.
 
 ## Completion Audit
 

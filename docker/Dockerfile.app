@@ -47,6 +47,8 @@ ENV GO_VERSION=${GO_VERSION_ARG}
 RUN --mount=type=cache,target=/go/pkg/mod make build-prod
 RUN --mount=type=cache,target=/go/pkg/mod cp -r /go/pkg/mod/github.com/yanyiwu/ /app/yanyiwu/
 
+FROM docker:28-cli AS docker-cli
+
 # Final stage
 FROM debian:12.12-slim
 
@@ -76,7 +78,7 @@ RUN if [ -n "$APK_MIRROR_ARG" ]; then \
         ffmpeg && \
     npm install -g tsx && \
     python3 -m pip install --break-system-packages --upgrade pip setuptools wheel && \
-    python3 -m pip install --break-system-packages e2b-code-interpreter && \
+    python3 -m pip install --break-system-packages e2b-code-interpreter opensandbox requests httpx && \
     mkdir -p /home/appuser/.local/bin && \
     curl -LsSf https://astral.sh/uv/install.sh | CARGO_HOME=/home/appuser/.cargo UV_INSTALL_DIR=/home/appuser/.local/bin sh && \
     chown -R appuser:appuser /home/appuser && \
@@ -91,10 +93,12 @@ RUN mkdir -p /data/files && \
 
 # Copy migrate tool from builder stage
 COPY --from=builder /go/bin/migrate /usr/local/bin/
+COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=builder /app/yanyiwu/ /go/pkg/mod/github.com/yanyiwu/
 
 # Copy the binary from the builder stage
 COPY --from=builder /app/config ./config
+COPY --from=builder /app/internal/executor/scripts ./internal/executor/scripts
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/dataset/samples ./dataset/samples

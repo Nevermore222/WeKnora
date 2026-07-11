@@ -131,11 +131,14 @@ Sandbox 相关配置通过环境变量设置：
 | `XELORA_SANDBOX_MODE` | sandbox 模式: `docker`, `local`, `disabled` | `disabled` |
 | `XELORA_SANDBOX_TIMEOUT` | 脚本执行超时（秒） | `60` |
 | `XELORA_SANDBOX_DOCKER_IMAGE` | 自定义 Docker 镜像 | `wechatopenai/xelora-sandbox:latest` |
-| `E2B_API_URL` | CubeSandbox 的 E2B 兼容 API 地址（仅 `provider=cubesandbox` 时使用） | - |
-| `E2B_API_KEY` | CubeSandbox / E2B SDK 占位 API Key（本地部署可用固定值） | - |
-| `CUBE_TEMPLATE_ID` | CubeSandbox 启动 sandbox 时使用的模板 ID | - |
-| `SSL_CERT_FILE` | CubeSandbox 本地 TLS CA 证书路径 | - |
-| `XELORA_CUBESANDBOX_PYTHON` | CubeSandbox helper 使用的 Python 可执行文件 | `python3` |
+| `XELORA_OPENSANDBOX_BASE_URL` | OpenSandbox 服务地址（仅 `provider=opensandbox` 时使用） | - |
+| `XELORA_OPENSANDBOX_API_KEY` | OpenSandbox API Key | - |
+| `XELORA_OPENSANDBOX_TEMPLATE_ID` | OpenSandbox 启动 sandbox 时使用的模板 ID | - |
+| `XELORA_OPENSANDBOX_PYTHON` | OpenSandbox helper 使用的 Python 可执行文件 | `python3` |
+| `E2B_API_URL` | 旧版 CubeSandbox / E2B 兼容地址（仅兼容路径使用） | - |
+| `E2B_API_KEY` | 旧版 CubeSandbox / E2B 兼容 API Key | - |
+| `CUBE_TEMPLATE_ID` | 旧版 CubeSandbox 模板 ID | - |
+| `SSL_CERT_FILE` | 旧版 CubeSandbox 本地 TLS CA 证书路径 | - |
 
 ### Sandbox 模式
 
@@ -332,6 +335,14 @@ skills/preloaded/
 │   └── SKILL.md
 ├── document-analyzer/
 │   └── SKILL.md
+├── officecli-document-editing/
+│   ├── SKILL.md
+│   └── scripts/
+│       └── officecli_bridge.py
+├── workspace-file-writer/
+│   ├── SKILL.md
+│   └── scripts/
+│       └── workspace_file_writer.py
 └── summary-generator/
     └── SKILL.md
 ```

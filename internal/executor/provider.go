@@ -9,9 +9,11 @@ import (
 )
 
 const (
-	ProviderStatusAvailable   = "available"
-	ProviderStatusUnavailable = "unavailable"
-	LocalProviderName         = "local"
+	ProviderStatusAvailable      = "available"
+	ProviderStatusUnavailable    = "unavailable"
+	LocalProviderName            = "local"
+	ControlledDockerProviderName = "controlled-docker"
+	OpenSandboxProviderName      = "opensandbox"
 )
 
 type ProviderCapability struct {
@@ -25,6 +27,9 @@ type ProviderCapability struct {
 	LastCheckedAt            time.Time `json:"last_checked_at"`
 }
 
+// Provider implementations stay behind this seam so Xelora keeps ownership of
+// workspace identity, artifacts, policy, and user-visible execution history
+// even when the active sandbox baseline changes.
 type Provider interface {
 	Name() string
 	ExecuteSkillScript(ctx context.Context, req SkillJobRequest, prepared *skills.PreparedScriptExecution, executor SkillExecutor) (*skills.ScriptExecutionOutcome, error)
@@ -61,7 +66,7 @@ func (p *LocalProvider) Capability(ctx context.Context) ProviderCapability {
 func selectProvider(providerName string, providers map[string]Provider) (Provider, error) {
 	name := providerName
 	if name == "" {
-		name = LocalProviderName
+		name = ControlledDockerProviderName
 	}
 
 	provider, ok := providers[name]

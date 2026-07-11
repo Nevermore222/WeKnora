@@ -44,7 +44,7 @@ var executeSkillScriptTool = BaseTool{
 
 // ExecuteSkillScriptInput defines the input parameters for the execute_skill_script tool
 type ExecuteSkillScriptInput struct {
-	Provider   string   `json:"provider,omitempty" jsonschema:"Optional execution provider key. Defaults to local until CubeSandbox is integrated."`
+	Provider   string   `json:"provider,omitempty" jsonschema:"Optional execution provider key. Defaults to controlled-docker. Use opensandbox only for experimental provider validation."`
 	SkillName  string   `json:"skill_name" jsonschema:"Name of the skill containing the script"`
 	ScriptPath string   `json:"script_path" jsonschema:"Relative path to the script within the skill directory (e.g. scripts/analyze.py)"`
 	Args       []string `json:"args,omitempty" jsonschema:"Optional command-line arguments to pass to the script. If the script works on a markdown/document file, include that relative file path as a normal positional argument. Flags like --no-quotes are not file paths."`
@@ -56,6 +56,9 @@ type ExecuteSkillScriptTool struct {
 	BaseTool
 	skillManager *skills.Manager
 	gateway      *executor.Gateway
+	// sessionWorkspaceResolver looks up the workspace binding for a session
+	// so file-producing skills can route outputs to the bound workspace.
+	sessionWorkspaceResolver func(sessionID string) *types.SessionWorkspaceBinding
 }
 
 // NewExecuteSkillScriptTool creates a new execute_skill_script tool instance
@@ -65,6 +68,13 @@ func NewExecuteSkillScriptTool(skillManager *skills.Manager) *ExecuteSkillScript
 		skillManager: skillManager,
 		gateway:      executor.NewGateway(),
 	}
+}
+
+// WithSessionWorkspaceResolver attaches a resolver that lets the tool look
+// up the session's bound workspace so file outputs are routed correctly.
+func (t *ExecuteSkillScriptTool) WithSessionWorkspaceResolver(resolver func(sessionID string) *types.SessionWorkspaceBinding) *ExecuteSkillScriptTool {
+	t.sessionWorkspaceResolver = resolver
+	return t
 }
 
 // Execute executes the execute_skill_script tool
@@ -122,6 +132,12 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 	jobRequest.ScriptPath = input.ScriptPath
 	jobRequest.Args = append([]string(nil), input.Args...)
 	jobRequest.Input = input.Input
+
+	// Resolve the session's workspace binding so the gateway can route file
+	// outputs to the bound workspace instead of a skill-private directory.
+	if t.sessionWorkspaceResolver != nil && jobRequest.SessionID != "" {
+		jobRequest.WorkspaceBinding = t.sessionWorkspaceResolver(jobRequest.SessionID)
+	}
 
 	// Execute the script through the Xelora-owned gateway layer.
 	logger.Infof(ctx, "[Tool][ExecuteSkillScript] Executing script: %s/%s with args: %v, input length: %d",
@@ -302,6 +318,21 @@ func normalizeExecuteSkillPayload(args []string, input string) ([]string, string
 	trimmed := strings.TrimSpace(input)
 	if trimmed == "" || !strings.HasPrefix(trimmed, "{") {
 		return args, input
+	}
+
+	// Preserve structured JSON request payloads used by file / Office skills.
+	// They are meant to be materialized verbatim into request.json instead of
+	// being collapsed to just the "content" field by the markdown envelope shim.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(trimmed), &raw); err == nil {
+		if _, hasAction := raw["action"]; hasAction {
+			return args, input
+		}
+		if _, hasData := raw["data"]; hasData {
+			if _, hasFile := raw["file"]; hasFile {
+				return args, input
+			}
+		}
 	}
 
 	var envelope executeSkillInputEnvelope

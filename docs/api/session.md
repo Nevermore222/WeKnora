@@ -40,7 +40,8 @@ curl --location 'http://localhost:8080/api/v1/sessions' \
 | 字段          | 类型   | 必填 | 描述     |
 | ------------- | ------ | ---- | -------- |
 | `title`       | string | 否   | 会话标题 |
-| `description` | string | 否   | 会话描述 |
+| `description` | string | 否  | 会话描述 |
+| `workspace_binding` | object | 否  | 绑定工作区，使该会话的文件输出默认写入指定工作区 |
 
 **响应**:
 
@@ -225,7 +226,8 @@ curl --location --request PUT 'http://localhost:8080/api/v1/sessions/411d6b70-9a
 | 字段          | 类型   | 必填 | 描述     |
 | ------------- | ------ | ---- | -------- |
 | `title`       | string | 否   | 会话标题 |
-| `description` | string | 否   | 会话描述 |
+| `description` | string | 否  | 会话描述 |
+| `workspace_binding` | object | 否  | 绑定工作区，使该会话的文件输出默认写入指定工作区 |
 
 **响应**:
 
@@ -475,3 +477,136 @@ curl --location 'http://localhost:8080/api/v1/sessions/continue-stream/ceb9babb-
 **响应格式**:
 
 服务器端事件流（Server-Sent Events），事件结构与 `/knowledge-chat/:session_id`、`/agent-chat/:session_id` 返回结果一致。若该消息当前在流中已无事件返回 `404 No stream events found`；若消息记录不存在返回 `404 Incomplete message not found`。
+
+
+## 工作区绑定（Workspace Binding）
+
+会话可以绑定一个工作区，使该会话产生的文件和产物默认写入绑定工作区的根目录，而不是隐藏的技能私有目录。
+
+### 绑定字段
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `workspace_id` | string | 工作区 API 返回的工作区 ID。创建/更新会话时客户端只需要提交此字段 |
+| `workspace_name` | string | 工作区显示名称（响应字段，由后端根据 `workspace_id` 自动填充） |
+| `root_path` | string | 工作区容器内根路径（响应字段，由后端解析；客户端不得传入） |
+| `status` | string | 绑定状态：`bound`、`unbound`、`invalid`、`access_denied`、`archived` |
+| `validation_message` | string | 绑定不可用时的说明信息 |
+| `bound_at` | string | 绑定创建时间 |
+| `last_validated_at` | string | 最近一次验证时间 |
+
+### 创建时绑定工作区
+
+在 `POST /sessions` 请求体中附带 `workspace_binding`：
+
+```json
+{
+  "title": "我的新对话",
+  "workspace_binding": {
+    "workspace_id": "ws_01jzlocalreports"
+  }
+}
+```
+
+创建成功后，响应数据中会返回完整的绑定状态：
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "411d6b70-...",
+    "title": "我的新对话",
+    "workspace_binding": {
+      "workspace_id": "ws_01jzlocalreports",
+      "workspace_name": "Reports",
+      "root_path": "/workspaces/Reports",
+      "status": "bound",
+      "bound_at": "2026-07-10T16:00:00Z",
+      "last_validated_at": "2026-07-10T16:00:00Z"
+    }
+  }
+}
+```
+
+### 读取绑定状态
+
+`GET /sessions/:id` 和 `GET /sessions` 的响应数据中均包含 `workspace_binding` 字段。未绑定工作区的会话该字段为 `null`，或者返回 `status=unbound`。
+
+### 更新绑定
+
+通过 `PUT /sessions/:id` 请求体附带 `workspace_binding` 可以更新绑定。传入 `null` 或空对象会清除绑定。
+
+### 绑定验证
+
+后端在创建和更新时验证绑定：
+
+- `workspace_id` 必须来自当前用户可见的 `GET /api/v1/workspaces` 列表。
+- 工作区不存在或不可用时，会返回明确的绑定失败信息。
+- 工作区已归档或不再可用时，会阻止新的默认文件输出。
+- 工作区名称和根路径由后端自动解析，客户端无需也不应传入 `workspace_name` 或 `root_path`。
+
+### 工作区 API
+
+工作区列表和创建接口使用同一套鉴权与租户上下文：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/workspaces` | 列出当前用户可绑定的本地工作区 |
+| `POST` | `/api/v1/workspaces` | 在已配置的宿主根目录下创建一个新工作区文件夹 |
+| `GET` | `/api/v1/workspaces/:id` | 读取并验证单个工作区 |
+
+`GET /api/v1/workspaces` 响应示例：
+
+```json
+[
+  {
+    "id": "ws_01jzlocalreports",
+    "name": "Reports",
+    "relative_path": "Reports",
+    "status": "available"
+  }
+]
+```
+
+响应不会包含宿主机绝对路径或 `root_path`。宿主根目录由部署环境变量
+`XELORA_WORKSPACE_HOST_ROOT` 配置，并在容器内挂载为
+`XELORA_WORKSPACE_CONTAINER_ROOT`（默认 `/workspaces`）。
+
+> 历史会话（在此功能上线前创建的）默认为未绑定状态，不会自动迁移。
+
+### 绑定失败示例
+
+当绑定校验失败时，API 返回 `400 Bad Request`，并附带明确错误信息：
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": 1000,
+    "message": "workspace binding must match the active workspace"
+  }
+}
+```
+
+常见失败场景：
+
+| 场景 | status | HTTP 状态码 | 说明 |
+| --- | --- | --- | --- |
+| `workspace_id` 不属于当前用户或不可访问 | `access_denied` | 400 | 例如提交了其他用户/租户创建的工作区 ID |
+| 工作区不存在或已失效 | `invalid` | 400 | 会阻止新的默认输出写入 |
+| 工作区已归档或不再活跃 | `archived` | 400 | 需要重新绑定可用工作区 |
+
+### 前端恢复行为
+
+当前端读取到 `invalid`、`access_denied` 或 `archived` 状态时，应明确提示该会话的默认文件输出已被阻止，并引导用户更新绑定，而不是假装文件已经成功写入其它位置。
+
+### 未绑定会话行为
+
+历史会话或显式未绑定的会话仍可继续用于普通聊天，但不会自动获得工作区文件输出能力。需要文件输出时，应先通过 `PUT /sessions/:id` 绑定一个有效工作区。
+
+### 恢复流程
+
+1. 读取当前会话的 `workspace_binding.status`。
+2. 若状态不是 `bound`，提示用户更新绑定。
+3. 通过 `PUT /sessions/:id` 提交新的 `workspace_binding`。
+4. 确认响应中的 `status` 已恢复为 `bound` 后，再继续文件输出相关请求。

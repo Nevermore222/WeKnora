@@ -1,0 +1,9 @@
+{
+  "action": "write_json",
+  "file": "exports/summary.json",
+  "data": {
+    "project": "Xelora",
+    "status": "active"
+  },
+  "indent": 2
+}

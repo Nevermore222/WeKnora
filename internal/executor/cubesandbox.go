@@ -18,6 +18,9 @@ import (
 
 const CubeSandboxProviderName = "cubesandbox"
 
+// CubeSandbox remains as a legacy-compatible provider path while OpenSandbox is
+// now the primary planning baseline for new executor work.
+
 type CubeSandboxConfig struct {
 	APIURL       string
 	APIKey       string
