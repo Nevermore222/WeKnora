@@ -58,6 +58,7 @@ type RouterParams struct {
 	AuditLogService              interfaces.AuditLogService
 	ChunkHandler                 *handler.ChunkHandler
 	SessionHandler               *session.Handler
+	WorkspaceHandler             *handler.WorkspaceHandler
 	MessageHandler               *handler.MessageHandler
 	ModelHandler                 *handler.ModelHandler
 	ModelCredentialsHandler      *handler.ModelCredentialsHandler
@@ -210,6 +211,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
 		RegisterChunkRoutes(v1, params.ChunkHandler, rbacGuards)
 		RegisterSessionRoutes(v1, params.SessionHandler, rbacGuards)
+		RegisterWorkspaceRoutes(v1, params.WorkspaceHandler, rbacGuards)
 		RegisterChatRoutes(v1, params.SessionHandler, rbacGuards)
 		RegisterMessageRoutes(v1, params.MessageHandler, rbacGuards)
 		RegisterModelRoutes(v1, params.ModelHandler, params.ModelCredentialsHandler, rbacGuards)
@@ -474,6 +476,16 @@ func RegisterSessionRoutes(r *gin.RouterGroup, handler *session.Handler, g *rbac
 		sessions.DELETE("/:id/pin", handler.UnpinSession)
 		// 继续接收活跃流
 		sessions.GET("/continue-stream/:session_id", handler.ContinueStream)
+	}
+}
+
+// RegisterWorkspaceRoutes exposes host-backed workspaces to tenant members.
+func RegisterWorkspaceRoutes(r *gin.RouterGroup, workspaceHandler *handler.WorkspaceHandler, g *rbacGuards) {
+	workspaces := r.Group("/workspaces", g.Viewer())
+	{
+		workspaces.GET("", workspaceHandler.List)
+		workspaces.POST("", workspaceHandler.Create)
+		workspaces.GET("/:id", workspaceHandler.Get)
 	}
 }
 

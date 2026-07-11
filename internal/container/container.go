@@ -82,11 +82,20 @@ import (
 	"github.com/Tencent/Xelora/internal/types"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
 	secutils "github.com/Tencent/Xelora/internal/utils"
+	"github.com/Tencent/Xelora/internal/workspace"
 	"github.com/tencent/vectordatabase-sdk-go/tcvectordb"
 	"github.com/weaviate/weaviate-go-client/v5/weaviate"
 	"github.com/weaviate/weaviate-go-client/v5/weaviate/auth"
 	wgrpc "github.com/weaviate/weaviate-go-client/v5/weaviate/grpc"
 )
+
+func newWorkspaceService() interfaces.WorkspaceService {
+	root := strings.TrimSpace(os.Getenv("XELORA_WORKSPACE_CONTAINER_ROOT"))
+	if root == "" {
+		root = "/workspaces"
+	}
+	return workspace.NewLocalRegistry(root)
+}
 
 // BuildContainer constructs the dependency injection container
 // Registers all components, services, repositories and handlers needed by the application
@@ -196,6 +205,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(service.NewUserService))
 	must(container.Provide(service.NewSystemSettingService))
 	must(container.Provide(service.NewXeloraCloudService))
+	must(container.Provide(newWorkspaceService))
 
 	// Extract services - register individual extracters with names
 	must(container.Provide(service.NewChunkExtractService, dig.Name("chunkExtractor")))
@@ -319,6 +329,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewFAQHandler))
 	must(container.Provide(handler.NewTagHandler))
 	must(container.Provide(session.NewHandler))
+	must(container.Provide(handler.NewWorkspaceHandler))
 	must(container.Provide(handler.NewMessageHandler))
 	must(container.Provide(handler.NewModelHandler))
 	must(container.Provide(handler.NewEvaluationHandler))
