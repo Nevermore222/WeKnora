@@ -970,11 +970,81 @@
                           <t-checkbox v-for="skill in skillOptions" :key="skill.name" :value="skill.name"
                             class="skill-checkbox-item">
                             <div class="skill-item-content">
-                              <span class="skill-name">{{ skill.name }}</span>
+                              <span class="skill-name-row">
+                                <span class="skill-name">{{ skill.name }}</span>
+                                <button type="button" class="skill-studio-link" @click.stop.prevent="openSkillStudio(skill.name)">
+                                  查看
+                                </button>
+                              </span>
                               <span class="skill-desc">{{ skill.description }}</span>
                             </div>
                           </t-checkbox>
                         </t-checkbox-group>
+                      </div>
+                    </div>
+
+                    <!-- Skill Studio 详情预览 -->
+                    <div v-if="skillOptions.length > 0" class="setting-row setting-row-vertical">
+                      <div class="setting-info">
+                        <label>Skill Studio</label>
+                        <p class="desc">查看 Skill 的说明、脚本和资源文件，便于管理员判断智能体应启用哪些能力。</p>
+                      </div>
+                      <div class="skill-studio-panel">
+                        <div class="skill-studio-list">
+                          <button v-for="skill in skillOptions" :key="skill.name" type="button"
+                            :class="['skill-studio-card', { active: selectedSkillName === skill.name }]"
+                            @click="openSkillStudio(skill.name)">
+                            <span class="skill-studio-card__name">{{ skill.name }}</span>
+                            <span class="skill-studio-card__meta">
+                              {{ skill.scripts?.length || 0 }} scripts · {{ skill.status || 'enabled' }}
+                            </span>
+                          </button>
+                        </div>
+
+                        <div class="skill-studio-detail">
+                          <div v-if="skillDetailLoading" class="skill-studio-empty">Loading skill detail...</div>
+                          <template v-else-if="selectedSkillDetail">
+                            <div class="skill-studio-head">
+                              <div>
+                                <h3>{{ selectedSkillDetail.name }}</h3>
+                                <p>{{ selectedSkillDetail.description }}</p>
+                              </div>
+                              <span class="skill-studio-badge">{{ selectedSkillDetail.source || 'preloaded' }}</span>
+                            </div>
+
+                            <div class="skill-studio-stats">
+                              <span>{{ skillStudioStats.scriptCount }} scripts</span>
+                              <span>{{ skillStudioStats.fileCount }} files</span>
+                              <span>{{ skillStudioStats.instructionLines }} instruction lines</span>
+                              <span>main: {{ selectedSkillPrimaryScript }}</span>
+                            </div>
+
+                            <div class="skill-studio-columns">
+                              <div class="skill-studio-block">
+                                <h4>Instructions</h4>
+                                <pre>{{ selectedSkillDetail.instructions }}</pre>
+                              </div>
+
+                              <div class="skill-studio-block skill-studio-files">
+                                <h4>Files</h4>
+                                <button v-for="file in selectedSkillDetail.files" :key="file.path" type="button"
+                                  :class="['skill-file-row', { active: selectedSkillFile?.path === file.path }]"
+                                  @click="openSkillFile(file.path)">
+                                  <span>{{ file.path }}</span>
+                                  <small>{{ file.is_script ? 'script' : 'file' }}</small>
+                                </button>
+                              </div>
+                            </div>
+
+                            <div class="skill-studio-block skill-studio-preview">
+                              <h4>File Preview</h4>
+                              <div v-if="skillFileLoading" class="skill-studio-empty">Loading file...</div>
+                              <pre v-else-if="selectedSkillFile">{{ selectedSkillFile.content }}</pre>
+                              <div v-else class="skill-studio-empty">Select a file to preview its content.</div>
+                            </div>
+                          </template>
+                          <div v-else class="skill-studio-empty">Select a skill to inspect its instructions and resources.</div>
+                        </div>
                       </div>
                     </div>
 
@@ -1391,7 +1461,7 @@ import {
 } from '@/api/agent';
 import { type ModelConfig } from '@/api/model';
 import { type MCPService } from '@/api/mcp-service';
-import { type SkillInfo } from '@/api/skill';
+import { getSkill, getSkillFile, type SkillDetail, type SkillFileContent, type SkillInfo } from '@/api/skill';
 import { type WebSearchProviderEntity } from '@/api/web-search-provider';
 import { type StorageEngineStatusItem, type PromptTemplate, type PromptTemplatesConfig } from '@/api/system';
 import { useUIStore } from '@/stores/ui';
@@ -1412,6 +1482,7 @@ import {
   type RequirementMissKind,
   type ScopeCapabilities,
 } from '@/utils/tool-capabilities';
+import { getSkillPrimaryScript, getSkillStudioStats } from '@/utils/skillStudio';
 
 const uiStore = useUIStore();
 const authStore = useAuthStore();
@@ -1496,9 +1567,17 @@ const agentSystemPromptTemplates = ref<PromptTemplate[]>([]);
 const intentPromptTemplates = ref<PromptTemplate[]>([]);
 const mcpOptions = ref<{ label: string; value: string }[]>([]);
 const webSearchProviderList = ref<WebSearchProviderEntity[]>([]);
-const skillOptions = ref<{ name: string; description: string }[]>([]);
+const skillOptions = ref<SkillInfo[]>([]);
 // 是否允许启用 Skills（取决于后端沙箱是否启用，disabled 时为 false；未请求前为 false 避免闪显）
 const skillsAvailable = ref(false);
+const selectedSkillName = ref('');
+const selectedSkillDetail = ref<SkillDetail | null>(null);
+const selectedSkillFile = ref<SkillFileContent | null>(null);
+const skillDetailLoading = ref(false);
+const skillFileLoading = ref(false);
+const selectedSkillSummary = computed(() => skillOptions.value.find(skill => skill.name === selectedSkillName.value) || null);
+const skillStudioStats = computed(() => getSkillStudioStats(selectedSkillDetail.value));
+const selectedSkillPrimaryScript = computed(() => getSkillPrimaryScript(selectedSkillDetail.value || selectedSkillSummary.value));
 // 存储引擎可用状态（用于图片存储 provider 选择）
 const storageEngineStatus = ref<StorageEngineStatusItem[]>([]);
 const imageStorageOptions = computed(() => {
@@ -2597,6 +2676,47 @@ const initSkillsSelectionMode = () => {
 };
 
 // 内置智能体：填入系统默认值
+const openSkillStudio = async (name: string) => {
+  if (!name) return;
+  selectedSkillName.value = name;
+  selectedSkillFile.value = null;
+  skillDetailLoading.value = true;
+
+  try {
+    const response = await getSkill(name);
+    selectedSkillDetail.value = response.data;
+  } catch (error: any) {
+    selectedSkillDetail.value = null;
+    MessagePlugin.error(error?.message || `Failed to load skill: ${name}`);
+  } finally {
+    skillDetailLoading.value = false;
+  }
+};
+
+const openSkillFile = async (path: string) => {
+  if (!selectedSkillName.value || !path) return;
+  skillFileLoading.value = true;
+
+  try {
+    const response = await getSkillFile(selectedSkillName.value, path);
+    selectedSkillFile.value = response.data;
+  } catch (error: any) {
+    selectedSkillFile.value = null;
+    MessagePlugin.error(error?.message || `Failed to load skill file: ${path}`);
+  } finally {
+    skillFileLoading.value = false;
+  }
+};
+
+const selectInitialSkillForStudio = () => {
+  const configured = formData.value.config.selected_skills?.find((name: string) =>
+    skillOptions.value.some(skill => skill.name === name),
+  );
+  const fallback = skillOptions.value[0]?.name || '';
+  const next = configured || selectedSkillName.value || fallback;
+  if (next) void openSkillStudio(next);
+};
+
 const fillBuiltinAgentDefaults = () => {
   const config = formData.value.config;
   const isAgent = config.agent_mode === 'smart-reasoning';
@@ -2863,6 +2983,9 @@ const loadDependencies = async () => {
 
     skillsAvailable.value = editorResources.skillsAvailable;
     skillOptions.value = editorResources.skills;
+    if (skillsAvailable.value && skillOptions.value.length > 0) {
+      selectInitialSkillForStudio();
+    }
 
     agentTypePresets.value = editorResources.agentTypePresets as AgentTypePreset[];
     applyPromptTemplateDefaults(editorResources.promptTemplates);
@@ -4817,16 +4940,227 @@ const handleSave = async () => {
   gap: 4px;
 }
 
+.skill-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .skill-name {
   font-size: 14px;
   font-weight: 500;
   color: var(--td-text-color-primary);
 }
 
+.skill-studio-link {
+  border: 0;
+  background: transparent;
+  color: var(--td-brand-color);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
 .skill-desc {
   font-size: 12px;
   color: var(--td-text-color-secondary);
   line-height: 1.5;
+}
+
+.skill-studio-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) 1fr;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  background:
+    linear-gradient(135deg, rgba(0, 186, 107, 0.08), transparent 34%),
+    var(--td-bg-color-container);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 12px;
+}
+
+.skill-studio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 480px;
+  overflow: auto;
+}
+
+.skill-studio-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--td-text-color-secondary);
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease;
+
+  &.active,
+  &:hover {
+    color: var(--td-text-color-primary);
+    background: var(--td-success-color-light);
+    border-color: var(--td-brand-color);
+  }
+}
+
+.skill-studio-card__name {
+  font-weight: 600;
+}
+
+.skill-studio-card__meta {
+  font-size: 11px;
+  color: var(--td-text-color-placeholder);
+}
+
+.skill-studio-detail {
+  min-width: 0;
+}
+
+.skill-studio-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+
+  h3 {
+    margin: 0 0 4px;
+    font-size: 17px;
+    color: var(--td-text-color-primary);
+  }
+
+  p {
+    margin: 0;
+    color: var(--td-text-color-secondary);
+    line-height: 1.5;
+  }
+}
+
+.skill-studio-badge {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+  border: 1px solid var(--td-brand-color-focus);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.skill-studio-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+
+  span {
+    padding: 5px 8px;
+    color: var(--td-text-color-secondary);
+    background: var(--td-bg-color-secondarycontainer);
+    border: 1px solid var(--td-component-stroke);
+    border-radius: 999px;
+    font-size: 12px;
+  }
+}
+
+.skill-studio-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+  gap: 12px;
+}
+
+.skill-studio-block {
+  min-width: 0;
+  padding: 12px;
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 10px;
+
+  h4 {
+    margin: 0 0 8px;
+    color: var(--td-text-color-primary);
+    font-size: 13px;
+  }
+
+  pre {
+    max-height: 220px;
+    margin: 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--td-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+}
+
+.skill-studio-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 278px;
+  overflow: auto;
+}
+
+.skill-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  color: var(--td-text-color-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+
+  &.active,
+  &:hover {
+    color: var(--td-text-color-primary);
+    background: var(--td-bg-color-container);
+    border-color: var(--td-brand-color);
+  }
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    color: var(--td-text-color-placeholder);
+  }
+}
+
+.skill-studio-preview {
+  margin-top: 12px;
+
+  pre {
+    max-height: 260px;
+  }
+}
+
+.skill-studio-empty {
+  padding: 18px;
+  color: var(--td-text-color-placeholder);
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px dashed var(--td-component-stroke);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .skill-studio-panel,
+  .skill-studio-columns {
+    grid-template-columns: 1fr;
+  }
 }
 
 .skill-info-box {
