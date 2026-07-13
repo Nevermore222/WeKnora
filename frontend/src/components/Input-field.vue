@@ -17,6 +17,7 @@ import { getCaretCoordinates } from '@/utils/caret';
 import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom';
 import { type ModelConfig } from '@/api/model';
 import { type CustomAgent, BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from '@/api/agent';
+import { listSkills, type SkillInfo } from '@/api/skill';
 import { useChatResourcesStore } from '@/stores/chatResources';
 import { useI18n } from 'vue-i18n';
 import AttachmentUpload, { type AttachmentFile } from './AttachmentUpload.vue';
@@ -26,6 +27,10 @@ import {
   toolsConsumeFiles,
   type ScopeCapabilities,
 } from '@/utils/tool-capabilities';
+import {
+  buildSkillSlashOptions,
+  filterSkillSlashOptions,
+} from '@/utils/skillSlashOptions';
 
 const route = useRoute();
 const router = useRouter();
@@ -374,6 +379,27 @@ const mentionLoading = ref(false);
 const mentionOffset = ref(0);
 const MENTION_PAGE_SIZE = 20;
 
+type SkillSlashOption = {
+  id: string;
+  title: string;
+  command: string;
+  description: string;
+  aliases: string[];
+  insertText: string;
+};
+
+const showSkillSlashMenu = ref(false);
+const skillSlashQuery = ref("");
+const skillSlashStartPos = ref(0);
+const skillSlashActiveIndex = ref(0);
+const selectedSkillDirectives = ref<SkillSlashOption[]>([]);
+const slashSkills = ref<SkillInfo[]>([]);
+const availableSkillSlashOptions = computed(() => buildSkillSlashOptions(slashSkills.value));
+
+const filteredSkillSlashOptions = computed(() => {
+  return filterSkillSlashOptions(availableSkillSlashOptions.value, skillSlashQuery.value);
+});
+
 // 共享智能体时用于标识「共享空间」的展示名（组织名或共享者），供 @ 列表与已选标签显示角标
 const sharedAgentOrgName = computed(() => {
   const sourceTenantId = settingsStore.selectedAgentSourceTenantId;
@@ -672,6 +698,16 @@ const loadAgents = async (force = false) => {
 // 共享智能体由源租户决定，本地停用列表不适用），按 智能推理 → 快速问答 →
 // 第一个可用 的顺序兜底切换。全部都被停用时保持原选择不动（极端场景，UI 仍会
 // 在 enabledAgents 过滤后显示空，由用户在智能体页恢复任意一个）。
+const loadSlashSkills = async () => {
+  try {
+    const response = await listSkills();
+    slashSkills.value = response.skills_available === false ? [] : (response.data || []);
+  } catch (error) {
+    console.error('Failed to load slash skills:', error);
+    slashSkills.value = [];
+  }
+};
+
 const ensureSelectedAgentNotDisabled = () => {
   if (settingsStore.selectedAgentSourceTenantId) return
   const currentId = settingsStore.selectedAgentId || BUILTIN_QUICK_ANSWER_ID
@@ -1200,6 +1236,70 @@ const getTextareaEl = () => {
   return el.querySelector('textarea');
 };
 
+const updateSkillSlashMenu = (inputVal: string, cursor: number) => {
+  const textBeforeCursor = inputVal.slice(0, cursor);
+  const match = textBeforeCursor.match(/(^|\s)\/([^\s/]*)$/);
+
+  if (!match) {
+    showSkillSlashMenu.value = false;
+    return;
+  }
+
+  skillSlashStartPos.value = cursor - match[0].length + match[1].length;
+  const nextQuery = match[2] || "";
+  if (nextQuery !== skillSlashQuery.value) {
+    skillSlashActiveIndex.value = 0;
+  }
+  skillSlashQuery.value = nextQuery;
+  showSkillSlashMenu.value = true;
+
+  if (skillSlashActiveIndex.value >= filteredSkillSlashOptions.value.length) {
+    skillSlashActiveIndex.value = Math.max(0, filteredSkillSlashOptions.value.length - 1);
+  }
+};
+
+const insertSkillSlashOption = (option: SkillSlashOption) => {
+  const textarea = getTextareaEl();
+  const cursor = textarea?.selectionStart ?? query.value.length;
+  const textBeforeSlash = query.value.slice(0, skillSlashStartPos.value);
+  const textAfterCursor = query.value.slice(cursor);
+
+  if (!selectedSkillDirectives.value.some(item => item.id === option.id)) {
+    selectedSkillDirectives.value.push(option);
+  }
+  query.value = textBeforeSlash + textAfterCursor;
+  showSkillSlashMenu.value = false;
+  skillSlashQuery.value = "";
+  skillSlashActiveIndex.value = 0;
+
+  nextTick(() => {
+    const nextTextarea = getTextareaEl();
+    if (!nextTextarea) return;
+    const nextCursor = textBeforeSlash.length;
+    nextTextarea.selectionStart = nextTextarea.selectionEnd = nextCursor;
+    nextTextarea.focus();
+  });
+};
+
+const removeSkillDirective = (id: string) => {
+  selectedSkillDirectives.value = selectedSkillDirectives.value.filter(item => item.id !== id);
+};
+
+const escapeMarkdownTitle = (value: string) => {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\s+/g, ' ').trim();
+};
+
+const buildMessageWithSkillDirectives = (message: string) => {
+  if (selectedSkillDirectives.value.length === 0) return message;
+  const links = selectedSkillDirectives.value.map(option => {
+    const hiddenText = escapeMarkdownTitle(option.insertText);
+    return `[${option.title}](xelora-skill://${option.id} "${hiddenText}")`;
+  });
+  const userMessage = message.trim();
+  const prefix = `使用 ${links.join(' ')}：`;
+  return userMessage ? `${prefix}\n${userMessage}` : prefix;
+};
+
 const onInput = (val: string | InputEvent) => {
   // 如果正在输入法组合中，不处理搜索逻辑，等待 compositionend
   if (isComposing.value) return;
@@ -1217,6 +1317,12 @@ const onInput = (val: string | InputEvent) => {
   const textBeforeCursor = inputVal.slice(0, cursor);
 
   console.log('[Mention] onInput called', { inputVal, cursor, textBeforeCursor, showMention: showMention.value });
+
+  if (showMention.value) {
+    showSkillSlashMenu.value = false;
+  } else {
+    updateSkillSlashMenu(inputVal, cursor);
+  }
 
   if (showMention.value) {
     // 如果不是按钮触发的，检查 @ 符号
@@ -1476,6 +1582,7 @@ const closeMentionSelector = (e: MouseEvent) => {
     return;
   }
   showMention.value = false;
+  showSkillSlashMenu.value = false;
 };
 
 // 窗口事件处理器
@@ -1493,6 +1600,7 @@ onMounted(() => {
     loadWebSearchConfig(),
     loadChatModels(),
     loadAgents(),
+    loadSlashSkills(),
   ]);
   window.addEventListener(CHAT_FILE_DROP_EVENT, handleChatFileDrop as EventListener);
 
@@ -1588,7 +1696,7 @@ const emit = defineEmits<{
 }>();
 
 const createSession = async (val: string) => {
-  if (!val.trim()) {
+  if (!val.trim() && selectedSkillDirectives.value.length === 0) {
     MessagePlugin.info(t('input.messages.enterContent'));
     return;
   }
@@ -1600,7 +1708,7 @@ const createSession = async (val: string) => {
   if (props.embeddedMode) {
     const textarea = getTextareaEl();
     if (textarea) textarea.blur();
-    emit('send-msg', val, selectedModelId.value || '', [], [], []);
+    emit('send-msg', buildMessageWithSkillDirectives(val), selectedModelId.value || '', [], [], []);
     clearvalue();
     return;
   }
@@ -1639,7 +1747,7 @@ const createSession = async (val: string) => {
   // detached DOM element (which causes getComputedStyle to throw).
   const textarea = getTextareaEl();
   if (textarea) textarea.blur();
-  emit('send-msg', val, selectedModelId.value, mentionedItems, imageFiles, attachmentFiles);
+  emit('send-msg', buildMessageWithSkillDirectives(val), selectedModelId.value, mentionedItems, imageFiles, attachmentFiles);
 
   // Clean up image previews
   uploadedImages.value.forEach(img => URL.revokeObjectURL(img.preview));
@@ -1845,9 +1953,39 @@ const clearvalue = () => {
   // otherwise TDesign's autosize will call getComputedStyle on a non-Element.
   if (!getTextareaEl()) return;
   query.value = "";
+  selectedSkillDirectives.value = [];
 }
 
 const onKeydown = (val: string, event: { e: { preventDefault(): unknown; keyCode: number; shiftKey: any; ctrlKey: any; }; }) => {
+  if (showSkillSlashMenu.value) {
+    if (event.e.keyCode === 38) { // Up
+      event.e.preventDefault();
+      if (filteredSkillSlashOptions.value.length > 0) {
+        skillSlashActiveIndex.value = Math.max(0, skillSlashActiveIndex.value - 1);
+      }
+      return;
+    }
+    if (event.e.keyCode === 40) { // Down
+      event.e.preventDefault();
+      if (filteredSkillSlashOptions.value.length > 0) {
+        skillSlashActiveIndex.value = Math.min(filteredSkillSlashOptions.value.length - 1, skillSlashActiveIndex.value + 1);
+      }
+      return;
+    }
+    if (event.e.keyCode === 13) { // Enter
+      const option = filteredSkillSlashOptions.value[skillSlashActiveIndex.value];
+      if (option) {
+        event.e.preventDefault();
+        insertSkillSlashOption(option);
+        return;
+      }
+    }
+    if (event.e.keyCode === 27) { // Esc
+      showSkillSlashMenu.value = false;
+      return;
+    }
+  }
+
   if (showMention.value) {
     if (event.e.keyCode === 38) { // Up
       event.e.preventDefault();
@@ -1881,6 +2019,11 @@ const onKeydown = (val: string, event: { e: { preventDefault(): unknown; keyCode
         event.e.preventDefault();
         const lastItem = items[items.length - 1];
         removeSelectedItem(lastItem);
+        return;
+      }
+      if (selectedSkillDirectives.value.length > 0) {
+        event.e.preventDefault();
+        selectedSkillDirectives.value = selectedSkillDirectives.value.slice(0, -1);
         return;
       }
     }
@@ -2124,7 +2267,17 @@ defineExpose({
         @update:files="uploadedAttachments = $event" />
 
       <!-- 选中的知识库和文件标签（显示在输入框内顶部） -->
-      <div v-if="allSelectedItems.length > 0" class="selected-tags-inline">
+      <div v-if="selectedSkillDirectives.length > 0 || allSelectedItems.length > 0" class="selected-tags-inline">
+        <span v-for="skill in selectedSkillDirectives" :key="skill.id" class="mention-chip mention-chip--skill">
+          <span class="mention-chip__icon-wrap">
+            <span class="mention-chip__icon">
+              <t-icon name="cube" />
+            </span>
+          </span>
+          <span class="mention-chip__name" :title="skill.description">{{ skill.title }}</span>
+          <span class="mention-chip__remove" @click.stop="removeSkillDirective(skill.id)"
+            :aria-label="$t('common.remove')">×</span>
+        </span>
         <span v-for="item in allSelectedItems" :key="item.id" class="mention-chip" :class="[
           item.type === 'kb' ? (item.kbType === 'faq' ? 'mention-chip--faq' : 'mention-chip--kb') : 'mention-chip--file',
           { 'mention-chip--agent': item.isAgentConfigured }
@@ -2149,6 +2302,25 @@ defineExpose({
       <t-textarea ref="textareaRef" v-model="query" :placeholder="inputPlaceholder" name="description" :autosize="true"
         @keydown="onKeydown" @input="onInput" @compositionstart="onCompositionStart" @compositionend="onCompositionEnd"
         @paste="onPaste" />
+
+      <div v-if="showSkillSlashMenu" class="skill-slash-menu" @mousedown.prevent>
+        <div class="skill-slash-menu__header">
+          <span>使用 / 选择 Skill</span>
+          <span class="skill-slash-menu__hint">Enter 插入</span>
+        </div>
+        <button v-for="(option, index) in filteredSkillSlashOptions" :key="option.id" type="button"
+          class="skill-slash-option" :class="{ active: index === skillSlashActiveIndex }"
+          @mouseenter="skillSlashActiveIndex = index" @mousedown.prevent @click.stop.prevent="insertSkillSlashOption(option)">
+          <span class="skill-slash-option__main">
+            <span class="skill-slash-option__title">{{ option.title }}</span>
+            <span class="skill-slash-option__command">{{ option.command }}</span>
+          </span>
+          <span class="skill-slash-option__desc">{{ option.description }}</span>
+        </button>
+        <div v-if="filteredSkillSlashOptions.length === 0" class="skill-slash-empty">
+          没有匹配的 Skill 快捷项
+        </div>
+      </div>
 
       <!-- 控制栏（放在 rich-input-container 内，相对输入框边框定位） -->
       <div class="control-bar" :class="{ 'is-embedded': embeddedMode }">
@@ -2340,7 +2512,7 @@ defineExpose({
 
           <!-- 发送按钮 -->
           <div v-if="!isReplying" @click="createSession(query)" class="control-btn send-btn" data-guide="chat-send"
-            :class="{ 'disabled': !query.length }">
+            :class="{ 'disabled': !query.length && selectedSkillDirectives.length === 0 }">
             <img src="../assets/img/sending-aircraft.svg" :alt="$t('input.send')" />
           </div>
         </div>
@@ -2405,6 +2577,90 @@ const getImgSrc = (url: string) => {
 }
 
 /* 选中的知识库/文件标签（mention list 已选项） */
+.skill-slash-menu {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(100% + 8px);
+  z-index: 120;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--td-component-stroke, #dcdcdc);
+  border-radius: 12px;
+  background: var(--td-bg-color-container, #fff);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.skill-slash-menu__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--td-text-color-secondary, #6b7280);
+}
+
+.skill-slash-menu__hint {
+  font-weight: 500;
+  color: var(--td-text-color-placeholder, #9ca3af);
+}
+
+.skill-slash-option {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--td-text-color-primary, #1f2937);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.skill-slash-option.active,
+.skill-slash-option:hover {
+  background: rgba(5, 192, 95, 0.1);
+}
+
+.skill-slash-option__main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.skill-slash-option__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.skill-slash-option__command {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--td-bg-color-secondarycontainer, #f3f4f6);
+  color: var(--td-brand-color, #07c05f);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.skill-slash-option__desc,
+.skill-slash-empty {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--td-text-color-secondary, #6b7280);
+}
+
+.skill-slash-empty {
+  padding: 14px 10px;
+  text-align: center;
+}
+
 .selected-tags-inline {
   display: flex;
   flex-wrap: wrap;
@@ -2561,6 +2817,22 @@ const getImgSrc = (url: string) => {
 }
 
 /* 智能体预配置：虚线边框区分 */
+.mention-chip--skill {
+  background: rgba(30, 144, 255, 0.10);
+  border-color: rgba(30, 144, 255, 0.32);
+  color: #8fc7ff;
+}
+
+.mention-chip--skill .mention-chip__icon-wrap {
+  background: rgba(30, 144, 255, 0.16);
+  color: #7bbcff;
+}
+
+.mention-chip--skill:hover {
+  background: rgba(30, 144, 255, 0.16);
+  border-color: rgba(30, 144, 255, 0.45);
+}
+
 .mention-chip--agent {
   border-style: dashed;
 }

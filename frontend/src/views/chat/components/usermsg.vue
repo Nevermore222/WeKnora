@@ -38,7 +38,7 @@
             </div>
         </div>
         <div class="user_msg">
-            {{ content }}
+            {{ displayContent }}
         </div>
         <picturePreview :reviewImg="reviewImg" :reviewUrl="reviewUrl" @closePreImg="closePreImg" />
     </div>
@@ -46,6 +46,7 @@
 <script setup>
 import { defineProps, computed, ref, watch, onMounted, nextTick } from "vue";
 import { hydrateProtectedFileImages } from '@/utils/security';
+import { sanitizeSkillDirectiveDisplay } from '@/utils/skillDirectiveDisplay';
 import picturePreview from '@/components/picture-preview.vue';
 import { useI18n } from 'vue-i18n';
 
@@ -81,6 +82,8 @@ const props = defineProps({
         default: false
     }
 });
+
+const displayContent = computed(() => sanitizeSkillDirectiveDisplay(props.content));
 
 const channelLabelMap = {
     web: () => t('chat.channelWeb'),

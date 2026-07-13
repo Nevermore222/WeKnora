@@ -145,6 +145,7 @@ import { useKnowledgeBaseCreationNavigation } from '@/hooks/useKnowledgeBaseCrea
 import { useChatStreamHandler } from '@/composables/useChatStreamHandler';
 import { useStickyBottomOnResize } from '@/composables/useStickyBottomOnResize';
 import { clearCitationChunkCache } from '@/utils/citationChunkCache';
+import { sanitizeSkillDirectiveDisplay } from '@/utils/skillDirectiveDisplay';
 
 const props = defineProps({
     session_id: { type: String, default: '' },
@@ -386,7 +387,7 @@ const getUserQuery = (index) => {
     }
     const previous = messagesList[index - 1];
     if (previous && previous.role === 'user') {
-        return previous.content || '';
+        return sanitizeSkillDirectiveDisplay(previous.content);
     }
     return '';
 };
