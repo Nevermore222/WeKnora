@@ -18,6 +18,51 @@ MUTATING_ACTIONS = {
     "batch",
     "write_docx",
     "write_xlsx",
+    "run_python",
+}
+
+OFFICECLI_PASSTHROUGH_VERBS = {
+    "open",
+    "close",
+    "watch",
+    "unwatch",
+    "view",
+    "get",
+    "query",
+    "set",
+    "add",
+    "remove",
+    "move",
+    "swap",
+    "refresh",
+    "raw",
+    "raw-set",
+    "add-part",
+    "validate",
+    "save",
+    "batch",
+    "dump",
+    "import",
+    "create",
+    "merge",
+    "help",
+}
+
+OFFICECLI_MUTATING_VERBS = {
+    "close",
+    "save",
+    "set",
+    "add",
+    "remove",
+    "move",
+    "swap",
+    "refresh",
+    "raw-set",
+    "add-part",
+    "batch",
+    "import",
+    "create",
+    "merge",
 }
 
 
@@ -140,6 +185,76 @@ def build_officecli_command(payload, request_path):
     raise ValueError(f"unsupported action: {action}")
 
 
+def build_officecli_passthrough_command(payload):
+    raw_command = payload.get("command")
+    if raw_command is None:
+        raw_command = payload.get("args")
+    if not isinstance(raw_command, list) or not raw_command:
+        raise ValueError("command must be a non-empty array for officecli")
+
+    command = [str(item) for item in raw_command]
+    verb = command[0]
+    if verb == "officecli":
+        raise ValueError("command must not include the officecli binary")
+    if verb not in OFFICECLI_PASSTHROUGH_VERBS:
+        raise ValueError(f"unsupported officecli command: {verb}")
+    if verb != "help":
+        if payload.get("file") is None:
+            raise ValueError("file is required for officecli document commands")
+        if "{file}" not in command:
+            raise ValueError("officecli document commands must use the {file} placeholder")
+
+    placeholders = {}
+    if payload.get("file") is not None:
+        placeholders["{file}"] = resolve_relative_path(payload["file"])
+
+    declared_paths = payload.get("paths", {})
+    if declared_paths is not None:
+        if not isinstance(declared_paths, dict):
+            raise ValueError("paths must be an object")
+        for name, path_value in declared_paths.items():
+            key = "{" + str(name) + "}"
+            if key == "{file}":
+                raise ValueError("paths must not override {file}")
+            placeholders[key] = resolve_relative_path(path_value)
+
+    resolved_args = []
+    for token in command:
+        replacement = placeholders.get(token)
+        if replacement is not None:
+            resolved_args.append(replacement)
+            continue
+        if token in {".."} or token.startswith("../") or token.startswith("..\\"):
+            raise ValueError(f"invalid officecli argument path: {token}")
+        if len(token) >= 3 and token[1:3] in {":\\", ":/"}:
+            raise ValueError(f"invalid officecli argument path: {token}")
+        resolved_args.append(token)
+
+    if payload.get("json", True) and "--json" not in resolved_args:
+        resolved_args.append("--json")
+    return ["officecli", *resolved_args]
+
+
+def officecli_passthrough_mutates(payload):
+    if str(payload.get("action")) != "officecli":
+        return False
+    if payload.get("mutates") is not None:
+        return bool(payload.get("mutates"))
+    raw_command = payload.get("command")
+    if raw_command is None:
+        raw_command = payload.get("args")
+    if not isinstance(raw_command, list) or not raw_command:
+        return False
+    return str(raw_command[0]) in OFFICECLI_MUTATING_VERBS
+
+
+def is_mutating_payload(payload):
+    action = str(require_field(payload, "action"))
+    if action == "officecli":
+        return officecli_passthrough_mutates(payload)
+    return action in MUTATING_ACTIONS
+
+
 def resolve_workspace_path(base_dir, candidate):
     relative = resolve_relative_path(candidate)
     resolved = (Path(base_dir) / relative).resolve()
@@ -177,7 +292,49 @@ def run_officecli(command):
     )
 
 
+def office_lock_file_for(path):
+    return path.with_name(f"~${path.name}")
+
+
+def unique_sibling_path(path, label):
+    candidate = path.with_name(f"{path.stem}.{label}{path.suffix}")
+    if not candidate.exists():
+        return candidate
+    for index in range(2, 100):
+        candidate = path.with_name(f"{path.stem}.{label}-{index}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+    raise ValueError(f"could not allocate a unique {label} path for {path.name}")
+
+
+def commit_staged_file(temp_path, final_path, base_dir):
+    try:
+        os.replace(temp_path, final_path)
+        return "replace"
+    except PermissionError as exc:
+        lock_file = office_lock_file_for(final_path)
+        if lock_file.exists():
+            pending_path = unique_sibling_path(final_path, "xelora-pending")
+            shutil.copy2(temp_path, pending_path)
+            raise PermissionError(
+                "target file is locked and could not be replaced. "
+                "Close the workbook in Office/WPS and retry. "
+                f"Lock file: {lock_file.relative_to(base_dir).as_posix()}. "
+                f"Validated pending output: {pending_path.relative_to(base_dir).as_posix()}."
+            ) from exc
+
+        # Some Windows bind mounts reject rename-over-existing while allowing a
+        # direct overwrite. The staged file has already been validated.
+        shutil.copy2(temp_path, final_path)
+        return "copy"
+
+
 def run_read_only(payload, request_path):
+    if str(payload.get("action")) == "officecli":
+        completed = run_officecli(build_officecli_passthrough_command(payload))
+        print_completed(completed)
+        return completed.returncode
+
     command, temp_path = build_officecli_command(payload, str(request_path))
     try:
         completed = run_officecli(command)
@@ -205,6 +362,28 @@ def run_mutation(payload, request_path, base_dir):
         return run_write_docx_mutation(staged_payload, temp_path, final_path, base_dir, replacements)
     if str(payload.get("action")) == "write_xlsx":
         return run_write_xlsx_mutation(staged_payload, temp_path, final_path, base_dir, replacements)
+    if str(payload.get("action")) == "run_python":
+        return run_python_mutation(staged_payload, temp_path, final_path, base_dir, replacements, str(request_path))
+    if str(payload.get("action")) == "officecli":
+        command = build_officecli_passthrough_command(staged_payload)
+        try:
+            completed = run_officecli(command)
+            print_completed(completed, replacements)
+            if completed.returncode != 0:
+                return completed.returncode
+
+            validated = run_officecli(
+                ["officecli", "validate", staged_payload["file"], "--json"]
+            )
+            print_completed(validated, replacements)
+            if validated.returncode != 0:
+                print("office_validation_failed", file=sys.stderr)
+                return validated.returncode or 1
+
+            commit_staged_file(temp_path, final_path, base_dir)
+            return 0
+        finally:
+            temp_path.unlink(missing_ok=True)
 
     command, batch_path = build_officecli_command(staged_payload, str(request_path))
     try:
@@ -221,7 +400,7 @@ def run_mutation(payload, request_path, base_dir):
             print("office_validation_failed", file=sys.stderr)
             return validated.returncode or 1
 
-        os.replace(temp_path, final_path)
+        commit_staged_file(temp_path, final_path, base_dir)
         return 0
     finally:
         if batch_path:
@@ -294,7 +473,7 @@ def run_write_docx_mutation(payload, temp_path, final_path, base_dir, replacemen
             print_completed(completed, replacements)
             if completed.returncode != 0:
                 return completed.returncode
-        os.replace(temp_path, final_path)
+        commit_staged_file(temp_path, final_path, base_dir)
         return 0
     finally:
         temp_path.unlink(missing_ok=True)
@@ -390,7 +569,7 @@ def run_write_xlsx_mutation(payload, temp_path, final_path, base_dir, replacemen
         workbook.close()
         validated = load_workbook(temp_path, read_only=True)
         validated.close()
-        os.replace(temp_path, final_path)
+        commit_staged_file(temp_path, final_path, base_dir)
         display_file = final_path.relative_to(base_dir).as_posix()
         print(
             json.dumps(
@@ -407,6 +586,65 @@ def run_write_xlsx_mutation(payload, temp_path, final_path, base_dir, replacemen
         temp_path.unlink(missing_ok=True)
 
 
+def validate_python_office_file(path):
+    suffix = path.suffix.lower()
+    if suffix == ".xlsx":
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(path, read_only=True)
+        workbook.close()
+        return
+    if suffix in {".docx", ".pptx"}:
+        import zipfile
+
+        if not zipfile.is_zipfile(path):
+            raise ValueError(f"{suffix} output is not a valid Office package")
+
+
+def run_python_mutation(payload, temp_path, final_path, base_dir, replacements, request_path):
+    code = payload.get("code")
+    if not isinstance(code, str) or not code.strip():
+        raise ValueError("code must be a non-empty string for run_python")
+
+    script_path = Path(request_path).with_name(f"office-python-{uuid.uuid4().hex}.py")
+    wrapper = "\n".join(
+        [
+            "import json",
+            "from pathlib import Path",
+            f"workspace_dir = Path({str(base_dir)!r})",
+            f"target_file = Path({str(temp_path)!r})",
+            f"final_file = Path({str(final_path)!r})",
+            f"payload = json.loads({json.dumps(json.dumps(payload, ensure_ascii=False))})",
+            code,
+            "",
+        ]
+    )
+    try:
+        script_path.write_text(wrapper, encoding="utf-8")
+        completed = run_officecli([sys.executable, script_path.relative_to(base_dir).as_posix()])
+        print_completed(completed, replacements)
+        if completed.returncode != 0:
+            return completed.returncode
+        if not temp_path.exists():
+            raise ValueError("run_python did not create or update the target file")
+        validate_python_office_file(temp_path)
+        commit_staged_file(temp_path, final_path, base_dir)
+        print(
+            json.dumps(
+                {
+                    "status": "success",
+                    "file": final_path.relative_to(base_dir).as_posix(),
+                    "action": "run_python",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
+    finally:
+        script_path.unlink(missing_ok=True)
+        temp_path.unlink(missing_ok=True)
+
+
 def run_request(request_arg):
     base_dir = Path.cwd().resolve()
     request_path = resolve_workspace_path(base_dir, request_arg)
@@ -416,8 +654,7 @@ def run_request(request_arg):
     if not isinstance(payload, dict):
         raise ValueError("request payload must be a JSON object")
 
-    action = str(require_field(payload, "action"))
-    if action in MUTATING_ACTIONS:
+    if is_mutating_payload(payload):
         return run_mutation(payload, request_path, base_dir)
     return run_read_only(payload, request_path)
 

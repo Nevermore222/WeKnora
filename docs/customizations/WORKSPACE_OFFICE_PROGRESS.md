@@ -51,6 +51,15 @@ paths and `..` escapes.
 - `write_docx` creates Word documents from title and paragraphs.
 - `write_xlsx` creates Excel workbooks from structured sheets, headers, and
   rows in one script call.
+- `officecli` passes supported OfficeCLI document commands through the same
+  bridge, so new OfficeCLI options and less common document verbs do not require
+  adding one JSON field at a time.
+- `run_python` allows direct Python SDK edits against a staged Office file,
+  including `openpyxl` styling and richer Word/PowerPoint changes through
+  `python-docx` and `python-pptx`.
+- Mutating commits now handle Windows-style replacement edge cases. If the
+  target file is locked by Office/WPS and a `~$...` lock file exists, the bridge
+  reports that clearly and preserves a validated `*.xelora-pending.*` copy.
 - Lower-level OfficeCLI actions are still available for existing document
   inspection and edits.
 
@@ -66,6 +75,7 @@ Local checks that passed during this delivery:
 ```powershell
 python -m unittest discover -s skills\preloaded\officecli-document-editing\scripts -p '*_test.py'
 python -m unittest discover -s skills\preloaded\xlsx\scripts -p '*_test.py'
+python -m unittest discover -s skills\preloaded\xlsx -p '*_test.py'
 ```
 
 Container check that passed:
@@ -82,6 +92,13 @@ Browser E2E evidence:
 - The UI reduced the flow to `3` thinking rounds and `2` tool calls.
 - The workbook was readable with `openpyxl` and contained the expected sheet,
   headers, and row data.
+- A local unit test verified that `run_python` can apply workbook fill, font,
+  and border styling through `openpyxl` and leave no staged temp file behind.
+- Local unit tests verified `officecli` passthrough for new OfficeCLI flags,
+  declared output path placeholders, blocked non-document management verbs, and
+  staged validation for mutating raw OfficeCLI commands.
+- Local unit tests verified replace fallback, Office lock-file diagnostics with
+  pending output retention, and stderr/stdout summaries for failed skill runs.
 
 ## Important Gotchas
 
@@ -95,6 +112,10 @@ Browser E2E evidence:
 - Do not commit `data/` smoke-test workspaces or generated Office artifacts.
 - Do not rely on `builtin-smart-reasoning` for file-writing validation; use a
   custom agent with file/script tools enabled.
+- Agent system prompts now include a concise file-work rule: real Office files
+  must go through `officecli-document-editing`, using `officecli` for raw
+  OfficeCLI commands and `run_python` only inside that bridge for SDK-level
+  edits.
 
 ## Remaining Work
 

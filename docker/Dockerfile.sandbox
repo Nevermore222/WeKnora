@@ -26,7 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN python -m pip install --no-cache-dir \
     openpyxl \
-    pandas
+    pandas \
+    python-docx \
+    python-pptx
 
 # OfficeCLI provides AI-friendly read/write operations for .docx, .xlsx, and
 # .pptx without requiring Microsoft Office. Keep it pinned for repeatable
@@ -34,9 +36,10 @@ RUN python -m pip install --no-cache-dir \
 RUN npm config set update-notifier false && \
     npm install -g @officecli/officecli@${OFFICECLI_VERSION}
 
-# Spreadsheet skills rely on openpyxl/pandas for workbook creation and
-# formula/error scanning. Formula recalculation requires LibreOffice in
-# environments that enable formula-heavy spreadsheet workflows.
+# Office skills rely on openpyxl/pandas plus python-docx/python-pptx for
+# direct Python edits when OfficeCLI's structured actions are too narrow.
+# Formula recalculation requires LibreOffice in environments that enable
+# formula-heavy spreadsheet workflows.
 
 # Create non-root user (UID 1000) for sandbox execution
 RUN groupadd -g 1000 sandbox && \

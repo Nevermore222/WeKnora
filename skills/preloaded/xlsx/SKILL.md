@@ -80,6 +80,15 @@ When running inside Xelora with `execute_skill_script`, prefer the
 - `input`: JSON with `"action": "write_xlsx"`, `"file"`, `"sheets"`,
   `"headers"`, and `"rows"`
 
+For workbook styling, formatting, formulas, charts, merged cells, or other
+features beyond the structured `write_xlsx` request, use the same bridge with
+`"action": "run_python"` and edit `target_file` with `openpyxl`.
+
+For OfficeCLI-specific spreadsheet operations or flags not covered by
+`write_xlsx`, use the same bridge with `"action": "officecli"` and pass the
+OfficeCLI command through the `command` array. Keep spreadsheet file work inside
+`officecli-document-editing`; do not invent new script names.
+
 Use `xlsx/scripts/create_xlsx.py` only as a compatibility wrapper when this
 skill has already been selected. It accepts the same structured JSON and will
 delegate to `write_xlsx`; do not invent other creation script names.

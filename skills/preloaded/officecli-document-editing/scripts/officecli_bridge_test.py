@@ -55,6 +55,68 @@ class OfficeCLIHelpersTest(unittest.TestCase):
             ],
         )
 
+    def test_build_officecli_passthrough_preserves_supported_options(self):
+        cmd = officecli_bridge.build_officecli_passthrough_command(
+            {
+                "action": "officecli",
+                "file": "brief.docx",
+                "command": ["view", "{file}", "text", "--start", "2", "--end", "8"],
+            }
+        )
+        self.assertEqual(
+            cmd,
+            [
+                "officecli",
+                "view",
+                "brief.docx",
+                "text",
+                "--start",
+                "2",
+                "--end",
+                "8",
+                "--json",
+            ],
+        )
+
+    def test_build_officecli_passthrough_resolves_declared_path_placeholders(self):
+        cmd = officecli_bridge.build_officecli_passthrough_command(
+            {
+                "action": "officecli",
+                "file": "brief.docx",
+                "command": ["view", "{file}", "html", "--out", "{preview}"],
+                "paths": {"preview": "previews/brief.html"},
+            }
+        )
+        self.assertEqual(
+            cmd,
+            [
+                "officecli",
+                "view",
+                "brief.docx",
+                "html",
+                "--out",
+                "previews/brief.html",
+                "--json",
+            ],
+        )
+
+    def test_build_officecli_passthrough_rejects_non_document_management_verbs(self):
+        with self.assertRaises(ValueError):
+            officecli_bridge.build_officecli_passthrough_command(
+                {
+                    "action": "officecli",
+                    "command": ["mcp", "register"],
+                }
+            )
+        with self.assertRaises(ValueError):
+            officecli_bridge.build_officecli_passthrough_command(
+                {
+                    "action": "officecli",
+                    "file": "brief.docx",
+                    "command": ["view", "../escape.docx", "text"],
+                }
+            )
+
     def test_run_officecli_uses_utf8_locale(self):
         with mock.patch.object(officecli_bridge.subprocess, "run") as mocked_run:
             mocked_run.return_value = subprocess.CompletedProcess([], 0, stdout="", stderr="")
@@ -64,6 +126,41 @@ class OfficeCLIHelpersTest(unittest.TestCase):
         env = mocked_run.call_args.kwargs["env"]
         self.assertEqual(env["LANG"], "C.UTF-8")
         self.assertEqual(env["LC_ALL"], "C.UTF-8")
+
+    def test_commit_staged_file_falls_back_to_copy_on_replace_permission_error(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            original = root / "brief.xlsx"
+            staged = root / ".brief.xelora-123.xlsx"
+            original.write_bytes(b"original")
+            staged.write_bytes(b"updated")
+
+            with mock.patch.object(officecli_bridge.os, "replace", side_effect=PermissionError("denied")):
+                method = officecli_bridge.commit_staged_file(staged, original, root)
+
+            self.assertEqual(method, "copy")
+            self.assertEqual(original.read_bytes(), b"updated")
+
+    def test_commit_staged_file_reports_office_lock_and_keeps_pending_copy(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            original = root / "brief.xlsx"
+            staged = root / ".brief.xelora-123.xlsx"
+            lock = root / "~$brief.xlsx"
+            original.write_bytes(b"original")
+            staged.write_bytes(b"updated")
+            lock.write_bytes(b"")
+
+            with mock.patch.object(officecli_bridge.os, "replace", side_effect=PermissionError("denied")):
+                with self.assertRaises(PermissionError) as raised:
+                    officecli_bridge.commit_staged_file(staged, original, root)
+
+            self.assertIn("Close the workbook in Office/WPS", str(raised.exception))
+            self.assertIn("~$brief.xlsx", str(raised.exception))
+            pending = root / "brief.xelora-pending.xlsx"
+            self.assertTrue(pending.exists())
+            self.assertEqual(pending.read_bytes(), b"updated")
+            self.assertEqual(original.read_bytes(), b"original")
 
     def test_mutation_validates_before_replacing_original(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -144,6 +241,48 @@ class OfficeCLIHelpersTest(unittest.TestCase):
 
             self.assertNotEqual(result, 0)
             self.assertEqual(original.read_bytes(), b"original")
+
+    def test_officecli_passthrough_mutation_stages_and_validates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            original = root / "brief.docx"
+            original.write_bytes(b"original")
+            request = root / "request.json"
+            request.write_text(
+                json.dumps(
+                    {
+                        "action": "officecli",
+                        "file": "brief.docx",
+                        "command": ["raw-set", "{file}", "/document", "--xml", "<w:document/>"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            calls = []
+
+            def fake_run(command, **kwargs):
+                calls.append(command)
+                if command[1] == "raw-set":
+                    (root / command[2]).write_bytes(b"updated")
+                return subprocess.CompletedProcess(command, 0, stdout=f"ok {command[2]}", stderr="")
+
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                with mock.patch.object(officecli_bridge.subprocess, "run", side_effect=fake_run):
+                    output = io.StringIO()
+                    with contextlib.redirect_stdout(output):
+                        result = officecli_bridge.run_request("request.json")
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(result, 0)
+            self.assertEqual(original.read_bytes(), b"updated")
+            self.assertEqual([call[1] for call in calls], ["raw-set", "validate"])
+            self.assertNotEqual(calls[0][2], "brief.docx")
+            self.assertIn("brief.docx", output.getvalue())
+            self.assertNotIn(".xelora-", output.getvalue())
 
     def test_write_docx_uses_compact_paragraph_request(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -231,6 +370,60 @@ class OfficeCLIHelpersTest(unittest.TestCase):
                 self.assertEqual(worksheet["B2"].value, "\u5df2\u4fee\u590d")
                 self.assertEqual(worksheet.freeze_panes, "A2")
                 self.assertTrue(worksheet["A1"].font.bold)
+            finally:
+                workbook.close()
+
+    def test_run_python_can_apply_xlsx_styles_atomically(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            workbook_path = root / "styled.xlsx"
+            workbook = openpyxl.Workbook()
+            worksheet = workbook.active
+            worksheet.append(["Section", "Title"])
+            worksheet.append(["Dao", "Chapter 1"])
+            workbook.save(workbook_path)
+            workbook.close()
+
+            request = root / "request.json"
+            request.write_text(
+                json.dumps(
+                    {
+                        "action": "run_python",
+                        "file": "styled.xlsx",
+                        "code": "\n".join(
+                            [
+                                "from openpyxl import load_workbook",
+                                "from openpyxl.styles import Font, PatternFill, Border, Side",
+                                "wb = load_workbook(target_file)",
+                                "ws = wb.active",
+                                "ws['A1'].fill = PatternFill('solid', fgColor='4A0E4E')",
+                                "ws['A1'].font = Font(color='FFFFFF', bold=True)",
+                                "thin = Side(style='thin', color='000000')",
+                                "ws['A1'].border = Border(left=thin, right=thin, top=thin, bottom=thin)",
+                                "wb.save(target_file)",
+                            ]
+                        ),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                result = officecli_bridge.run_request("request.json")
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(result, 0)
+            self.assertFalse(list(root.glob(".styled.xelora-*.xlsx")))
+            workbook = openpyxl.load_workbook(workbook_path)
+            try:
+                worksheet = workbook.active
+                self.assertEqual(worksheet["A1"].fill.fgColor.rgb, "004A0E4E")
+                self.assertEqual(worksheet["A1"].font.color.rgb, "00FFFFFF")
+                self.assertTrue(worksheet["A1"].font.bold)
+                self.assertEqual(worksheet["A1"].border.left.style, "thin")
             finally:
                 workbook.close()
 
