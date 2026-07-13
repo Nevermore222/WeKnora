@@ -24,6 +24,11 @@ var executeSkillScriptTool = BaseTool{
 - Use this tool to run utility scripts bundled with a skill
 - Scripts are executed in an isolated sandbox for security
 - Only scripts from loaded skills can be executed
+- Always pass both skill_name and script_path. Do not call this tool with only
+  input text or only a skill name.
+- For the officecli-document-editing skill, the script_path is always
+  "scripts/officecli_bridge.py"; pass the JSON request filename in args and
+  the JSON request body in input.
 
 ## When to Use
 - When a skill's instructions reference a utility script (e.g., "Run scripts/analyze_form.py")
@@ -231,14 +236,39 @@ func (t *ExecuteSkillScriptTool) Execute(ctx context.Context, args json.RawMessa
 		Data:    resultData,
 		Error: func() string {
 			if !success {
-				if result.Error != "" {
-					return result.Error
-				}
-				return fmt.Sprintf("Script exited with code %d", result.ExitCode)
+				return failedScriptErrorSummary(result.ExitCode, result.Error, result.Stdout, result.Stderr)
 			}
 			return ""
 		}(),
 	}, nil
+}
+
+func failedScriptErrorSummary(exitCode int, execError, stdout, stderr string) string {
+	parts := []string{fmt.Sprintf("Script exited with code %d", exitCode)}
+	if strings.TrimSpace(execError) != "" {
+		parts = append(parts, "error: "+trimToolSnippet(execError, 600))
+	}
+	if strings.TrimSpace(stderr) != "" {
+		parts = append(parts, "stderr: "+trimToolSnippet(stderr, 1200))
+	}
+	if strings.TrimSpace(stdout) != "" {
+		parts = append(parts, "stdout: "+trimToolSnippet(stdout, 600))
+	}
+	return strings.Join(parts, "\n")
+}
+
+func trimToolSnippet(value string, maxLen int) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= maxLen {
+		return value
+	}
+	if maxLen <= 1 {
+		return value[:maxLen]
+	}
+	if maxLen <= 3 {
+		return strings.TrimSpace(value[:maxLen])
+	}
+	return strings.TrimSpace(value[:maxLen-3]) + "..."
 }
 
 // Cleanup releases any resources
