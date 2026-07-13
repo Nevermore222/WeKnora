@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Tencent/Xelora/internal/agent/skills"
 	"github.com/Tencent/Xelora/internal/errors"
 	"github.com/Tencent/Xelora/internal/logger"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
@@ -150,5 +151,58 @@ func (h *SkillHandler) GetSkillFile(c *gin.Context) {
 			Content:  file.Content,
 			IsScript: file.IsScript,
 		},
+	})
+}
+
+// TestRunSkill godoc
+// @Summary      Validate a skill script test run
+// @Description  Validate a preloaded skill script invocation and return a structured Skill Studio result
+// @Tags         Skills
+// @Accept       json
+// @Produce      json
+// @Param        name     path      string                     true  "Skill name"
+// @Param        request  body      skills.SkillTestRunRequest true  "Test run payload"
+// @Success      200      {object}  map[string]interface{}     "Skill test result"
+// @Failure      400      {object}  errors.AppError            "Invalid request"
+// @Failure      404      {object}  errors.AppError            "Skill or script not found"
+// @Failure      500      {object}  errors.AppError            "Server error"
+// @Security     Bearer
+// @Security     ApiKeyAuth
+// @Router       /skills/{name}/test-run [post]
+func (h *SkillHandler) TestRunSkill(c *gin.Context) {
+	ctx := c.Request.Context()
+	name := c.Param("name")
+
+	var req skills.SkillTestRunRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(errors.NewBadRequestError("Invalid request parameters").WithDetails(err.Error()))
+		return
+	}
+	if strings.TrimSpace(req.ScriptPath) == "" {
+		c.Error(errors.NewBadRequestError("script_path is required"))
+		return
+	}
+
+	result, err := h.skillService.TestRunSkill(ctx, name, req)
+	if err != nil {
+		logger.ErrorWithFields(ctx, err, nil)
+		message := err.Error()
+		switch {
+		case strings.Contains(message, "script_path is required"),
+			strings.Contains(message, "invalid file path"),
+			strings.Contains(message, "outside skill directory"),
+			strings.Contains(message, "not an executable script"):
+			c.Error(errors.NewBadRequestError(message))
+		case strings.Contains(message, "not found") || strings.Contains(message, "no such file"):
+			c.Error(errors.NewNotFoundError("Skill script not found"))
+		default:
+			c.Error(errors.NewInternalServerError("Failed to test skill: " + message))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    result,
 	})
 }

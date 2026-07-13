@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/Tencent/Xelora/internal/agent/skills"
@@ -189,6 +190,42 @@ func (s *skillService) GetSkillFile(ctx context.Context, name, path string) (*sk
 		return nil, fmt.Errorf("failed to load skill file: %w", err)
 	}
 	return file, nil
+}
+
+// TestRunSkill validates a skill script invocation for Skill Studio. Real
+// execution stays behind the workspace-bound tool gateway; this endpoint keeps
+// the management API from becoming a second arbitrary script runner.
+func (s *skillService) TestRunSkill(ctx context.Context, name string, req skills.SkillTestRunRequest) (*skills.SkillTestRunResult, error) {
+	scriptPath := strings.TrimSpace(req.ScriptPath)
+	if scriptPath == "" {
+		return nil, fmt.Errorf("script_path is required")
+	}
+
+	if _, err := s.GetSkillByName(ctx, name); err != nil {
+		return nil, err
+	}
+	file, err := s.GetSkillFile(ctx, name, scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	if !file.IsScript {
+		return nil, fmt.Errorf("file is not an executable script: %s", scriptPath)
+	}
+
+	result := &skills.SkillTestRunResult{
+		SkillName:  name,
+		ScriptPath: scriptPath,
+		Args:       append([]string(nil), req.Args...),
+		Success:    false,
+		Stdout:     "",
+		Stderr:     "",
+		Error:      "workspace_required: bind a workspace before running skill test scripts",
+		Artifacts:  []skills.SkillTestRunArtifact{},
+	}
+	if strings.TrimSpace(req.WorkspaceID) != "" {
+		result.Error = "execution_unavailable: Skill Studio test-run is validated but not yet wired to workspace execution"
+	}
+	return result, nil
 }
 
 // GetPreloadedDir returns the configured preloaded skills directory

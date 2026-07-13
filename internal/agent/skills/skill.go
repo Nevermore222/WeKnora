@@ -88,6 +88,38 @@ type SkillDetail struct {
 	Files        []SkillFileSummary   `json:"files"`
 }
 
+// SkillTestRunRequest validates an admin-triggered skill script invocation.
+type SkillTestRunRequest struct {
+	Provider    string   `json:"provider,omitempty"`
+	ScriptPath  string   `json:"script_path"`
+	Args        []string `json:"args,omitempty"`
+	Input       string   `json:"input,omitempty"`
+	WorkspaceID string   `json:"workspace_id,omitempty"`
+}
+
+// SkillTestRunArtifact is an API-safe artifact summary for test-run results.
+type SkillTestRunArtifact struct {
+	Name         string `json:"name"`
+	RelativePath string `json:"relative_path"`
+	Kind         string `json:"kind"`
+	Size         int64  `json:"size"`
+}
+
+// SkillTestRunResult keeps failed preflight and future execution results in
+// one stable response shape for Skill Studio.
+type SkillTestRunResult struct {
+	SkillName        string                 `json:"skill_name"`
+	ScriptPath       string                 `json:"script_path"`
+	Args             []string               `json:"args,omitempty"`
+	Success          bool                   `json:"success"`
+	ExitCode         *int                   `json:"exit_code,omitempty"`
+	Stdout           string                 `json:"stdout"`
+	Stderr           string                 `json:"stderr"`
+	Error            string                 `json:"error,omitempty"`
+	Artifacts        []SkillTestRunArtifact `json:"artifacts"`
+	ArtifactDetected bool                   `json:"artifact_detected"`
+}
+
 // SkillFile represents an additional file within a skill directory (Level 3)
 type SkillFile struct {
 	Name     string // Filename (e.g., "FORMS.md", "scripts/validate.py")

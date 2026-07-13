@@ -22,4 +22,7 @@ type SkillService interface {
 
 	// GetSkillFile retrieves an additional file from a skill directory
 	GetSkillFile(ctx context.Context, name, path string) (*skills.SkillFile, error)
+
+	// TestRunSkill validates a script invocation for Skill Studio.
+	TestRunSkill(ctx context.Context, name string, req skills.SkillTestRunRequest) (*skills.SkillTestRunResult, error)
 }

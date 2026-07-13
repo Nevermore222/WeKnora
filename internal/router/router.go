@@ -1020,6 +1020,8 @@ func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler,
 	{
 		// List all preloaded skills — Viewer+
 		skills.GET("", g.Viewer(), skillHandler.ListSkills)
+		// Validate a skill script test run — Admin+
+		skills.POST("/:name/test-run", g.Admin(), skillHandler.TestRunSkill)
 		// Read a skill file before the generic detail route — Viewer+
 		skills.GET("/:name/files/*path", g.Viewer(), skillHandler.GetSkillFile)
 		// Read skill instructions and resource summaries — Viewer+
