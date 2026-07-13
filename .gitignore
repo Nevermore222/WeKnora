@@ -60,6 +60,7 @@ frontend/.vite
 frontend/chrome-extension/
 Xelora-Chrome-Extension
 packages/protoc-3.19.4-linux-x86_64.zip
+release-bundles/
 
 Claude.md
 
