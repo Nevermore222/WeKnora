@@ -8,12 +8,14 @@ const functionBody = source
   .replace(/export interface SkillStudioStats \{[\s\S]*?\}\n/g, '')
   .replace(/export function getSkillStudioStats/, 'function getSkillStudioStats')
   .replace(/export function getSkillPrimaryScript/, 'function getSkillPrimaryScript')
+  .replace(/export function buildSkillTestRunPayload/, 'function buildSkillTestRunPayload')
   .replace(/\?: SkillInfo \| SkillDetail \| null/g, '')
   .replace(/: SkillStudioStats/g, '')
+  .replace(/: SkillTestRunRequest/g, '')
   .replace(/: string/g, '')
   .replace(/ as SkillDetail/g, '');
 
-const helpers = Function(`${functionBody}; return { getSkillStudioStats, getSkillPrimaryScript };`)();
+const helpers = Function(`${functionBody}; return { getSkillStudioStats, getSkillPrimaryScript, buildSkillTestRunPayload };`)();
 
 test('summarizes skill detail for studio cards', () => {
   const skill = {
@@ -37,4 +39,16 @@ test('handles skills without resource summaries', () => {
     instructionLines: 0,
   });
   assert.equal(helpers.getSkillPrimaryScript(null), 'No script');
+});
+
+test('builds a default skill test-run payload from the primary script', () => {
+  const skill = {
+    scripts: [{ path: 'scripts/run.py', language: 'python' }],
+  };
+
+  assert.deepEqual(helpers.buildSkillTestRunPayload(skill), {
+    script_path: 'scripts/run.py',
+    args: [],
+    input: '',
+  });
 });

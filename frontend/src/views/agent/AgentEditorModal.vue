@@ -1018,6 +1018,24 @@
                               <span>{{ skillStudioStats.instructionLines }} instruction lines</span>
                               <span>main: {{ selectedSkillPrimaryScript }}</span>
                             </div>
+                            <div class="skill-studio-actions">
+                              <button type="button" class="skill-studio-test-button"
+                                :disabled="skillTestRunLoading || selectedSkillPrimaryScript === 'No script'"
+                                @click="runSelectedSkillTest">
+                                {{ skillTestRunLoading ? 'Testing...' : 'Test main script' }}
+                              </button>
+                              <span class="skill-studio-action-hint">Validates script path and execution readiness.</span>
+                            </div>
+                            <div v-if="selectedSkillTestRunResult" class="skill-test-result"
+                              :class="{ success: selectedSkillTestRunResult.success }">
+                              <div class="skill-test-result__title">
+                                <span>{{ selectedSkillTestRunResult.success ? 'Ready' : 'Needs attention' }}</span>
+                                <small>{{ selectedSkillTestRunResult.script_path }}</small>
+                              </div>
+                              <p v-if="selectedSkillTestRunResult.error">{{ selectedSkillTestRunResult.error }}</p>
+                              <p v-else>Script test-run returned successfully.</p>
+                              <pre v-if="selectedSkillTestRunResult.stdout || selectedSkillTestRunResult.stderr">{{ selectedSkillTestRunResult.stdout || selectedSkillTestRunResult.stderr }}</pre>
+                            </div>
 
                             <div class="skill-studio-columns">
                               <div class="skill-studio-block">
@@ -1461,7 +1479,7 @@ import {
 } from '@/api/agent';
 import { type ModelConfig } from '@/api/model';
 import { type MCPService } from '@/api/mcp-service';
-import { getSkill, getSkillFile, type SkillDetail, type SkillFileContent, type SkillInfo } from '@/api/skill';
+import { getSkill, getSkillFile, testRunSkill, type SkillDetail, type SkillFileContent, type SkillInfo, type SkillTestRunResult } from '@/api/skill';
 import { type WebSearchProviderEntity } from '@/api/web-search-provider';
 import { type StorageEngineStatusItem, type PromptTemplate, type PromptTemplatesConfig } from '@/api/system';
 import { useUIStore } from '@/stores/ui';
@@ -1482,7 +1500,7 @@ import {
   type RequirementMissKind,
   type ScopeCapabilities,
 } from '@/utils/tool-capabilities';
-import { getSkillPrimaryScript, getSkillStudioStats } from '@/utils/skillStudio';
+import { buildSkillTestRunPayload, getSkillPrimaryScript, getSkillStudioStats } from '@/utils/skillStudio';
 
 const uiStore = useUIStore();
 const authStore = useAuthStore();
@@ -1575,6 +1593,8 @@ const selectedSkillDetail = ref<SkillDetail | null>(null);
 const selectedSkillFile = ref<SkillFileContent | null>(null);
 const skillDetailLoading = ref(false);
 const skillFileLoading = ref(false);
+const skillTestRunLoading = ref(false);
+const selectedSkillTestRunResult = ref<SkillTestRunResult | null>(null);
 const selectedSkillSummary = computed(() => skillOptions.value.find(skill => skill.name === selectedSkillName.value) || null);
 const skillStudioStats = computed(() => getSkillStudioStats(selectedSkillDetail.value));
 const selectedSkillPrimaryScript = computed(() => getSkillPrimaryScript(selectedSkillDetail.value || selectedSkillSummary.value));
@@ -2680,6 +2700,7 @@ const openSkillStudio = async (name: string) => {
   if (!name) return;
   selectedSkillName.value = name;
   selectedSkillFile.value = null;
+  selectedSkillTestRunResult.value = null;
   skillDetailLoading.value = true;
 
   try {
@@ -2690,6 +2711,31 @@ const openSkillStudio = async (name: string) => {
     MessagePlugin.error(error?.message || `Failed to load skill: ${name}`);
   } finally {
     skillDetailLoading.value = false;
+  }
+};
+
+const runSelectedSkillTest = async () => {
+  if (!selectedSkillDetail.value) return;
+  const payload = buildSkillTestRunPayload(selectedSkillDetail.value);
+  if (!payload.script_path) {
+    MessagePlugin.warning('This skill has no executable script to test.');
+    return;
+  }
+
+  skillTestRunLoading.value = true;
+  try {
+    const response = await testRunSkill(selectedSkillDetail.value.name, payload);
+    selectedSkillTestRunResult.value = response.data;
+    if (response.data.success) {
+      MessagePlugin.success('Skill script is ready.');
+    } else if (response.data.error) {
+      MessagePlugin.warning(response.data.error);
+    }
+  } catch (error: any) {
+    selectedSkillTestRunResult.value = null;
+    MessagePlugin.error(error?.message || 'Failed to test skill script.');
+  } finally {
+    skillTestRunLoading.value = false;
   }
 };
 
@@ -5017,6 +5063,75 @@ const handleSave = async () => {
 .skill-studio-card__meta {
   font-size: 11px;
   color: var(--td-text-color-placeholder);
+}
+
+.skill-studio-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+
+.skill-studio-test-button {
+  border: 1px solid var(--td-brand-color);
+  color: var(--td-brand-color);
+  background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.skill-studio-action-hint {
+  font-size: 12px;
+  color: var(--td-text-color-placeholder);
+}
+
+.skill-test-result {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--td-warning-color) 38%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--td-warning-color) 10%, var(--td-bg-color-container));
+
+  &.success {
+    border-color: color-mix(in srgb, var(--td-success-color) 42%, transparent);
+    background: color-mix(in srgb, var(--td-success-color) 10%, var(--td-bg-color-container));
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: var(--td-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  pre {
+    margin-top: 8px;
+    max-height: 140px;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-size: 11px;
+  }
+}
+
+.skill-test-result__title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+
+  small {
+    color: var(--td-text-color-placeholder);
+    font-weight: 500;
+  }
 }
 
 .skill-studio-detail {

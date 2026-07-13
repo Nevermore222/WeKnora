@@ -1,4 +1,4 @@
-import type { SkillDetail, SkillInfo } from '@/api/skill'
+import type { SkillDetail, SkillInfo, SkillTestRunRequest } from '@/api/skill'
 
 export interface SkillStudioStats {
   scriptCount: number
@@ -21,4 +21,13 @@ export function getSkillStudioStats(skill?: SkillInfo | SkillDetail | null): Ski
 export function getSkillPrimaryScript(skill?: SkillInfo | SkillDetail | null): string {
   const scripts = Array.isArray(skill?.scripts) ? skill.scripts : []
   return scripts[0]?.path || 'No script'
+}
+
+export function buildSkillTestRunPayload(skill?: SkillInfo | SkillDetail | null): SkillTestRunRequest {
+  const scriptPath = getSkillPrimaryScript(skill)
+  return {
+    script_path: scriptPath === 'No script' ? '' : scriptPath,
+    args: [],
+    input: '',
+  }
 }
