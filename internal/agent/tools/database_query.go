@@ -29,7 +29,7 @@ var databaseQueryTool = BaseTool{
 - name (VARCHAR): Knowledge base name
 - description (TEXT): Description
 - tenant_id (INTEGER): Owner tenant ID
-- embedding_model_id, summary_model_id, rerank_model_id (VARCHAR): Model IDs
+- embedding_model_id, summary_model_id (VARCHAR): Model IDs
 - vlm_config (JSON): Includes VLM settings such as enabled flag and model_id
 - created_at, updated_at, deleted_at (TIMESTAMP)
 
@@ -93,6 +93,11 @@ Join knowledge bases and documents:
 - Only SELECT queries are allowed
 - Limit results with LIMIT clause for better performance
 - Use appropriate JOINs when querying across tables
+- When a query uses table aliases, qualify shared columns such as created_at,
+  updated_at, id, tenant_id, and deleted_at (for example kb.created_at) to avoid
+  ambiguous column errors
+- Do not select columns that are not listed above. In particular,
+  knowledge_bases does not have rerank_model_id in this schema
 - All timestamps are in UTC with time zone`,
 	schema: utils.GenerateSchema[DatabaseQueryInput](),
 }
