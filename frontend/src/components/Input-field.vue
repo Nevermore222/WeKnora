@@ -394,7 +394,24 @@ const skillSlashStartPos = ref(0);
 const skillSlashActiveIndex = ref(0);
 const selectedSkillDirectives = ref<SkillSlashOption[]>([]);
 const slashSkills = ref<SkillInfo[]>([]);
-const availableSkillSlashOptions = computed(() => buildSkillSlashOptions(slashSkills.value));
+const agentSkillSelectionMode = computed(() => {
+  if (!hasAgentConfig.value) return 'all';
+  return currentAgentConfig.value?.skills_selection_mode || 'none';
+});
+const agentSelectedSkillNames = computed(() => currentAgentConfig.value?.selected_skills || []);
+const agentScopedSlashSkills = computed(() => {
+  const mode = agentSkillSelectionMode.value;
+  if (mode === 'none') return [];
+  if (mode === 'all') return slashSkills.value;
+
+  const selectedNames = agentSelectedSkillNames.value;
+  const byName = new Map(slashSkills.value.map(skill => [skill.name, skill]));
+  return selectedNames.map(name => byName.get(name) || {
+    name,
+    description: 'Selected skill for the current agent.',
+  });
+});
+const availableSkillSlashOptions = computed(() => buildSkillSlashOptions(agentScopedSlashSkills.value));
 
 const filteredSkillSlashOptions = computed(() => {
   return filterSkillSlashOptions(availableSkillSlashOptions.value, skillSlashQuery.value);
