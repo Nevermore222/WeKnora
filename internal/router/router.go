@@ -85,7 +85,7 @@ type RouterParams struct {
 	RedisClient                  *redis.Client
 	DataSourceHandler            *handler.DataSourceHandler
 	DataSourceCredentialsHandler *handler.DataSourceCredentialsHandler
-	XeloraCloudHandler          *handler.XeloraCloudHandler
+	XeloraCloudHandler           *handler.XeloraCloudHandler
 	WikiPageHandler              *handler.WikiPageHandler
 }
 
@@ -1020,6 +1020,10 @@ func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler,
 	{
 		// List all preloaded skills — Viewer+
 		skills.GET("", g.Viewer(), skillHandler.ListSkills)
+		// Read a skill file before the generic detail route — Viewer+
+		skills.GET("/:name/files/*path", g.Viewer(), skillHandler.GetSkillFile)
+		// Read skill instructions and resource summaries — Viewer+
+		skills.GET("/:name", g.Viewer(), skillHandler.GetSkill)
 	}
 }
 

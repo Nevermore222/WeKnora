@@ -56,6 +56,38 @@ type SkillMetadata struct {
 	BasePath    string // Path to skill directory for later loading
 }
 
+// SkillScriptSummary is the API-safe summary of an executable script inside a skill.
+type SkillScriptSummary struct {
+	Path     string `json:"path"`
+	Language string `json:"language"`
+}
+
+// SkillFileSummary is the API-safe summary of a file inside a skill.
+type SkillFileSummary struct {
+	Path     string `json:"path"`
+	IsScript bool   `json:"is_script"`
+}
+
+// SkillSummary is the management API representation of a discovered skill.
+type SkillSummary struct {
+	Name        string               `json:"name"`
+	Description string               `json:"description"`
+	Source      string               `json:"source"`
+	Status      string               `json:"status"`
+	Scripts     []SkillScriptSummary `json:"scripts"`
+}
+
+// SkillDetail is the management API representation of a loaded skill.
+type SkillDetail struct {
+	Name         string               `json:"name"`
+	Description  string               `json:"description"`
+	Source       string               `json:"source"`
+	Status       string               `json:"status"`
+	Instructions string               `json:"instructions"`
+	Scripts      []SkillScriptSummary `json:"scripts"`
+	Files        []SkillFileSummary   `json:"files"`
+}
+
 // SkillFile represents an additional file within a skill directory (Level 3)
 type SkillFile struct {
 	Name     string // Filename (e.g., "FORMS.md", "scripts/validate.py")

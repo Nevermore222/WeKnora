@@ -1,52 +1,99 @@
 # Skills API
 
-[返回目录](./README.md)
+[Back to API index](./README.md)
 
-| 方法 | 路径      | 描述               |
-| ---- | --------- | ------------------ |
-| GET  | `/skills` | 获取预装 Skills 列表 |
+Skills are scanned from the configured preloaded skills directory. The API is read-only in this phase so the frontend can build a Skill Studio and `/skill` picker without exposing install or mutation operations yet.
 
-## GET `/skills` - 获取预装 Skills 列表
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/skills` | List discovered skills with lightweight script summaries |
+| GET | `/skills/{name}` | Get one skill's instructions and resource summary |
+| GET | `/skills/{name}/files/{path}` | Read a file inside one skill directory |
 
-获取系统中所有预装的智能体技能列表。
+## GET `/skills`
 
-**请求**:
+Returns all discovered skills. `skills_available` is `true` only when the sandbox mode is enabled.
 
-```curl
+```bash
 curl --location 'http://localhost:8080/api/v1/skills' \
---header 'X-API-Key: sk-xxxxx' \
---header 'Content-Type: application/json'
+  --header 'X-API-Key: sk-xxxxx'
 ```
-
-**响应**:
 
 ```json
 {
-    "data": [
+  "success": true,
+  "skills_available": true,
+  "data": [
+    {
+      "name": "officecli-document-editing",
+      "description": "Create or modify Office files through the OfficeCLI bridge.",
+      "source": "preloaded",
+      "status": "enabled",
+      "scripts": [
         {
-            "name": "web_search",
-            "description": "搜索互联网获取最新信息"
-        },
-        {
-            "name": "code_interpreter",
-            "description": "执行代码并返回结果"
-        },
-        {
-            "name": "image_generation",
-            "description": "根据文本描述生成图片"
+          "path": "scripts/officecli_bridge.py",
+          "language": "python"
         }
-    ],
-    "skills_available": true,
-    "success": true
+      ]
+    }
+  ]
 }
 ```
 
-当系统未配置 Skills 时，`skills_available` 返回 `false`，`data` 为空数组：
+## GET `/skills/{name}`
+
+Loads a skill's full `SKILL.md` instructions plus a summary of files and executable scripts.
+
+```bash
+curl --location 'http://localhost:8080/api/v1/skills/officecli-document-editing' \
+  --header 'X-API-Key: sk-xxxxx'
+```
 
 ```json
 {
-    "data": [],
-    "skills_available": false,
-    "success": true
+  "success": true,
+  "data": {
+    "name": "officecli-document-editing",
+    "description": "Create or modify Office files through the OfficeCLI bridge.",
+    "source": "preloaded",
+    "status": "enabled",
+    "instructions": "Use this skill for Office document editing...",
+    "scripts": [
+      {
+        "path": "scripts/officecli_bridge.py",
+        "language": "python"
+      }
+    ],
+    "files": [
+      {
+        "path": "SKILL.md",
+        "is_script": false
+      },
+      {
+        "path": "scripts/officecli_bridge.py",
+        "is_script": true
+      }
+    ]
+  }
+}
+```
+
+## GET `/skills/{name}/files/{path}`
+
+Reads one file from inside the skill directory. The path must be relative to that skill; absolute paths and directory traversal are rejected.
+
+```bash
+curl --location 'http://localhost:8080/api/v1/skills/officecli-document-editing/files/scripts/officecli_bridge.py' \
+  --header 'X-API-Key: sk-xxxxx'
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "path": "scripts/officecli_bridge.py",
+    "content": "print('example')\n",
+    "is_script": true
+  }
 }
 ```

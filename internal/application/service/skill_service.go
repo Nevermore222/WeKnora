@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/Tencent/Xelora/internal/agent/skills"
@@ -111,6 +112,30 @@ func (s *skillService) ListPreloadedSkills(ctx context.Context) ([]*skills.Skill
 	return metadata, nil
 }
 
+// ListSkillSummaries returns API-safe summaries for all discovered skills.
+func (s *skillService) ListSkillSummaries(ctx context.Context) ([]*skills.SkillSummary, error) {
+	metadata, err := s.ListPreloadedSkills(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]*skills.SkillSummary, 0, len(metadata))
+	for _, meta := range metadata {
+		scripts, err := s.scriptSummaries(meta.Name)
+		if err != nil {
+			logger.Warnf(ctx, "Failed to list scripts for skill %s: %v", meta.Name, err)
+		}
+		summaries = append(summaries, &skills.SkillSummary{
+			Name:        meta.Name,
+			Description: meta.Description,
+			Source:      "preloaded",
+			Status:      "enabled",
+			Scripts:     scripts,
+		})
+	}
+	return summaries, nil
+}
+
 // GetSkillByName retrieves a skill by its name
 func (s *skillService) GetSkillByName(ctx context.Context, name string) (*skills.Skill, error) {
 	if err := s.ensureInitialized(ctx); err != nil {
@@ -129,7 +154,78 @@ func (s *skillService) GetSkillByName(ctx context.Context, name string) (*skills
 	return skill, nil
 }
 
+// GetSkillDetail retrieves a loaded skill plus its file and script summaries.
+func (s *skillService) GetSkillDetail(ctx context.Context, name string) (*skills.SkillDetail, error) {
+	skill, err := s.GetSkillByName(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	files, scripts, err := s.fileAndScriptSummaries(name)
+	if err != nil {
+		return nil, err
+	}
+	return &skills.SkillDetail{
+		Name:         skill.Name,
+		Description:  skill.Description,
+		Source:       "preloaded",
+		Status:       "enabled",
+		Instructions: skill.Instructions,
+		Scripts:      scripts,
+		Files:        files,
+	}, nil
+}
+
+// GetSkillFile retrieves an additional file from a skill.
+func (s *skillService) GetSkillFile(ctx context.Context, name, path string) (*skills.SkillFile, error) {
+	if err := s.ensureInitialized(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize skill service: %w", err)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	file, err := s.loader.LoadSkillFile(name, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load skill file: %w", err)
+	}
+	return file, nil
+}
+
 // GetPreloadedDir returns the configured preloaded skills directory
 func (s *skillService) GetPreloadedDir() string {
 	return s.preloadedDir
+}
+
+func (s *skillService) scriptSummaries(name string) ([]skills.SkillScriptSummary, error) {
+	_, scripts, err := s.fileAndScriptSummaries(name)
+	return scripts, err
+}
+
+func (s *skillService) fileAndScriptSummaries(name string) ([]skills.SkillFileSummary, []skills.SkillScriptSummary, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	files, err := s.loader.ListSkillFiles(name)
+	if err != nil {
+		return nil, nil, err
+	}
+	sort.Strings(files)
+
+	fileSummaries := make([]skills.SkillFileSummary, 0, len(files))
+	scriptSummaries := make([]skills.SkillScriptSummary, 0)
+	for _, file := range files {
+		path := filepath.ToSlash(file)
+		isScript := skills.IsScript(path)
+		fileSummaries = append(fileSummaries, skills.SkillFileSummary{
+			Path:     path,
+			IsScript: isScript,
+		})
+		if isScript {
+			scriptSummaries = append(scriptSummaries, skills.SkillScriptSummary{
+				Path:     path,
+				Language: skills.GetScriptLanguage(path),
+			})
+		}
+	}
+	return fileSummaries, scriptSummaries, nil
 }
