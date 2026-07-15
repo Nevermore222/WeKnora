@@ -111,10 +111,15 @@
                <span v-else class="workspace-binding-text">{{ t('chat.workspaceUnbound') }}</span>
            </div>
             <!-- Workspace binding recovery banner for invalid/access_denied/archived -->
-            <div v-if="!embeddedMode && workspaceBindingError" class="workspace-binding-recovery">
+           <div v-if="!embeddedMode && workspaceBindingError" class="workspace-binding-recovery">
                 <t-icon name="error-circle" size="14px" />
                 <span class="recovery-text">{{ workspaceBindingError }}</span>
             </div>
+           <WorkspaceFilePanel
+                v-if="!embeddedMode && isWorkspaceBound"
+                :workspace-id="workspaceBinding?.workspace_id"
+                :title="workspaceBinding?.workspace_name || '工作区文件'"
+            />
            <InputField ref="inputFieldRef"
                 @send-msg="(query, modelId, mentionedItems, imageFiles, attachmentFiles) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles)"
                 @stop-generation="handleStopGeneration" :isReplying="isReplying" :sessionId="session_id"
@@ -132,6 +137,7 @@ import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import InputField from '../../components/Input-field.vue';
 import botmsg from './components/botmsg.vue';
 import usermsg from './components/usermsg.vue';
+import WorkspaceFilePanel from '@/components/workspace-files/WorkspaceFilePanel.vue';
 import { getMessageList, getSession } from "@/api/chat/index";
 import { getSuggestedQuestions } from "@/api/agent/index";
 import { useStream } from '../../api/chat/streame'
