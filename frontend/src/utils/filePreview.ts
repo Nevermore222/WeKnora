@@ -39,7 +39,7 @@ export function detectPreviewKind(name: string, mimeType = ''): PreviewKind {
 
 export function canInlinePreview(ref: PreviewFileRef) {
   const kind = ref.kind || detectPreviewKind(ref.name, ref.mimeType);
-  return kind === 'markdown' || kind === 'text' || kind === 'image' || kind === 'pdf';
+  return kind === 'markdown' || kind === 'text' || kind === 'image' || kind === 'pdf' || kind === 'presentation';
 }
 
 export function normalizeWorkspaceFileRef(workspaceId: string, file: WorkspaceFileEntry): PreviewFileRef {
@@ -95,6 +95,19 @@ export function fileInfoText(ref: PreviewFileRef) {
 
 function revokeObjectUrlLater(url: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export async function createPreviewObjectUrl(ref: PreviewFileRef, mimeType?: string) {
+  if (!ref.workspaceId) {
+    throw new Error('当前文件缺少 workspaceId，无法预览');
+  }
+  const blob = await fetchWorkspaceFileBlob(ref.workspaceId, ref.relativePath || ref.path, 'raw');
+  const previewBlob = mimeType && blob.type !== mimeType ? new Blob([blob], { type: mimeType }) : blob;
+  const objectUrl = URL.createObjectURL(previewBlob);
+  return {
+    objectUrl,
+    revoke: () => URL.revokeObjectURL(objectUrl),
+  };
 }
 
 export async function openPreviewFile(ref: PreviewFileRef) {

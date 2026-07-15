@@ -42,23 +42,23 @@ function formatSize(size?: number) {
       >
         <header class="file-workbench-tabs">
           <div class="file-tabs">
-            <button
+            <div
               v-for="opened in store.openedFiles"
               :key="`${opened.workspaceId || opened.sessionId || opened.source}:${opened.relativePath || opened.path}`"
-              type="button"
+              role="button"
+              tabindex="0"
               class="file-tab"
               :class="{ 'is-active': store.currentKey === `${opened.workspaceId || opened.sessionId || opened.source}:${opened.relativePath || opened.path}` }"
               @click="store.activate(opened)"
+              @keydown.enter.prevent="store.activate(opened)"
+              @keydown.space.prevent="store.activate(opened)"
             >
               <t-icon :name="opened.kind === 'image' ? 'image' : 'file'" size="15px" />
               <span>{{ opened.name }}</span>
-              <t-icon
-                name="close"
-                size="13px"
-                class="file-tab-close"
-                @click.stop="store.closeFile(opened)"
-              />
-            </button>
+              <button type="button" class="file-tab-close" title="关闭" @click.stop="store.closeFile(opened)">
+                <t-icon name="close" size="13px" />
+              </button>
+            </div>
           </div>
           <button type="button" class="file-tab-add" title="从右侧文件树打开文件" @click="store.openBrowser">
             <t-icon name="add" size="16px" />
@@ -174,11 +174,23 @@ function formatSize(size?: number) {
 }
 
 .file-tab-close {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
   opacity: 0.68;
 }
 
 .file-tab-close:hover {
+  background: var(--td-bg-color-container-hover);
   opacity: 1;
 }
 

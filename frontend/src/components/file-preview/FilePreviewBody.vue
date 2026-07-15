@@ -5,6 +5,7 @@ import { canInlinePreview, detectPreviewKind } from '@/utils/filePreview';
 import TextPreview from './previews/TextPreview.vue';
 import ImagePreview from './previews/ImagePreview.vue';
 import PdfPreview from './previews/PdfPreview.vue';
+import PptPreview from './previews/PptPreview.vue';
 import UnsupportedPreview from './previews/UnsupportedPreview.vue';
 
 const props = defineProps<{
@@ -20,6 +21,7 @@ const canPreview = computed(() => canInlinePreview({ ...props.file, kind: kind.v
     <TextPreview v-if="canPreview && (kind === 'markdown' || kind === 'text')" :file="file" />
     <ImagePreview v-else-if="canPreview && kind === 'image'" :file="file" />
     <PdfPreview v-else-if="canPreview && kind === 'pdf'" :file="file" />
+    <PptPreview v-else-if="canPreview && kind === 'presentation'" :file="file" />
     <UnsupportedPreview v-else :file="file" />
   </div>
 </template>
