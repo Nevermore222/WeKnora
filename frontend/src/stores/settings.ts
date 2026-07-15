@@ -165,10 +165,6 @@ export const useSettingsStore = defineStore("settings", {
     // 共享智能体来源租户 ID（可选）
     selectedAgentSourceTenantId: (state) => state.settings.selectedAgentSourceTenantId ?? null,
 
-    // 当前会话的工作区绑定状态。null = 未加载/无绑定。
-    activeSessionWorkspaceBinding: (state): SessionWorkspaceBindingPayload | null =>
-      state.activeSessionWorkspaceBinding ?? null,
-
     // 当前会话是否已绑定工作区。
     isSessionWorkspaceBound: (state): boolean => {
       const b = state.activeSessionWorkspaceBinding;
