@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { previewWorkspaceFile } from '@/api/workspace';
 import type { PreviewFileRef } from '@/utils/filePreview';
@@ -10,6 +10,11 @@ const props = defineProps<{
 
 const loading = ref(false);
 const content = ref('');
+
+const lines = computed(() => {
+  const value = content.value || '';
+  return value.length ? value.split(/\r?\n/) : [''];
+});
 
 async function loadPreview() {
   if (!props.file.workspaceId) {
@@ -34,25 +39,46 @@ watch(() => props.file.path, loadPreview);
 
 <template>
   <t-loading :loading="loading">
-    <pre class="text-preview">{{ content }}</pre>
+    <div class="text-preview-editor">
+      <div v-for="(line, index) in lines" :key="index" class="text-preview-line">
+        <span class="line-number">{{ index + 1 }}</span>
+        <code>{{ line || ' ' }}</code>
+      </div>
+    </div>
   </t-loading>
 </template>
 
 <style scoped>
-.text-preview {
-  min-height: 320px;
-  max-height: calc(100vh - 220px);
-  margin: 0;
-  padding: 16px;
+.text-preview-editor {
+  min-height: calc(100vh - 245px);
   overflow: auto;
-  border: 1px solid var(--td-border-level-1-color);
-  border-radius: 10px;
-  background: var(--td-bg-color-container);
+  padding: 14px 0;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--td-bg-color-container-hover) 72%, transparent) 0 64px, transparent 64px),
+    var(--td-bg-color-container);
   color: var(--td-text-color-primary);
-  font-family: "JetBrains Mono", "Cascadia Code", monospace;
+  font-family: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", monospace;
   font-size: 13px;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-word;
+  line-height: 1.72;
+}
+
+.text-preview-line {
+  display: grid;
+  min-width: max-content;
+  grid-template-columns: 64px 1fr;
+}
+
+.line-number {
+  padding-right: 14px;
+  color: var(--td-text-color-placeholder);
+  text-align: right;
+  user-select: none;
+}
+
+.text-preview-line code {
+  padding: 0 18px;
+  color: inherit;
+  font: inherit;
+  white-space: pre;
 }
 </style>

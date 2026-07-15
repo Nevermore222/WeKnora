@@ -49,7 +49,6 @@ function openDownload() {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px 0 16px;
-  border-bottom: 1px solid var(--td-border-level-1-color);
+  padding-top: 8px;
 }
 </style>
