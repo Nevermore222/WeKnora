@@ -130,6 +130,7 @@
             @click="filePreviewStore.toggleBrowser()"
         >
             <t-icon name="folder-open" size="18px" />
+            <span class="workspace-file-toggle__label">文件</span>
         </button>
         <WorkspaceFileBrowser
             v-if="!embeddedMode && isWorkspaceBound && filePreviewStore.browserVisible"
@@ -1154,21 +1155,25 @@ onBeforeRouteUpdate((to, from, next) => {
 
 .workspace-file-toggle {
     position: fixed;
-    right: 18px;
-    bottom: 142px;
+    top: 50%;
+    right: 0;
     z-index: 510;
     display: inline-flex;
-    width: 42px;
-    height: 42px;
+    width: 46px;
+    min-height: 88px;
     align-items: center;
     justify-content: center;
+    gap: 6px;
     border: 1px solid color-mix(in srgb, var(--td-border-level-1-color) 70%, transparent);
-    border-radius: 14px;
+    border-right: 0;
+    border-radius: 16px 0 0 16px;
     background: color-mix(in srgb, var(--td-bg-color-container) 94%, transparent);
     box-shadow: 0 16px 44px rgba(0, 0, 0, 0.24);
     color: var(--td-text-color-secondary);
     cursor: pointer;
+    flex-direction: column;
     transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+    transform: translateY(-50%);
     backdrop-filter: blur(14px);
 
     &:hover,
@@ -1176,8 +1181,16 @@ onBeforeRouteUpdate((to, from, next) => {
         border-color: color-mix(in srgb, var(--td-brand-color) 55%, transparent);
         background: color-mix(in srgb, var(--td-brand-color) 14%, var(--td-bg-color-container));
         color: var(--td-brand-color);
-        transform: translateY(-1px);
+        transform: translate(-2px, -50%);
     }
+}
+
+.workspace-file-toggle__label {
+    writing-mode: vertical-rl;
+    color: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
 }
 
 .msg_list {
