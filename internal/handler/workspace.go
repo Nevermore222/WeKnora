@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"mime"
 	"net/http"
 	"strings"
 
@@ -54,6 +55,47 @@ func (h *WorkspaceHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, workspaceResponseEntry(entry))
 }
 
+const workspacePreviewMaxBytes int64 = 1 << 20
+
+func (h *WorkspaceHandler) ListFiles(c *gin.Context) {
+	files, err := h.service.ListFiles(c.Request.Context(), strings.TrimSpace(c.Param("id")), c.Query("path"))
+	if err != nil {
+		writeWorkspaceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"files": files})
+}
+
+func (h *WorkspaceHandler) PreviewFile(c *gin.Context) {
+	preview, err := h.service.PreviewFile(c.Request.Context(), strings.TrimSpace(c.Param("id")), c.Query("path"), workspacePreviewMaxBytes)
+	if err != nil {
+		writeWorkspaceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, preview)
+}
+
+func (h *WorkspaceHandler) RawFile(c *gin.Context) {
+	opened, err := h.service.OpenFile(c.Request.Context(), strings.TrimSpace(c.Param("id")), c.Query("path"))
+	if err != nil {
+		writeWorkspaceError(c, err)
+		return
+	}
+	c.Header("Content-Type", opened.ContentType)
+	c.File(opened.AbsolutePath)
+}
+
+func (h *WorkspaceHandler) DownloadFile(c *gin.Context) {
+	opened, err := h.service.OpenFile(c.Request.Context(), strings.TrimSpace(c.Param("id")), c.Query("path"))
+	if err != nil {
+		writeWorkspaceError(c, err)
+		return
+	}
+	c.Header("Content-Type", opened.ContentType)
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": opened.Name}))
+	c.File(opened.AbsolutePath)
+}
+
 func workspaceResponseEntry(entry *workspace.Entry) *workspace.Entry {
 	if entry == nil {
 		return nil
@@ -78,6 +120,10 @@ func writeWorkspaceError(c *gin.Context, err error) {
 		c.JSON(http.StatusForbidden, gin.H{"code": "workspace_access_denied", "message": "workspace is not writable"})
 	case errors.Is(err, workspace.ErrNotConfigured):
 		c.JSON(http.StatusServiceUnavailable, gin.H{"code": "workspace_not_configured", "message": "workspace root is not configured"})
+	case errors.Is(err, workspace.ErrFileTooLarge):
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"code": "workspace_file_too_large", "message": "file is too large to preview"})
+	case errors.Is(err, workspace.ErrUnsupportedPreview):
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{"code": "workspace_preview_unsupported", "message": "file type is not supported for inline preview"})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"code": "workspace_error", "message": "workspace operation failed"})
 	}

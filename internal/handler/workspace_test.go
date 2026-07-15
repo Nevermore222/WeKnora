@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Tencent/Xelora/internal/types"
@@ -21,6 +23,12 @@ type workspaceServiceStub struct {
 	listErr    error
 	createErr  error
 	resolveErr error
+	files      []*workspace.FileEntry
+	fileErr    error
+	preview    *workspace.FilePreview
+	previewErr error
+	opened     *workspace.FileOpenResult
+	openErr    error
 	input      workspace.CreateInput
 }
 
@@ -35,6 +43,18 @@ func (s *workspaceServiceStub) Create(_ context.Context, input workspace.CreateI
 
 func (s *workspaceServiceStub) Resolve(context.Context, string) (*workspace.Entry, error) {
 	return s.resolved, s.resolveErr
+}
+
+func (s *workspaceServiceStub) ListFiles(context.Context, string, string) ([]*workspace.FileEntry, error) {
+	return s.files, s.fileErr
+}
+
+func (s *workspaceServiceStub) PreviewFile(context.Context, string, string, int64) (*workspace.FilePreview, error) {
+	return s.preview, s.previewErr
+}
+
+func (s *workspaceServiceStub) OpenFile(context.Context, string, string) (*workspace.FileOpenResult, error) {
+	return s.opened, s.openErr
 }
 
 func workspaceHandlerContext(method, target string, body []byte) (*gin.Context, *httptest.ResponseRecorder) {
@@ -102,4 +122,34 @@ func TestWorkspaceHandlerCreateMapsValidationErrors(t *testing.T) {
 
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
 	require.Contains(t, recorder.Body.String(), `"code":"workspace_invalid_name"`)
+}
+
+func TestWorkspaceHandlerPreviewFileRejectsTraversal(t *testing.T) {
+	stub := &workspaceServiceStub{previewErr: workspace.ErrPathEscape}
+	handler := NewWorkspaceHandler(stub)
+	c, recorder := workspaceHandlerContext(http.MethodGet, "/api/v1/workspaces/ws-1/files/preview?path=../secret.txt", nil)
+	c.Params = gin.Params{{Key: "id", Value: "ws-1"}}
+
+	handler.PreviewFile(c)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "workspace_invalid_name")
+}
+
+func TestWorkspaceHandlerDownloadSetsAttachment(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "summary.md")
+	require.NoError(t, os.WriteFile(path, []byte("# Summary"), 0o644))
+	stub := &workspaceServiceStub{opened: &workspace.FileOpenResult{
+		Name: "summary.md", RelativePath: "summary.md", AbsolutePath: path,
+		ContentType: "text/markdown; charset=utf-8", Size: 9,
+	}}
+	handler := NewWorkspaceHandler(stub)
+	c, recorder := workspaceHandlerContext(http.MethodGet, "/api/v1/workspaces/ws-1/files/download?path=summary.md", nil)
+	c.Params = gin.Params{{Key: "id", Value: "ws-1"}}
+
+	handler.DownloadFile(c)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Header().Get("Content-Disposition"), "attachment")
 }
