@@ -1,4 +1,4 @@
-﻿-- Session workspace binding: durable per-conversation default file-output workspace.
+-- Session workspace binding: durable per-conversation default file-output workspace.
 -- Stored as JSONB in the sessions table; consumed by the executor gateway to
 -- route generated artifacts to the bound workspace root.
 DO $$ BEGIN RAISE NOTICE '[Migration 000063] Adding workspace_binding column to sessions...'; END $$;

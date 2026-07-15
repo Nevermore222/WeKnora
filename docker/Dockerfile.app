@@ -8,6 +8,7 @@ ARG GOPRIVATE_ARG
 ARG GOPROXY_ARG
 ARG GOSUMDB_ARG=off
 ARG APK_MIRROR_ARG
+ARG PRELOAD_DUCKDB_EXTENSIONS_ARG=1
 
 # 设置Go环境变量
 ENV GOPRIVATE=${GOPRIVATE_ARG}
@@ -28,7 +29,8 @@ RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY cmd/download cmd/download
-RUN go run cmd/download/duckdb/duckdb.go
+RUN if [ "$PRELOAD_DUCKDB_EXTENSIONS_ARG" = "1" ]; then go run cmd/download/duckdb/duckdb.go; fi
+RUN mkdir -p /root/.duckdb
 COPY . .
 
 # Get version and commit info for build injection
@@ -55,12 +57,16 @@ FROM debian:12.12-slim
 WORKDIR /app
 
 ARG APK_MIRROR_ARG
+ARG INSTALL_SANDBOX_TOOLS_ARG=1
 
 # Create a non-root user first
 RUN useradd -m -s /bin/bash appuser
 
-# First, install ca-certificates without mirror to ensure HTTPS works
-RUN apt-get update && \
+# First, install ca-certificates.
+RUN if [ -n "$APK_MIRROR_ARG" ]; then \
+        sed -i "s@deb.debian.org@${APK_MIRROR_ARG}@g" /etc/apt/sources.list.d/debian.sources; \
+    fi && \
+    apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
@@ -72,20 +78,30 @@ RUN if [ -n "$APK_MIRROR_ARG" ]; then \
     apt-get install -y --no-install-recommends \
         build-essential postgresql-client default-mysql-client tzdata sed curl bash vim wget \
         libsqlite3-0 \
-        python3 python3-pip python3-dev libffi-dev libssl-dev \
-        nodejs npm \
         gosu \
         ffmpeg && \
-    npm install -g tsx && \
-    python3 -m pip install --break-system-packages --upgrade pip setuptools wheel && \
-    python3 -m pip install --break-system-packages e2b-code-interpreter opensandbox requests httpx && \
-    mkdir -p /home/appuser/.local/bin && \
-    curl -LsSf https://astral.sh/uv/install.sh | CARGO_HOME=/home/appuser/.cargo UV_INSTALL_DIR=/home/appuser/.local/bin sh && \
-    chown -R appuser:appuser /home/appuser && \
-    ln -sf /home/appuser/.local/bin/uvx /usr/local/bin/uvx && \
-    chmod +x /usr/local/bin/uvx && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+RUN if [ "$INSTALL_SANDBOX_TOOLS_ARG" = "1" ]; then \
+        if [ -n "$APK_MIRROR_ARG" ]; then \
+            sed -i "s@deb.debian.org@${APK_MIRROR_ARG}@g" /etc/apt/sources.list.d/debian.sources; \
+        fi && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+            python3 python3-pip python3-dev libffi-dev libssl-dev \
+            nodejs npm && \
+        npm install -g tsx && \
+        python3 -m pip install --break-system-packages --upgrade pip setuptools wheel && \
+        python3 -m pip install --break-system-packages e2b-code-interpreter opensandbox requests httpx && \
+        mkdir -p /home/appuser/.local/bin && \
+        curl -LsSf https://astral.sh/uv/install.sh | CARGO_HOME=/home/appuser/.cargo UV_INSTALL_DIR=/home/appuser/.local/bin sh && \
+        ln -sf /home/appuser/.local/bin/uvx /usr/local/bin/uvx && \
+        chmod +x /usr/local/bin/uvx && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi && \
+    chown -R appuser:appuser /home/appuser
 
 # Create data directories and set permissions
 RUN mkdir -p /data/files && \
