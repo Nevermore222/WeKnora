@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useFilePreviewStore } from '@/stores/filePreview';
+import { MessagePlugin } from 'tdesign-vue-next';
+import { openPreviewFile } from '@/utils/filePreview';
 import FilePreviewActions from './FilePreviewActions.vue';
 import FilePreviewBody from './FilePreviewBody.vue';
 
@@ -13,9 +15,13 @@ const breadcrumbs = computed(() => {
   return parts.length ? parts : file.value ? [file.value.name] : [];
 });
 
-function openRawFile() {
-  if (!file.value?.rawUrl && !file.value?.downloadUrl) return;
-  window.open(file.value.rawUrl || file.value.downloadUrl, '_blank', 'noopener,noreferrer');
+async function openRawFile() {
+  if (!file.value?.workspaceId) return;
+  try {
+    await openPreviewFile(file.value);
+  } catch (error: any) {
+    MessagePlugin.error(error?.message || '打开文件失败');
+  }
 }
 
 function formatSize(size?: number) {
@@ -69,7 +75,7 @@ function formatSize(size?: number) {
           <div class="file-toolbar-actions">
             <span class="file-meta">{{ file.kind || 'file' }}</span>
             <span v-if="file.size != null" class="file-meta">{{ formatSize(file.size) }}</span>
-            <t-button size="small" variant="outline" :disabled="!file.rawUrl && !file.downloadUrl" @click="openRawFile">
+            <t-button size="small" variant="outline" :disabled="!file.workspaceId" @click="openRawFile">
               打开
             </t-button>
             <t-button size="small" variant="text" shape="square" @click="store.close">

@@ -1,4 +1,4 @@
-import { get, post } from '@/utils/request';
+import { get, getDown, post } from '@/utils/request';
 import { getApiBaseUrl } from '@/utils/api-base';
 
 export type WorkspaceStatus = 'available' | 'missing' | 'access_denied' | 'archived';
@@ -50,4 +50,8 @@ export function workspaceFileRawUrl(workspaceId: string, path: string) {
 
 export function workspaceFileDownloadUrl(workspaceId: string, path: string) {
   return `${getApiBaseUrl()}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/files/download?path=${encodeURIComponent(path)}`;
+}
+
+export async function fetchWorkspaceFileBlob(workspaceId: string, path: string, mode: 'raw' | 'download' = 'raw') {
+  return getDown(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/files/${mode}?path=${encodeURIComponent(path)}`) as Promise<Blob>;
 }

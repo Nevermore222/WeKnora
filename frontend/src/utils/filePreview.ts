@@ -1,4 +1,5 @@
 import {
+  fetchWorkspaceFileBlob,
   workspaceFileDownloadUrl,
   workspaceFileRawUrl,
   type WorkspaceFileEntry,
@@ -90,4 +91,42 @@ export function fileInfoText(ref: PreviewFileRef) {
     ref.sessionId ? `Session: ${ref.sessionId}` : null,
     ref.jobId ? `Job: ${ref.jobId}` : null,
   ].filter(Boolean).join('\n');
+}
+
+function revokeObjectUrlLater(url: string) {
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export async function openPreviewFile(ref: PreviewFileRef) {
+  if (!ref.workspaceId) {
+    throw new Error('当前文件缺少 workspaceId，无法打开');
+  }
+  const target = window.open('about:blank', '_blank', 'noopener,noreferrer');
+  if (!target) {
+    throw new Error('浏览器阻止了新窗口，请允许弹窗后重试');
+  }
+  try {
+    const blob = await fetchWorkspaceFileBlob(ref.workspaceId, ref.relativePath || ref.path, 'raw');
+    const objectUrl = URL.createObjectURL(blob);
+    target.location.href = objectUrl;
+    revokeObjectUrlLater(objectUrl);
+  } catch (error) {
+    target.close();
+    throw error;
+  }
+}
+
+export async function downloadPreviewFile(ref: PreviewFileRef) {
+  if (!ref.workspaceId) {
+    throw new Error('当前文件缺少 workspaceId，无法下载');
+  }
+  const blob = await fetchWorkspaceFileBlob(ref.workspaceId, ref.relativePath || ref.path, 'download');
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = ref.name || 'download';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  revokeObjectUrlLater(objectUrl);
 }
