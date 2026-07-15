@@ -4,13 +4,24 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/yanyiwu/gojieba"
 )
 
-// Jieba is a global instance of Chinese text segmentation tool
-var Jieba *gojieba.Jieba = newJieba()
+var (
+	jiebaOnce sync.Once
+	jieba     *gojieba.Jieba
+)
+
+// GetJieba returns the shared Chinese text segmenter on first real use.
+func GetJieba() *gojieba.Jieba {
+	jiebaOnce.Do(func() {
+		jieba = newJieba()
+	})
+	return jieba
+}
 
 func newJieba() *gojieba.Jieba {
 	dictDir := os.Getenv("JIEBA_DICT_DIR")
