@@ -115,16 +115,27 @@
                 <t-icon name="error-circle" size="14px" />
                 <span class="recovery-text">{{ workspaceBindingError }}</span>
             </div>
-           <WorkspaceFilePanel
-                v-if="!embeddedMode && isWorkspaceBound"
-                :workspace-id="workspaceBinding?.workspace_id"
-                :title="workspaceBinding?.workspace_name || '工作区文件'"
-            />
            <InputField ref="inputFieldRef"
                 @send-msg="(query, modelId, mentionedItems, imageFiles, attachmentFiles) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles)"
                 @stop-generation="handleStopGeneration" :isReplying="isReplying" :sessionId="session_id"
                 :assistantMessageId="currentAssistantMessageId" :embeddedMode="embeddedMode"></InputField>
         </div>
+        <button
+            v-if="!embeddedMode && isWorkspaceBound"
+            type="button"
+            class="workspace-file-toggle"
+            :class="{ 'is-active': filePreviewStore.browserVisible }"
+            title="打开工作区文件"
+            aria-label="打开工作区文件"
+            @click="filePreviewStore.toggleBrowser()"
+        >
+            <t-icon name="folder-open" size="18px" />
+        </button>
+        <WorkspaceFileBrowser
+            v-if="!embeddedMode && isWorkspaceBound && filePreviewStore.browserVisible"
+            :workspace-id="workspaceBinding?.workspace_id"
+            :title="workspaceBinding?.workspace_name || '工作区文件'"
+        />
     </div>
     <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode"
         :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType"
@@ -137,7 +148,7 @@ import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import InputField from '../../components/Input-field.vue';
 import botmsg from './components/botmsg.vue';
 import usermsg from './components/usermsg.vue';
-import WorkspaceFilePanel from '@/components/workspace-files/WorkspaceFilePanel.vue';
+import WorkspaceFileBrowser from '@/components/workspace-files/WorkspaceFileBrowser.vue';
 import { getMessageList, getSession } from "@/api/chat/index";
 import { getSuggestedQuestions } from "@/api/agent/index";
 import { useStream } from '../../api/chat/streame'
@@ -146,6 +157,7 @@ import { useSettingsStore } from '@/stores/settings';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useI18n } from 'vue-i18n';
 import { useUIStore } from '@/stores/ui';
+import { useFilePreviewStore } from '@/stores/filePreview';
 import KnowledgeBaseEditorModal from '@/views/knowledge/KnowledgeBaseEditorModal.vue';
 import { useKnowledgeBaseCreationNavigation } from '@/hooks/useKnowledgeBaseCreationNavigation';
 import { useChatStreamHandler } from '@/composables/useChatStreamHandler';
@@ -172,6 +184,7 @@ const isAgentStreamSession = () => {
 };
 
 const uiStore = useUIStore();
+const filePreviewStore = useFilePreviewStore();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 const { t } = useI18n();
 
@@ -892,11 +905,13 @@ onBeforeRouteLeave((to, from, next) => {
     // 离开聊天会话 → 还原"用户全局默认"，避免旧会话的请求态泄漏到新建对话。
     useSettingsStoreInstance.restoreDefaultsIfSnapshotted();
     useSettingsStoreInstance.clearSessionWorkspaceBinding();
+    filePreviewStore.closeBrowser();
     next()
 })
 onBeforeRouteUpdate((to, from, next) => {
     clearData()
     useSettingsStoreInstance.clearSessionWorkspaceBinding();
+    filePreviewStore.closeBrowser();
     // 仅"会话 → 会话"会落到这里；跨会话覆盖的还原放到 route.params 的 watch 里，
     // 因为新会话的 getSession 也在那边触发，便于保证 restore→snapshot→apply 顺序。
     next()
@@ -1134,6 +1149,34 @@ onBeforeRouteUpdate((to, from, next) => {
         min-height: auto;
         box-sizing: border-box;
         overflow-x: hidden;
+    }
+}
+
+.workspace-file-toggle {
+    position: fixed;
+    right: 18px;
+    bottom: 142px;
+    z-index: 510;
+    display: inline-flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in srgb, var(--td-border-level-1-color) 70%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--td-bg-color-container) 94%, transparent);
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.24);
+    color: var(--td-text-color-secondary);
+    cursor: pointer;
+    transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+    backdrop-filter: blur(14px);
+
+    &:hover,
+    &.is-active {
+        border-color: color-mix(in srgb, var(--td-brand-color) 55%, transparent);
+        background: color-mix(in srgb, var(--td-brand-color) 14%, var(--td-bg-color-container));
+        color: var(--td-brand-color);
+        transform: translateY(-1px);
     }
 }
 
