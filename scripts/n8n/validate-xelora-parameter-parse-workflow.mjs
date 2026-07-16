@@ -60,6 +60,8 @@ assert(nodeNames.has("Prepare Xelora Agent Request"), "missing agent request pre
 assert(nodeNames.has("Call Xelora Agent"), "missing agent call node");
 assert(nodeNames.has("Parse Xelora Stream"), "missing stream parser node");
 assert(nodeNames.has("Validate Parameter JSON"), "missing JSON validation node");
+assert(nodeNames.has("Should Retry Xelora Parse"), "missing retry decision node");
+assert(nodeNames.has("Prepare Retry Attempt"), "missing retry preparation node");
 assert(nodeNames.has("Ensure Xelora Staging Tables"), "missing staging table node");
 assert(nodeNames.has("Build Parameter Insert SQL"), "missing insert SQL builder node");
 assert(nodeNames.has("Insert Xelora Parameter Rows"), "missing parameter insert node");
@@ -85,6 +87,11 @@ assert(
 assert(
   serialized.includes("xelora_parameter_parse_failures"),
   "workflow must write failures to failure table",
+);
+assert(serialized.includes("retry_reason"), "workflow must preserve retry reason");
+assert(
+  serialized.includes("Number($json.attempt_count || 1) < 2"),
+  "workflow must retry at most once",
 );
 
 if (process.exitCode) process.exit();

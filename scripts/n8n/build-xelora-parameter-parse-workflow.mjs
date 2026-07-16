@@ -395,6 +395,37 @@ return [{
     },
     { typeVersion: 1 },
   ),
+  node(
+    "xelora-should-retry",
+    "Should Retry Xelora Parse",
+    "n8n-nodes-base.if",
+    [2160, 320],
+    {
+      conditions: {
+        boolean: [
+          {
+            value1: "={{ $json.valid !== true && Number($json.attempt_count || 1) < 2 }}",
+            value2: true,
+          },
+        ],
+      },
+    },
+    { typeVersion: 1 },
+  ),
+  codeNode(
+    "xelora-prepare-retry",
+    "Prepare Retry Attempt",
+    [2400, 320],
+    `if ($json.valid === true) return [{ json: $json }];
+if (Number($json.attempt_count || 1) >= 2) return [{ json: $json }];
+return [{
+  json: {
+    ...$json,
+    attempt_count: Number($json.attempt_count || 1) + 1,
+    retry_reason: $json.error_type || "invalid_response"
+  }
+}];`,
+  ),
   postgresNode(
     "xelora-ensure-tables",
     "Ensure Xelora Staging Tables",
@@ -507,7 +538,7 @@ ON CONFLICT (command_id, parameter_name) DO UPDATE SET
   codeNode(
     "xelora-build-failure-sql",
     "Build Failure Insert SQL",
-    [2160, 400],
+    [2640, 440],
     `function sqlString(value) {
   if (value === null || value === undefined || value === "") return "NULL";
   return "'" + String(value).replace(/'/g, "''").replace(/\\\\/g, "\\\\\\\\") + "'";
@@ -537,7 +568,7 @@ return [{
   postgresNode(
     "xelora-insert-failure",
     "Insert Xelora Failure Row",
-    [2400, 400],
+    [2880, 440],
     "={{ $json.sql_query }}",
   ),
 );
@@ -554,7 +585,10 @@ connect(workflow.connections, "Validate Parameter JSON", "Is Valid Parameter JSO
 connect(workflow.connections, "Is Valid Parameter JSON", "Ensure Xelora Staging Tables", 0);
 connect(workflow.connections, "Ensure Xelora Staging Tables", "Build Parameter Insert SQL");
 connect(workflow.connections, "Build Parameter Insert SQL", "Insert Xelora Parameter Rows");
-connect(workflow.connections, "Is Valid Parameter JSON", "Build Failure Insert SQL", 1);
+connect(workflow.connections, "Is Valid Parameter JSON", "Should Retry Xelora Parse", 1);
+connect(workflow.connections, "Should Retry Xelora Parse", "Prepare Retry Attempt", 0);
+connect(workflow.connections, "Prepare Retry Attempt", "Prepare Xelora Session Request");
+connect(workflow.connections, "Should Retry Xelora Parse", "Build Failure Insert SQL", 1);
 connect(workflow.connections, "Build Failure Insert SQL", "Insert Xelora Failure Row");
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
