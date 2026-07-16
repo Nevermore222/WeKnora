@@ -78,6 +78,9 @@ assert(
   "workflow must not reuse the old webhook path",
 );
 assert(serialized.includes("N8N_XELORA_API_KEY"), "workflow must use N8N_XELORA_API_KEY");
+assert(serialized.includes("XELORA_API_BASE_URL"), "workflow must support XELORA_API_BASE_URL");
+assert(serialized.includes("/agent-chat/"), "workflow must call the registered Xelora agent-chat endpoint");
+assert(!serialized.includes("/agent-qa"), "workflow must not call the stale agent-qa swagger route");
 assert(serialized.includes("XELORA_PARAMETER_AGENT_ID"), "workflow must use XELORA_PARAMETER_AGENT_ID");
 assert(serialized.includes("XELORA_MANUAL_ASP_KB_ID"), "workflow must use XELORA_MANUAL_ASP_KB_ID");
 assert(

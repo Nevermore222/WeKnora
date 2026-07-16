@@ -72,6 +72,15 @@ function runPsql(sql) {
   ).trim();
 }
 
+function readExistingEnvValue(filePath, key) {
+  if (!fs.existsSync(filePath)) return "";
+  const line = fs
+    .readFileSync(filePath, "utf8")
+    .split(/\r?\n/)
+    .find((entry) => entry.startsWith(`${key}=`));
+  return line ? line.slice(key.length + 1).trim() : "";
+}
+
 const kbResult = runPsql(`
 SELECT id || '|' || tenant_id || '|' || COALESCE(summary_model_id, '') || '|' || COALESCE(creator_id, '')
 FROM knowledge_bases
@@ -172,7 +181,7 @@ updated AS (
   UPDATE custom_agents
   SET
     description = ${sqlLiteral(agentDescription)},
-    avatar = 'control-platform',
+    avatar = 'C',
     config = ${agentConfigSql}::jsonb,
     created_by = COALESCE(created_by, ${createdBySql}),
     runnable_by_viewer = true,
@@ -195,7 +204,7 @@ inserted AS (
   SELECT
     ${sqlLiteral(agentName)},
     ${sqlLiteral(agentDescription)},
-    'control-platform',
+    'C',
     false,
     ${Number(tenantId)},
     ${createdBySql},
@@ -215,11 +224,16 @@ if (!upsertResult) {
 }
 
 fs.mkdirSync(path.dirname(envOutputPath), { recursive: true });
+const existingApiKey = readExistingEnvValue(envOutputPath, "N8N_XELORA_API_KEY");
+const apiKeyForEnv =
+  existingApiKey && existingApiKey !== "configure-in-n8n-runtime"
+    ? existingApiKey
+    : "configure-in-n8n-runtime";
 fs.writeFileSync(
   envOutputPath,
   [
-    "XELORA_BASE_URL=http://Xelora-app:8080",
-    "N8N_XELORA_API_KEY=configure-in-n8n-runtime",
+    "XELORA_API_BASE_URL=http://localhost/api/v1",
+    `N8N_XELORA_API_KEY=${apiKeyForEnv}`,
     `XELORA_PARAMETER_AGENT_ID=${upsertResult}`,
     `XELORA_MANUAL_ASP_KB_ID=${manualAspKbId}`,
     "",

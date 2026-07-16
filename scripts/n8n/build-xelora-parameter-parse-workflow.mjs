@@ -115,12 +115,14 @@ return [{
     "xelora-prepare-session",
     "Prepare Xelora Session Request",
     [500, 240],
-    `const baseUrl = String($env.XELORA_BASE_URL || "http://Xelora-app:8080").replace(/\\/$/, "");
+    `const configuredApiBase = String($env.XELORA_API_BASE_URL || "").trim();
+const hostBase = String($env.XELORA_BASE_URL || "http://Xelora-app:8080").replace(/\\/$/, "");
+const apiBase = (configuredApiBase || hostBase + "/api/v1").replace(/\\/$/, "");
 return [{
   json: {
     ...$json,
-    xelora_base_url: baseUrl,
-    session_url: baseUrl + "/api/v1/sessions",
+    xelora_api_base_url: apiBase,
+    session_url: apiBase + "/sessions",
     session_request_body: {
       title: "CL parameter parse " + $json.command
     }
@@ -178,7 +180,7 @@ return [{
   json: {
     ...prior,
     session_id: String(sessionId),
-    agent_url: prior.xelora_base_url + "/api/v1/agent-chat/" + String(sessionId)
+    agent_url: prior.xelora_api_base_url + "/agent-chat/" + String(sessionId)
   }
 }];`,
   ),
