@@ -2,19 +2,21 @@
 
 ## Goal
 
-Replace the first Dify/RAGFlow-backed n8n workflow for CL command parameter parsing with a Xelora-backed workflow.
+Create a new parallel Xelora-backed n8n workflow for CL command parameter parsing, using the existing Dify/RAGFlow-backed workflow as the reference implementation.
 
-The first migration scope is only command parameter parsing. n8n remains responsible for workflow orchestration, database reads and writes, retry handling, response validation, and failure recording. Xelora provides the dedicated agent, the `Manual_ASP` knowledge base, streaming answer generation, and strict JSON output.
+The first migration scope is only command parameter parsing. The existing workflow must remain unchanged and runnable during the early migration phase. n8n remains responsible for workflow orchestration, database reads and writes, retry handling, response validation, and failure recording. Xelora provides the dedicated agent, the `Manual_ASP` knowledge base, streaming answer generation, and strict JSON output.
 
 ## Current Context
 
 The existing n8n parameter parsing workflow receives command context, reads `source_content` from `analyzes.command_reference_list`, merges those snippets, calls a Dify agent, parses the streamed response, and stores parsed parameter data.
 
-The new workflow keeps the high-level n8n shape but removes the database `SOURCE` payload from the LLM request. The Xelora agent must use the `Manual_ASP` knowledge base as the factual source for command parameter extraction.
+The new parallel workflow keeps the high-level n8n shape but removes the database `SOURCE` payload from the LLM request. The Xelora agent must use the `Manual_ASP` knowledge base as the factual source for command parameter extraction.
+
+The Dify/RAGFlow workflow is not replaced in this phase. It remains the baseline path for production comparison and rollback.
 
 ## Decisions
 
-- First migrated workflow: command parameter parsing.
+- First new parallel workflow: command parameter parsing.
 - Xelora agent: one dedicated CL command parameter parsing agent.
 - Knowledge base: existing `Manual_ASP`.
 - Authentication from n8n to Xelora: `X-API-Key`.
@@ -22,10 +24,13 @@ The new workflow keeps the high-level n8n shape but removes the database `SOURCE
 - Output protocol: strict JSON, aligned with `command_parameters`.
 - Retry policy: retry strict JSON once. If the second attempt fails, record failure and do not write parameter rows.
 - Skill usage: no skill for the first parameter parsing phase. Later verification-case table generation and TOIN&FS code generation should use dedicated skills.
+- Migration policy: add a new n8n workflow instead of editing or replacing the existing Dify/RAGFlow workflow.
+- Suggested workflow name: `Xelora - CL Parameter Parse - Parallel`.
+- Suggested execution mode: manual or isolated webhook during validation, not the existing production trigger.
 
 ## n8n Workflow
 
-The new n8n workflow receives:
+The new parallel n8n workflow receives:
 
 ```json
 {
@@ -49,6 +54,14 @@ The workflow steps are:
 10. If the retry fails, record a workflow failure with the raw response.
 
 The workflow must not query or pass `analyzes.command_reference_list.source_content` to Xelora in this phase.
+
+The workflow should be copied or recreated from the existing n8n parameter parsing workflow only as a structural reference. It must not overwrite the original workflow ID, original webhook path, original credentials, or original production schedule.
+
+During validation, writes should be isolated from the original workflow when possible:
+
+- Preferred: write to a comparison table or staging table for Xelora parameter parsing results.
+- Acceptable: write to `command_parameters` only when an explicit `source_system = xelora` or equivalent isolation field exists.
+- Not acceptable: silently overwrite rows produced by the existing Dify/RAGFlow workflow.
 
 ## Xelora Request
 
@@ -219,14 +232,15 @@ These skills should hold stable business rules such as case categories, priority
 
 ## Success Criteria
 
-The migration is successful when:
+The parallel workflow is successful when:
 
 - n8n can parse at least one known CL command through Xelora without passing `source_content`.
 - Xelora uses `Manual_ASP` and returns strict JSON.
-- n8n can validate and write parameter records.
+- n8n can validate and write parameter records to an isolated target.
 - Invalid JSON is retried once and then recorded as failure.
 - Empty evidence does not produce fabricated parameter rows.
-- Existing Dify-backed workflow can remain available as a manual fallback during comparison.
+- Existing Dify-backed workflow remains unchanged and available during comparison.
+- Xelora output can be compared against the existing workflow output before any production cutover decision.
 
 ## Out Of Scope
 
@@ -236,3 +250,4 @@ The migration is successful when:
 - Changing the `Manual_ASP` ingestion pipeline.
 - Reworking current database schemas beyond minimal logging needs.
 - Replacing n8n orchestration.
+- Replacing, disabling, or deleting the existing Dify/RAGFlow workflow.
