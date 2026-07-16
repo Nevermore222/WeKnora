@@ -17,11 +17,11 @@
 - Create: `E:\Xelora\WeKnora\scripts\n8n\build-xelora-parameter-parse-workflow.mjs`
   - Generates the new workflow JSON deterministically.
 - Create: `E:\Xelora\n8n\参数解析\Xelora-CL-Parameter-Parse-Parallel_1.0.0.json`
-  - New n8n workflow export for manual import or API import.
+  - New external n8n workflow export for manual import or API import. This path is outside the `WeKnora` Git repository and is verified, not committed.
 - Modify: `E:\Xelora\WeKnora\docs\superpowers\plans\2026-07-16-xelora-n8n-parallel-parameter-parse.md`
   - Mark completed steps during implementation.
 
-No existing n8n export is modified. The existing Dify/RAGFlow workflow remains the production baseline.
+No existing n8n export is modified. The existing Dify/RAGFlow workflow remains the production baseline. Repository commits include the generator, validator, and plan updates only; the generated external workflow JSON is an on-disk artifact under `E:\Xelora\n8n`.
 
 ## Environment Contract
 
@@ -732,16 +732,16 @@ Expected:
 PASS: E:\Xelora\n8n\参数解析\Xelora-CL-Parameter-Parse-Parallel_1.0.0.json
 ```
 
-- [ ] **Step 4: Commit builder and workflow export**
+- [ ] **Step 4: Commit builder and validator**
 
 Run:
 
 ```powershell
-git add -- scripts/n8n/build-xelora-parameter-parse-workflow.mjs scripts/n8n/validate-xelora-parameter-parse-workflow.mjs ..\n8n\参数解析\Xelora-CL-Parameter-Parse-Parallel_1.0.0.json
+git add -- scripts/n8n/build-xelora-parameter-parse-workflow.mjs scripts/n8n/validate-xelora-parameter-parse-workflow.mjs
 git commit -m "feat: add parallel xelora parameter parse workflow"
 ```
 
-Expected: commit includes only the two scripts and the new Xelora workflow export.
+Expected: commit includes only the two scripts. The external workflow export is verified by the validator and remains at `E:\Xelora\n8n\参数解析\Xelora-CL-Parameter-Parse-Parallel_1.0.0.json`.
 
 ---
 
@@ -815,11 +815,11 @@ PASS: E:\Xelora\n8n\参数解析\Xelora-CL-Parameter-Parse-Parallel_1.0.0.json
 Run:
 
 ```powershell
-git add -- scripts/n8n/build-xelora-parameter-parse-workflow.mjs ..\n8n\参数解析\Xelora-CL-Parameter-Parse-Parallel_1.0.0.json
+git add -- scripts/n8n/build-xelora-parameter-parse-workflow.mjs
 git commit -m "feat: add retry path to xelora parameter parse workflow"
 ```
 
-Expected: commit includes only the builder and regenerated workflow.
+Expected: commit includes only the builder. The regenerated external workflow export is verified by the validator and remains at `E:\Xelora\n8n\参数解析\Xelora-CL-Parameter-Parse-Parallel_1.0.0.json`.
 
 ---
 
