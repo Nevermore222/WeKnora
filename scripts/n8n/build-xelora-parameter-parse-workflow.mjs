@@ -41,7 +41,7 @@ function connect(connections, from, to, outputIndex = 0) {
   connections[from].main[outputIndex].push({ node: to, type: "main", index: 0 });
 }
 
-function postgresNode(id, name, position, query) {
+function postgresNode(id, name, position, query, extra = {}) {
   return node(
     id,
     name,
@@ -56,24 +56,25 @@ function postgresNode(id, name, position, query) {
       typeVersion: 2.1,
       credentials: { postgres: { id: "tWcUIJhVg6bDlGDc", name: "TargetDB" } },
       onError: "continueErrorOutput",
+      ...extra,
     },
   );
 }
 
 const workflow = {
-  name: "Xelora - CL Parameter Parse - Parallel",
+  name: "Xelora版CL命令参数解析工作流（并行）_1.0.0",
   nodes: [],
   connections: {},
   active: false,
   settings: { executionOrder: "v1" },
   pinData: {},
-  tags: [{ name: "Xelora Parallel" }, { name: "Parameter Parse" }],
+  tags: [{ name: "Xelora并行" }, { name: "参数解析" }],
 };
 
 workflow.nodes.push(
   node(
     "xelora-webhook-parameter-parse",
-    "Webhook - Xelora Parameter Parse",
+    "Webhook接收参数",
     "n8n-nodes-base.webhook",
     [0, 240],
     {
@@ -82,11 +83,15 @@ workflow.nodes.push(
       responseMode: "lastNode",
       options: { rawBody: true },
     },
-    { typeVersion: 2.1, webhookId: "xelora-cl-parameter-parse-parallel" },
+    {
+      typeVersion: 2.1,
+      webhookId: "xelora-cl-parameter-parse-parallel",
+      notes: "接收参数：command_id(主表ID)、command、language；用于并行验证Xelora智能体参数解析流程",
+    },
   ),
   codeNode(
     "xelora-parse-input",
-    "Parse Webhook Input",
+    "解析Webhook参数",
     [240, 240],
     `const input = $json.body || $json;
 const commandId = Number(input.command_id);
@@ -110,10 +115,11 @@ return [{
     attempt_count: 1
   }
 }];`,
+    { notes: "从Webhook接收参数：command_id(主表ID)、command、language" },
   ),
   codeNode(
     "xelora-prepare-session",
-    "Prepare Xelora Session Request",
+    "准备Xelora会话请求",
     [500, 240],
     `const configuredApiBase = String($env.XELORA_API_BASE_URL || "").trim();
 const hostBase = String($env.XELORA_BASE_URL || "http://Xelora-app:8080").replace(/\\/$/, "");
@@ -128,10 +134,11 @@ return [{
     }
   }
 }];`,
+    { notes: "准备创建Xelora会话；使用XELORA_API_BASE_URL，局域网调用时配置为对外开放URL" },
   ),
   node(
     "xelora-create-session",
-    "Create Xelora Session",
+    "创建Xelora会话",
     "n8n-nodes-base.httpRequest",
     [760, 240],
     {
@@ -149,13 +156,17 @@ return [{
       jsonBody: "={{ $json.session_request_body }}",
       options: { response: { response: { neverError: true } } },
     },
-    { typeVersion: 4.2, onError: "continueErrorOutput" },
+    {
+      typeVersion: 4.2,
+      onError: "continueErrorOutput",
+      notes: "调用Xelora /api/v1/sessions 创建会话，后续智能体流式调用复用该session_id",
+    },
   ),
   codeNode(
     "xelora-extract-session",
-    "Extract Xelora Session",
+    "提取Xelora会话ID",
     [1040, 240],
-    `const prior = $("Prepare Xelora Session Request").first().json;
+    `const prior = $("准备Xelora会话请求").first().json;
 const response = $input.first().json;
 const sessionId =
   response.session_id ||
@@ -183,10 +194,11 @@ return [{
     agent_url: prior.xelora_api_base_url + "/agent-chat/" + String(sessionId)
   }
 }];`,
+    { notes: "从创建会话响应中提取session_id，并拼接Xelora智能体流式调用地址 /agent-chat/{session_id}" },
   ),
   codeNode(
     "xelora-prepare-agent",
-    "Prepare Xelora Agent Request",
+    "准备Xelora智能体请求",
     [1200, 240],
     `const query = [
   "Parse all parameters of CL command " + $json.command + ".",
@@ -214,10 +226,11 @@ return [{
     }
   }
 }];`,
+    { notes: "准备调用Xelora内CL命令参数解析智能体；不再传入数据库源码字段，以Manual_ASP知识库为准" },
   ),
   node(
     "xelora-call-agent",
-    "Call Xelora Agent",
+    "调用Xelora参数解析智能体",
     "n8n-nodes-base.httpRequest",
     [1340, 240],
     {
@@ -235,13 +248,17 @@ return [{
       jsonBody: "={{ $json.agent_request_body }}",
       options: { response: { response: { neverError: true } } },
     },
-    { typeVersion: 4.2, onError: "continueErrorOutput" },
+    {
+      typeVersion: 4.2,
+      onError: "continueErrorOutput",
+      notes: "替代原“调用参数解析智能体”节点；通过Xelora API流式调用绑定Manual_ASP知识库的智能体",
+    },
   ),
   codeNode(
     "xelora-parse-stream",
-    "Parse Xelora Stream",
+    "处理AI响应",
     [1540, 240],
-    `const requestData = $("Prepare Xelora Agent Request").first().json;
+    `const requestData = $("准备Xelora智能体请求").first().json;
 const response = $input.first().json;
 let answer = "";
 let sawComplete = false;
@@ -295,10 +312,11 @@ return [{
     response_time: new Date().toISOString()
   }
 }];`,
+    { notes: "解析Xelora SSE流式响应，提取完整AI参数分析结果；对应原工作流“处理AI响应”节点" },
   ),
   codeNode(
     "xelora-validate-json",
-    "Validate Parameter JSON",
+    "解析参数二维表",
     [1740, 240],
     `const requiredParameterFields = [
   "parameter_name",
@@ -384,10 +402,11 @@ return [{
     no_parameters_found: parameters.length === 0
   }
 }];`,
+    { notes: "从AI响应中解析参数JSON，规范化为参数二维表数据；输出字段保持后续入库所需结构" },
   ),
   node(
     "xelora-valid-if",
-    "Is Valid Parameter JSON",
+    "判断参数解析是否成功",
     "n8n-nodes-base.if",
     [1920, 240],
     {
@@ -395,11 +414,11 @@ return [{
         boolean: [{ value1: "={{ $json.valid }}", value2: true }],
       },
     },
-    { typeVersion: 1 },
+    { typeVersion: 1, notes: "判断AI响应是否为可入库的参数JSON：true=保存参数，false=进入重试/失败记录" },
   ),
   node(
     "xelora-should-retry",
-    "Should Retry Xelora Parse",
+    "判断是否重新调用",
     "n8n-nodes-base.if",
     [2160, 320],
     {
@@ -412,11 +431,11 @@ return [{
         ],
       },
     },
-    { typeVersion: 1 },
+    { typeVersion: 1, notes: "解析失败时最多重新调用一次Xelora智能体，避免无限循环" },
   ),
   codeNode(
     "xelora-prepare-retry",
-    "Prepare Retry Attempt",
+    "准备重新调用请求",
     [2400, 320],
     `if ($json.valid === true) return [{ json: $json }];
 if (Number($json.attempt_count || 1) >= 2) return [{ json: $json }];
@@ -427,10 +446,11 @@ return [{
     retry_reason: $json.error_type || "invalid_response"
   }
 }];`,
+    { notes: "准备重新调用参数解析智能体的请求，保留失败原因并增加迭代次数" },
   ),
   postgresNode(
     "xelora-ensure-tables",
-    "Ensure Xelora Staging Tables",
+    "初始化Xelora参数表",
     [2160, 120],
     `CREATE TABLE IF NOT EXISTS analyzes.xelora_command_parameters_staging (
   id SERIAL PRIMARY KEY,
@@ -469,10 +489,11 @@ CREATE TABLE IF NOT EXISTS analyzes.xelora_parameter_parse_failures (
   attempt_count INTEGER DEFAULT 1,
   created_at TIMESTAMP DEFAULT NOW()
 );`,
+    { notes: "首次运行时创建Xelora并行参数解析暂存表和失败记录表（仅执行一次即可）" },
   ),
   codeNode(
     "xelora-build-insert-sql",
-    "Build Parameter Insert SQL",
+    "准备保存参数SQL",
     [2400, 120],
     `function sqlString(value) {
   if (value === null || value === undefined || value === "") return "NULL";
@@ -530,16 +551,18 @@ ON CONFLICT (command_id, parameter_name) DO UPDATE SET
   updated_at = NOW();\`
   }
 }];`,
+    { notes: "将参数数组转换为批量写入SQL，准备保存到Xelora并行参数解析暂存表" },
   ),
   postgresNode(
     "xelora-insert-rows",
-    "Insert Xelora Parameter Rows",
+    "保存参数到表",
     [2640, 120],
     "={{ $json.sql_query }}",
+    { notes: "将解析后的参数逐行保存到Xelora参数暂存表，如果已存在则更新" },
   ),
   codeNode(
     "xelora-build-failure-sql",
-    "Build Failure Insert SQL",
+    "准备失败记录SQL",
     [2640, 440],
     `function sqlString(value) {
   if (value === null || value === undefined || value === "") return "NULL";
@@ -566,32 +589,34 @@ return [{
 );\`
   }
 }];`,
+    { notes: "智能体调用或JSON解析失败时，生成失败记录SQL，便于并行流程排查" },
   ),
   postgresNode(
     "xelora-insert-failure",
-    "Insert Xelora Failure Row",
+    "保存失败记录",
     [2880, 440],
     "={{ $json.sql_query }}",
+    { notes: "保存Xelora参数解析失败信息，不影响原有参数解析工作流并行运行" },
   ),
 );
 
-connect(workflow.connections, "Webhook - Xelora Parameter Parse", "Parse Webhook Input");
-connect(workflow.connections, "Parse Webhook Input", "Prepare Xelora Session Request");
-connect(workflow.connections, "Prepare Xelora Session Request", "Create Xelora Session");
-connect(workflow.connections, "Create Xelora Session", "Extract Xelora Session");
-connect(workflow.connections, "Extract Xelora Session", "Prepare Xelora Agent Request");
-connect(workflow.connections, "Prepare Xelora Agent Request", "Call Xelora Agent");
-connect(workflow.connections, "Call Xelora Agent", "Parse Xelora Stream");
-connect(workflow.connections, "Parse Xelora Stream", "Validate Parameter JSON");
-connect(workflow.connections, "Validate Parameter JSON", "Is Valid Parameter JSON");
-connect(workflow.connections, "Is Valid Parameter JSON", "Ensure Xelora Staging Tables", 0);
-connect(workflow.connections, "Ensure Xelora Staging Tables", "Build Parameter Insert SQL");
-connect(workflow.connections, "Build Parameter Insert SQL", "Insert Xelora Parameter Rows");
-connect(workflow.connections, "Is Valid Parameter JSON", "Should Retry Xelora Parse", 1);
-connect(workflow.connections, "Should Retry Xelora Parse", "Prepare Retry Attempt", 0);
-connect(workflow.connections, "Prepare Retry Attempt", "Prepare Xelora Session Request");
-connect(workflow.connections, "Should Retry Xelora Parse", "Build Failure Insert SQL", 1);
-connect(workflow.connections, "Build Failure Insert SQL", "Insert Xelora Failure Row");
+connect(workflow.connections, "Webhook接收参数", "解析Webhook参数");
+connect(workflow.connections, "解析Webhook参数", "准备Xelora会话请求");
+connect(workflow.connections, "准备Xelora会话请求", "创建Xelora会话");
+connect(workflow.connections, "创建Xelora会话", "提取Xelora会话ID");
+connect(workflow.connections, "提取Xelora会话ID", "准备Xelora智能体请求");
+connect(workflow.connections, "准备Xelora智能体请求", "调用Xelora参数解析智能体");
+connect(workflow.connections, "调用Xelora参数解析智能体", "处理AI响应");
+connect(workflow.connections, "处理AI响应", "解析参数二维表");
+connect(workflow.connections, "解析参数二维表", "判断参数解析是否成功");
+connect(workflow.connections, "判断参数解析是否成功", "初始化Xelora参数表", 0);
+connect(workflow.connections, "初始化Xelora参数表", "准备保存参数SQL");
+connect(workflow.connections, "准备保存参数SQL", "保存参数到表");
+connect(workflow.connections, "判断参数解析是否成功", "判断是否重新调用", 1);
+connect(workflow.connections, "判断是否重新调用", "准备重新调用请求", 0);
+connect(workflow.connections, "准备重新调用请求", "准备Xelora会话请求");
+connect(workflow.connections, "判断是否重新调用", "准备失败记录SQL", 1);
+connect(workflow.connections, "准备失败记录SQL", "保存失败记录");
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, JSON.stringify(workflow, null, 2) + "\n", "utf8");
