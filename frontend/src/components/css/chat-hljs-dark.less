@@ -1,12 +1,35 @@
 // Dark-theme highlight token colors only. Chat Markdown layout/chrome styles
 // belong to chat-markdown.less.
 html[theme-mode='dark'] {
-  .markdown-content .chat-code-block__pre,
-  .answer-content .chat-code-block__pre,
-  .ai-markdown-template .chat-code-block__pre,
-  .agent-stream-display .chat-code-block__pre {
+  .chat-code-block {
+    background: #1b1b1b;
+    border-color: color-mix(in srgb, var(--td-component-stroke) 54%, var(--td-text-color-anti));
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--td-text-color-primary) 12%, transparent);
+  }
+
+  .chat-code-block__header {
+    background: #222;
+    border-bottom-color: color-mix(in srgb, var(--td-component-stroke) 60%, var(--td-text-color-anti));
+  }
+
+  .chat-code-block__lang,
+  .chat-code-block__copy {
+    color: var(--td-text-color-secondary);
+  }
+
+  .chat-code-block__copy:hover {
+    color: var(--td-text-color-anti);
+  }
+
+  .chat-code-block__pre {
+    color: #f0f6fc;
+    background: #171717;
+
+    code,
     .hljs {
-      color: #c9d1d9;
+      color: #f0f6fc !important;
+      background: transparent;
+      -webkit-text-fill-color: #f0f6fc;
     }
 
     .hljs-doctag,
@@ -64,7 +87,7 @@ html[theme-mode='dark'] {
     }
 
     .hljs-subst {
-      color: #c9d1d9;
+      color: #f0f6fc;
     }
 
     .hljs-section {

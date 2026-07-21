@@ -2933,6 +2933,25 @@ const handleAddToKnowledge = (answerEvent: any) => {
   }
 }
 
+:global(html[theme-mode='dark'] .agent-stream-display .tool-output-wrapper .detail-output-wrapper) {
+  background: #101010;
+  background: color-mix(in srgb, var(--td-bg-color-container) 72%, #000);
+  border-color: color-mix(in srgb, var(--td-component-stroke) 58%, var(--td-text-color-anti));
+}
+
+:global(html[theme-mode='dark'] .agent-stream-display .tool-output-wrapper .detail-output) {
+  background: #101010;
+  background: color-mix(in srgb, var(--td-bg-color-container) 78%, #000);
+  color: var(--td-text-color-anti);
+}
+
+:global(html[theme-mode='dark'] .agent-stream-display .tool-arguments-wrapper .detail-code) {
+  background: #101010;
+  background: color-mix(in srgb, var(--td-bg-color-container) 78%, #000);
+  border-color: color-mix(in srgb, var(--td-component-stroke) 58%, var(--td-text-color-anti));
+  color: var(--td-text-color-anti);
+}
+
 .loading-indicator {
   display: flex;
   align-items: center;

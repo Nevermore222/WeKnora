@@ -177,4 +177,16 @@ const toolArguments = computed(() => props.arguments || {});
     }
   }
 }
+
+:global(html[theme-mode='dark'] .tool-result-renderer .fallback-output .detail-output-wrapper) {
+  background: #101010;
+  background: color-mix(in srgb, var(--td-bg-color-container) 72%, #000);
+  border-color: color-mix(in srgb, var(--td-component-stroke) 58%, var(--td-text-color-anti));
+}
+
+:global(html[theme-mode='dark'] .tool-result-renderer .fallback-output .detail-output) {
+  background: #101010;
+  background: color-mix(in srgb, var(--td-bg-color-container) 78%, #000);
+  color: var(--td-text-color-anti);
+}
 </style>
