@@ -1,3 +1,5 @@
+name: Xelora
+
 configs:
   opensandbox-config:
     content: |
@@ -851,9 +853,17 @@ networks:
 
 volumes:
   postgres-data:
+    external: true
+    name: xelora-offline-20260714-011513_postgres-data
   data-files:
+    external: true
+    name: weknora_data-files
   docreader-tmp:
+    external: true
+    name: xelora-offline-20260714-011513_docreader-tmp
   opensandbox-data:
+    external: true
+    name: xelora-offline-20260714-011513_opensandbox-data
   minio_data:
   neo4j-data:
   qdrant_data:
