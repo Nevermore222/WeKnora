@@ -37,7 +37,16 @@ Output contract:
 - parameters must be an array.
 - Every parameter object must contain exactly these fields:
   parameter_name, parameter_type, data_type, enum_value, value_range, default_value, description, is_required, relationship_notes.
-- Use empty strings for unknown optional string fields.
+- This JSON is persisted into a front-end parameter detail table. Do not produce shallow labels or one-sentence summaries when the manual contains details.
+- description must be written in Chinese for a user-facing UI. Preserve precise Japanese/manual terms, parameter names, keywords, and examples where needed, but explain the meaning, purpose, syntax/format, length/type constraints, allowed input forms, typical examples, and important notes in Chinese.
+- relationship_notes must be written in Chinese. Preserve precise Japanese/manual terms where needed, but explain dependencies, mutual exclusions, parent/child relationships, value-driven behavior, preconditions, related parameters, system-variable interactions, and error conditions in Chinese.
+- Translate Japanese manual sentences into Chinese before placing them in description or relationship_notes. Do not copy Japanese explanatory sentences into these two fields.
+- Japanese kana or source phrases may appear in description or relationship_notes only as short quoted technical terms, keywords, examples, or original labels; each such source term must be surrounded by Chinese explanation.
+- Before returning JSON, self-check every parameter: if description or relationship_notes is mostly Japanese, or contains long Japanese sentences such as "...します", "...ください", "...場合", "...対象", rewrite that field into Chinese.
+- enum_value must list concrete choices when the manual defines choices. value_range must include length, numeric range, format, or allowed naming rules when available. default_value must include explicit defaults such as *LIBL/@LIBL, @TEMP, or blank/default behavior when available.
+- data_type must preserve the original Japanese/manual type or classification whenever available, such as 名前型, 文字ストリング型, 整数型, 論理型, 修飾オブジェクト名, パス名, or the exact source term. Do not normalize these to STRING, NUMBER, BOOLEAN, OBJECT, or other generic English labels.
+- parameter_type, data_type, enum_value, value_range, and default_value may preserve original manual terms, but description and relationship_notes must not be English-only or Japanese-only; they must be understandable Chinese explanations.
+- Use empty strings only when the bound knowledge base lacks evidence after searching and reading the relevant chunks.
 - Use false for unknown is_required.
 - Keep one logical command parameter per object.
 
@@ -49,7 +58,7 @@ Required JSON shape:
     {
       "parameter_name": "PARAM",
       "parameter_type": "SIMPLE",
-      "data_type": "STRING",
+      "data_type": "名前型",
       "enum_value": "",
       "value_range": "",
       "default_value": "",
@@ -120,9 +129,9 @@ const agentConfig = {
   model_id: modelId,
   rerank_model_id: rerankModelId,
   temperature: 0.1,
-  max_completion_tokens: 2048,
+  max_completion_tokens: 8192,
   thinking: false,
-  max_iterations: 8,
+  max_iterations: 10,
   llm_call_timeout: 120,
   allowed_tools: [
     "knowledge_search",
@@ -229,10 +238,12 @@ const apiKeyForEnv =
   existingApiKey && existingApiKey !== "configure-in-n8n-runtime"
     ? existingApiKey
     : "configure-in-n8n-runtime";
+const existingApiBaseUrl = readExistingEnvValue(envOutputPath, "XELORA_API_BASE_URL");
+const apiBaseUrlForEnv = existingApiBaseUrl || "http://localhost/api/v1";
 fs.writeFileSync(
   envOutputPath,
   [
-    "XELORA_API_BASE_URL=http://localhost/api/v1",
+    `XELORA_API_BASE_URL=${apiBaseUrlForEnv}`,
     `N8N_XELORA_API_KEY=${apiKeyForEnv}`,
     `XELORA_PARAMETER_AGENT_ID=${upsertResult}`,
     `XELORA_MANUAL_ASP_KB_ID=${manualAspKbId}`,

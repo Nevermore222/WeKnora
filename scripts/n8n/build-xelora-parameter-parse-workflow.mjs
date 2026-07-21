@@ -201,8 +201,15 @@ return [{
     "准备Xelora智能体请求",
     [1200, 240],
     `const query = [
-  "Parse all parameters of CL command " + $json.command + ".",
-  "Use only the Manual_ASP knowledge base.",
+  "请基于Manual_ASP知识库深度解析CL命令" + $json.command + "的全部参数。",
+  "必须输出可直接落入前台参数详情表的高质量数据：参数说明要完整，取值范围、默认值、必填性、枚举值和参数间关系必须尽量从知识库抽取。",
+  "description字段需要说明用途、指定规则、格式/长度/类型约束、典型值或注意事项；relationship_notes字段需要说明依赖、互斥、联动、前置条件、错误条件和与其他参数/系统变量的关系。",
+  "description和relationship_notes必须使用中文说明；可以保留必要的日文原文术语、参数名、关键字和示例，但不能只输出英文或日文短句。",
+  "不要把Manual_ASP中的日文说明句直接复制到description或relationship_notes；必须先翻译并整理为中文。日文假名或原文短语只能作为术语、关键字、示例保留，并且必须配套中文解释。",
+  $json.retry_reason ? ("上一次输出未通过校验，失败原因：" + $json.retry_reason + "。本次必须修正后再输出。") : "",
+  "data_type字段必须尽量使用Manual_ASP原文中的日语类型/分类名称，例如名前型、文字ストリング型、整数型、論理型等；不要把原文类型泛化成STRING、NUMBER、BOOLEAN。",
+  "不要只输出简单英文短句；优先保留手册中的日文术语，并用中文补充解释。",
+  "如果知识库存在证据，不得把description、value_range、default_value、relationship_notes留空。",
   "Return exactly one JSON object and no Markdown.",
   "Schema: {command, language, parameters:[{parameter_name, parameter_type, data_type, enum_value, value_range, default_value, description, is_required, relationship_notes}]}."
 ].join(" ");
@@ -266,38 +273,47 @@ let sawComplete = false;
 function absorbEvent(event) {
   if (!event || typeof event !== "object") return;
   if (typeof event.answer === "string") answer += event.answer;
-  if (typeof event.content === "string") answer += event.content;
-  if (event.event === "complete" || event.type === "complete" || event.done === true) sawComplete = true;
+  const responseType = String(event.response_type || event.event || event.type || "").toLowerCase();
+  const isAnswerChunk =
+    responseType === "" ||
+    responseType === "answer" ||
+    responseType === "message" ||
+    responseType === "agent_message" ||
+    responseType === "final_answer" ||
+    responseType === "final_answer_chunk";
+  const isNonAnswerEvent =
+    responseType === "agent_query" ||
+    responseType === "tool_call" ||
+    responseType === "tool_result" ||
+    responseType === "thinking" ||
+    responseType === "complete" ||
+    responseType === "error";
+  if (typeof event.content === "string" && isAnswerChunk && !isNonAnswerEvent) answer += event.content;
+  if (responseType === "complete" || event.done === true) sawComplete = true;
+  if (responseType === "error" && event.content && !answer) answer = JSON.stringify(event);
+}
+
+function parseSseText(text) {
+  for (const line of String(text || "").split("\\n")) {
+    const trimmed = line.trimStart();
+    if (!trimmed.startsWith("data:")) continue;
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") {
+      sawComplete = true;
+      continue;
+    }
+    try {
+      absorbEvent(JSON.parse(payload));
+    } catch {
+      continue;
+    }
+  }
 }
 
 if (typeof response === "string") {
-  for (const line of response.split("\\n")) {
-    if (!line.startsWith("data: ")) continue;
-    const payload = line.slice(6).trim();
-    if (!payload || payload === "[DONE]") {
-      sawComplete = true;
-      continue;
-    }
-    try {
-      absorbEvent(JSON.parse(payload));
-    } catch {
-      continue;
-    }
-  }
+  parseSseText(response);
 } else if (typeof response.data === "string") {
-  for (const line of response.data.split("\\n")) {
-    if (!line.startsWith("data: ")) continue;
-    const payload = line.slice(6).trim();
-    if (!payload || payload === "[DONE]") {
-      sawComplete = true;
-      continue;
-    }
-    try {
-      absorbEvent(JSON.parse(payload));
-    } catch {
-      continue;
-    }
-  }
+  parseSseText(response.data);
 } else {
   absorbEvent(response);
   absorbEvent(response.data);
@@ -342,6 +358,27 @@ function extractJsonObject(text) {
 function normalizeString(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
+}
+
+function countMatches(text, pattern) {
+  const matches = String(text || "").match(pattern);
+  return matches ? matches.length : 0;
+}
+
+function hasChineseExplanation(text) {
+  return /用于|如果|需要|必须|可以|不能|表示|说明|关系|依赖|互斥|影响|默认|取值|参数|文件|命令|删除|条件|存在|省略|否则|因此|前置|错误|当.+时/.test(String(text || ""));
+}
+
+function hasJapaneseSentence(text) {
+  const value = String(text || "");
+  const kanaCount = countMatches(value, /[\u3040-\u30ff]/g);
+  return kanaCount >= 10 || /します|ください|場合|対象|省略時|指定した|指定します|異なります|できません|必要です/.test(value);
+}
+
+function needsChineseRewrite(text) {
+  const value = String(text || "").trim();
+  if (!value) return false;
+  return hasJapaneseSentence(value) && !hasChineseExplanation(value);
 }
 
 let parsed;
@@ -391,6 +428,30 @@ const parameters = Array.from(dedup.values()).map((entry, index) => ({
   ...entry.value,
   display_order: index + 1
 }));
+
+const nonChineseFields = [];
+for (const parameter of parameters) {
+  for (const field of ["description", "relationship_notes"]) {
+    if (needsChineseRewrite(parameter[field])) {
+      nonChineseFields.push((parameter.parameter_name || "<unknown>") + "." + field);
+    }
+  }
+}
+
+if (nonChineseFields.length) {
+  return [{
+    json: {
+      ...$json,
+      valid: false,
+      error_type: "non_chinese_explanation",
+      error_message: "description/relationship_notes must be translated into Chinese: " + nonChineseFields.slice(0, 20).join(", "),
+      parsed_command: normalizeString(parsed.command) || $json.command,
+      parsed_language: normalizeString(parsed.language) || $json.language,
+      parameters,
+      no_parameters_found: parameters.length === 0
+    }
+  }];
+}
 
 return [{
   json: {
@@ -448,49 +509,6 @@ return [{
 }];`,
     { notes: "准备重新调用参数解析智能体的请求，保留失败原因并增加迭代次数" },
   ),
-  postgresNode(
-    "xelora-ensure-tables",
-    "初始化Xelora参数表",
-    [2160, 120],
-    `CREATE TABLE IF NOT EXISTS analyzes.xelora_command_parameters_staging (
-  id SERIAL PRIMARY KEY,
-  command_id INTEGER NOT NULL,
-  command VARCHAR(100) NOT NULL,
-  language VARCHAR(50) NOT NULL,
-  parameter_name VARCHAR(100) NOT NULL,
-  parameter_type VARCHAR(50),
-  data_type VARCHAR(50),
-  enum_value VARCHAR(500),
-  value_range VARCHAR(500),
-  default_value VARCHAR(500),
-  display_order INTEGER DEFAULT 0,
-  description TEXT,
-  is_required BOOLEAN DEFAULT false,
-  relationship_notes TEXT,
-  raw_response TEXT,
-  session_id VARCHAR(200),
-  workflow_source VARCHAR(50) DEFAULT 'xelora_parallel',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  CONSTRAINT xelora_command_parameters_staging_unique UNIQUE (command_id, parameter_name)
-);
-
-CREATE TABLE IF NOT EXISTS analyzes.xelora_parameter_parse_failures (
-  id SERIAL PRIMARY KEY,
-  command_id INTEGER,
-  command VARCHAR(100),
-  language VARCHAR(50),
-  stage VARCHAR(100) NOT NULL,
-  status VARCHAR(50) NOT NULL,
-  error_type VARCHAR(100),
-  error_message TEXT,
-  raw_response TEXT,
-  session_id VARCHAR(200),
-  attempt_count INTEGER DEFAULT 1,
-  created_at TIMESTAMP DEFAULT NOW()
-);`,
-    { notes: "首次运行时创建Xelora并行参数解析暂存表和失败记录表（仅执行一次即可）" },
-  ),
   codeNode(
     "xelora-build-insert-sql",
     "准备保存参数SQL",
@@ -506,8 +524,6 @@ function sqlBoolean(value) {
 
 const rows = ($json.parameters || []).map((parameter) => \`(
   \${Number($json.command_id)},
-  \${sqlString($json.command)},
-  \${sqlString($json.language)},
   \${sqlString(parameter.parameter_name)},
   \${sqlString(parameter.parameter_type)},
   \${sqlString(parameter.data_type)},
@@ -517,26 +533,31 @@ const rows = ($json.parameters || []).map((parameter) => \`(
   \${Number(parameter.display_order || 0)},
   \${sqlString(parameter.description)},
   \${sqlBoolean(parameter.is_required)},
-  \${sqlString(parameter.relationship_notes)},
-  \${sqlString($json.raw_response)},
-  \${sqlString($json.session_id)}
+  \${sqlString(parameter.relationship_notes)}
 )\`);
 
 if (!rows.length) {
-  return [{ json: { ...$json, sql_query: "SELECT 1 AS no_parameters_found;" } }];
+  return [{
+    json: {
+      ...$json,
+      sql_query: \`DELETE FROM analyzes.command_parameters
+WHERE command_id = \${Number($json.command_id)};\`
+    }
+  }];
 }
 
 return [{
   json: {
     ...$json,
-    sql_query: \`INSERT INTO analyzes.xelora_command_parameters_staging (
-  command_id, command, language, parameter_name, parameter_type, data_type,
+    sql_query: \`DELETE FROM analyzes.command_parameters
+WHERE command_id = \${Number($json.command_id)};
+
+INSERT INTO analyzes.command_parameters (
+  command_id, parameter_name, parameter_type, data_type,
   enum_value, value_range, default_value, display_order, description,
-  is_required, relationship_notes, raw_response, session_id
+  is_required, relationship_notes
 ) VALUES \${rows.join(",\\n")}
 ON CONFLICT (command_id, parameter_name) DO UPDATE SET
-  command = EXCLUDED.command,
-  language = EXCLUDED.language,
   parameter_type = EXCLUDED.parameter_type,
   data_type = EXCLUDED.data_type,
   enum_value = EXCLUDED.enum_value,
@@ -546,19 +567,293 @@ ON CONFLICT (command_id, parameter_name) DO UPDATE SET
   description = EXCLUDED.description,
   is_required = EXCLUDED.is_required,
   relationship_notes = EXCLUDED.relationship_notes,
-  raw_response = EXCLUDED.raw_response,
-  session_id = EXCLUDED.session_id,
   updated_at = NOW();\`
   }
 }];`,
-    { notes: "将参数数组转换为批量写入SQL，准备保存到Xelora并行参数解析暂存表" },
+    { notes: "将参数数组转换为批量写入SQL，准备保存到正式command_parameters表" },
   ),
   postgresNode(
     "xelora-insert-rows",
     "保存参数到表",
     [2640, 120],
     "={{ $json.sql_query }}",
-    { notes: "将解析后的参数逐行保存到Xelora参数暂存表，如果已存在则更新" },
+    { notes: "将解析后的参数逐行保存到command_parameters表，如果已存在则更新" },
+  ),
+  codeNode(
+    "xelora-build-parameter-markdown",
+    "生成参数二维表Markdown",
+    [2880, 120],
+    `function cell(value) {
+  const text = value === null || value === undefined || value === "" ? "-" : String(value);
+  return text.replace(/\\|/g, "\\\\|").replace(/\\r?\\n/g, "<br>");
+}
+
+const source = $("解析参数二维表").first().json;
+const parameters = Array.isArray(source.parameters) ? source.parameters : [];
+let markdown = "| 参数名称 | 参数类型 | 数据类型 | 枚举值 | 取值范围 | 默认值 | 参数描述 | 是否必需 | 参数关系备注 |\\n";
+markdown += "|---|---|---|---|---|---|---|---|---|\\n";
+for (const parameter of parameters) {
+  markdown += "| " + [
+    cell(parameter.parameter_name),
+    cell(parameter.parameter_type),
+    cell(parameter.data_type),
+    cell(parameter.enum_value),
+    cell(parameter.value_range),
+    cell(parameter.default_value),
+    cell(parameter.description),
+    parameter.is_required ? "是" : "否",
+    cell(parameter.relationship_notes)
+  ].join(" | ") + " |\\n";
+}
+
+return [{
+  json: {
+    ...source,
+    parameter_table_markdown: markdown,
+    overview_session_url: source.xelora_api_base_url + "/sessions",
+    overview_session_request_body: {
+      title: "CL command overview " + source.command
+    }
+  }
+}];`,
+    { notes: "参数保存后，将解析结果转换为Markdown参数二维表，供Xelora概述智能体生成detail_info" },
+  ),
+  node(
+    "xelora-create-overview-session",
+    "创建概述会话",
+    "n8n-nodes-base.httpRequest",
+    [3120, 120],
+    {
+      method: "POST",
+      url: "={{ $json.overview_session_url }}",
+      sendHeaders: true,
+      headerParameters: {
+        parameters: [
+          { name: "X-API-Key", value: "={{ $env.N8N_XELORA_API_KEY }}" },
+          { name: "Content-Type", value: "application/json" },
+        ],
+      },
+      sendBody: true,
+      specifyBody: "json",
+      jsonBody: "={{ $json.overview_session_request_body }}",
+      options: { response: { response: { neverError: true } } },
+    },
+    {
+      typeVersion: 4.2,
+      onError: "continueErrorOutput",
+      notes: "为CL命令概述智能体创建独立Xelora会话",
+    },
+  ),
+  codeNode(
+    "xelora-prepare-overview-agent",
+    "准备概述智能体请求",
+    [3360, 120],
+    `const prior = $("生成参数二维表Markdown").first().json;
+const response = $input.first().json;
+const sessionId =
+  response.session_id ||
+  response.id ||
+  response.data?.session_id ||
+  response.data?.id ||
+  response.result?.session_id ||
+  response.result?.id;
+
+if (!sessionId) {
+  return [{
+    json: {
+      ...prior,
+      overview_status: "failed",
+      overview_error_message: "overview session create failed: " + JSON.stringify(response).slice(0, 2000)
+    }
+  }];
+}
+
+const query = [
+  "请基于Manual_ASP知识库和以下参数二维表，生成CL命令" + prior.command + "的完整Markdown概述文档。",
+  "输出格式必须与CL命令概述智能体要求一致：命令介绍、命令格式、系统要求、参数含义介绍、注意事项、使用示例、終了代码、相关命令、最佳实践。",
+  "終了代码模块按照Manual_ASP原文中的集合形式输出即可，例如直接列出0000、0137等代码集合；不要生成包含含义或处理建议的二维表。没有明确依据时说明未检索到，不要套用通用代码表。",
+  "参数二维表如下：\\n" + prior.parameter_table_markdown
+].join("\\n\\n");
+
+const overviewQuery = [
+  "请基于Manual_ASP知识库和以下参数二维表，生成CL命令" + prior.command + "的完整Markdown概述文档。",
+  "必须理解Manual原文后重写，不要复制PDF/扫描版中的框图、错位空格、竖排花括号、表格边框或OCR残留字符。",
+  "命令格式模块必须输出重写后的规范化语法：命令名和参数名使用正常连续写法；可选参数用[]；多选值用{ A | B | C }；不要输出R S T M B R这类分隔字母。",
+  "如果Manual原文的命令格式区域出现乱码或版式字符，请根据参数含义、可选项、互斥关系和示例重构干净语法，不要尝试复刻原图。",
+  "禁止输出明显乱码或抽取残留字符，例如�、ï、þ、ü、蜻、譁、縺、繧、莠、螂、窶等。",
+  "输出格式必须与CL命令概述智能体要求一致：命令介绍、命令格式、系统要求、参数含义介绍、注意事项、使用示例、終了代码、相关命令、最佳实践。",
+  "終了代码模块按照Manual_ASP原文中的集合形式输出即可，例如直接列出0000、0137等代码集合；不要生成包含含义或处理建议的二维表。没有明确依据时说明未检索到，不要套用通用代码表。",
+  "参数二维表如下：\\n" + prior.parameter_table_markdown
+].join("\\n\\n");
+
+return [{
+  json: {
+    ...prior,
+    overview_session_id: String(sessionId),
+    overview_agent_url: prior.xelora_api_base_url + "/agent-chat/" + String(sessionId),
+    overview_agent_request_body: {
+      query: overviewQuery,
+      agent_enabled: true,
+      agent_id: $env.XELORA_CL_OVERVIEW_AGENT_ID,
+      knowledge_base_ids: [$env.XELORA_MANUAL_ASP_KB_ID],
+      mentioned_items: [{
+        id: $env.XELORA_MANUAL_ASP_KB_ID,
+        name: "Manual_ASP",
+        type: "kb",
+        kb_type: "document"
+      }],
+      web_search_enabled: false,
+      channel: "api"
+    }
+  }
+}];`,
+    { notes: "准备调用Xelora CL命令概述智能体；传入参数二维表并以Manual_ASP知识库补全概述" },
+  ),
+  node(
+    "xelora-call-overview-agent",
+    "调用概述智能体",
+    "n8n-nodes-base.httpRequest",
+    [3600, 120],
+    {
+      method: "POST",
+      url: "={{ $json.overview_agent_url }}",
+      sendHeaders: true,
+      headerParameters: {
+        parameters: [
+          { name: "X-API-Key", value: "={{ $env.N8N_XELORA_API_KEY }}" },
+          { name: "Content-Type", value: "application/json" },
+        ],
+      },
+      sendBody: true,
+      specifyBody: "json",
+      jsonBody: "={{ $json.overview_agent_request_body }}",
+      options: { response: { response: { neverError: true } } },
+    },
+    {
+      typeVersion: 4.2,
+      onError: "continueErrorOutput",
+      notes: "调用Xelora CL命令概述智能体，获取Markdown命令概述",
+    },
+  ),
+  codeNode(
+    "xelora-parse-overview-stream",
+    "处理概述响应",
+    [3840, 120],
+    `const requestData = $("准备概述智能体请求").first().json;
+const response = $input.first().json;
+let answer = "";
+let sawComplete = false;
+
+function absorbEvent(event) {
+  if (!event || typeof event !== "object") return;
+  if (typeof event.answer === "string") answer += event.answer;
+  const responseType = String(event.response_type || event.event || event.type || "").toLowerCase();
+  const isAnswerChunk =
+    responseType === "" ||
+    responseType === "answer" ||
+    responseType === "message" ||
+    responseType === "agent_message" ||
+    responseType === "final_answer" ||
+    responseType === "final_answer_chunk";
+  const isNonAnswerEvent =
+    responseType === "agent_query" ||
+    responseType === "tool_call" ||
+    responseType === "tool_result" ||
+    responseType === "thinking" ||
+    responseType === "complete" ||
+    responseType === "error";
+  if (typeof event.content === "string" && isAnswerChunk && !isNonAnswerEvent) answer += event.content;
+  if (responseType === "complete" || event.done === true) sawComplete = true;
+  if (responseType === "error" && event.content && !answer) answer = JSON.stringify(event);
+}
+
+function parseSseText(text) {
+  for (const line of String(text || "").split("\\n")) {
+    const trimmed = line.trimStart();
+    if (!trimmed.startsWith("data:")) continue;
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") {
+      sawComplete = true;
+      continue;
+    }
+    try {
+      absorbEvent(JSON.parse(payload));
+    } catch {
+      continue;
+    }
+  }
+}
+
+if (typeof response === "string") {
+  parseSseText(response);
+} else if (typeof response.data === "string") {
+  parseSseText(response.data);
+} else {
+  absorbEvent(response);
+  absorbEvent(response.data);
+  absorbEvent(response.result);
+}
+
+const overview = answer.trim();
+function hasGarbledText(text) {
+  const value = String(text || "");
+  return /�|ï|þ|ü|蜻|譁|縺|繧|莠|螂|窶|讎|閭|菴|荳|隸|譛|蜿|蠑|逧|莉/.test(value);
+}
+const overview_has_garbled_text = hasGarbledText(overview);
+const cleanOverview = overview_has_garbled_text ? "" : overview;
+return [{
+  json: {
+    ...requestData,
+    overview_response: cleanOverview,
+    overview_status: cleanOverview ? "success" : "failed",
+    overview_error_message: cleanOverview
+      ? ""
+      : overview_has_garbled_text
+        ? "overview response contains garbled text; detail_info was not updated"
+        : "overview response is empty: " + JSON.stringify(response).slice(0, 2000),
+    overview_has_garbled_text,
+    overview_stream_complete: sawComplete,
+    overview_response_time: new Date().toISOString()
+  }
+}];`,
+    { notes: "解析Xelora概述智能体SSE响应，提取Markdown概述正文" },
+  ),
+  codeNode(
+    "xelora-build-overview-update-sql",
+    "准备更新命令主表SQL",
+    [4080, 120],
+    `function sqlString(value) {
+  if (value === null || value === undefined || value === "") return "NULL";
+  return "'" + String(value).replace(/'/g, "''").replace(/\\\\/g, "\\\\\\\\") + "'";
+}
+
+const detailInfo = $json.overview_response || "";
+if (!detailInfo.trim()) {
+  return [{
+    json: {
+      ...$json,
+      sql_query: "SELECT 1 AS overview_empty;"
+    }
+  }];
+}
+
+return [{
+  json: {
+    ...$json,
+    sql_query: \`UPDATE analyzes.command_master
+SET detail_info = \${sqlString(detailInfo)}::text,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = \${Number($json.command_id)};\`
+  }
+}];`,
+    { notes: "将概述Markdown转换为更新command_master.detail_info的SQL；不建表不改结构" },
+  ),
+  postgresNode(
+    "xelora-update-command-master",
+    "更新命令主表",
+    [4320, 120],
+    "={{ $json.sql_query }}",
+    { notes: "将概述智能体生成的Markdown写入analyzes.command_master.detail_info" },
   ),
   codeNode(
     "xelora-build-failure-sql",
@@ -609,9 +904,15 @@ connect(workflow.connections, "准备Xelora智能体请求", "调用Xelora参数
 connect(workflow.connections, "调用Xelora参数解析智能体", "处理AI响应");
 connect(workflow.connections, "处理AI响应", "解析参数二维表");
 connect(workflow.connections, "解析参数二维表", "判断参数解析是否成功");
-connect(workflow.connections, "判断参数解析是否成功", "初始化Xelora参数表", 0);
-connect(workflow.connections, "初始化Xelora参数表", "准备保存参数SQL");
+connect(workflow.connections, "判断参数解析是否成功", "准备保存参数SQL", 0);
 connect(workflow.connections, "准备保存参数SQL", "保存参数到表");
+connect(workflow.connections, "保存参数到表", "生成参数二维表Markdown");
+connect(workflow.connections, "生成参数二维表Markdown", "创建概述会话");
+connect(workflow.connections, "创建概述会话", "准备概述智能体请求");
+connect(workflow.connections, "准备概述智能体请求", "调用概述智能体");
+connect(workflow.connections, "调用概述智能体", "处理概述响应");
+connect(workflow.connections, "处理概述响应", "准备更新命令主表SQL");
+connect(workflow.connections, "准备更新命令主表SQL", "更新命令主表");
 connect(workflow.connections, "判断参数解析是否成功", "判断是否重新调用", 1);
 connect(workflow.connections, "判断是否重新调用", "准备重新调用请求", 0);
 connect(workflow.connections, "准备重新调用请求", "准备Xelora会话请求");
