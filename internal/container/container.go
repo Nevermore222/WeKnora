@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -58,6 +59,7 @@ import (
 	feishuConnector "github.com/Tencent/Xelora/internal/datasource/connector/feishu"
 	notionConnector "github.com/Tencent/Xelora/internal/datasource/connector/notion"
 	yuqueConnector "github.com/Tencent/Xelora/internal/datasource/connector/yuque"
+	"github.com/Tencent/Xelora/internal/desktopremote"
 	"github.com/Tencent/Xelora/internal/event"
 	"github.com/Tencent/Xelora/internal/handler"
 	"github.com/Tencent/Xelora/internal/handler/session"
@@ -355,6 +357,14 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewDataSourceHandler))
 	// Wiki page handler
 	must(container.Provide(handler.NewWikiPageHandler))
+	// Enterprise connector (personal edition)
+	must(container.Provide(newDesktopRemoteProfileStore))
+	must(container.Provide(desktopremote.NewSessionStore))
+	must(container.Provide(desktopremote.NewCredentialStore))
+	must(container.Provide(newDesktopRemoteAuthClient))
+	must(container.Provide(newDesktopRemoteManager))
+	must(container.Provide(newDesktopRemoteGateway))
+	must(container.Provide(handler.NewDesktopRemoteHandler))
 	// IM integration
 	logger.Debugf(ctx, "[Container] Registering IM integration...")
 	must(container.Provide(imPkg.NewService))
@@ -434,6 +444,37 @@ func must(err error) {
 func initLangfuse() (*langfuse.Manager, error) {
 	cfg := langfuse.LoadConfigFromEnv()
 	return langfuse.Init(cfg)
+}
+
+func newDesktopRemoteProfileStore(db *gorm.DB) (*desktopremote.ProfileStore, error) {
+	store := desktopremote.NewProfileStore(db)
+	if err := store.AutoMigrate(); err != nil {
+		return nil, fmt.Errorf("desktop remote profile migration: %w", err)
+	}
+	return store, nil
+}
+
+func newDesktopRemoteAuthClient(
+	profiles *desktopremote.ProfileStore,
+	credentials desktopremote.CredentialStore,
+	sessions *desktopremote.SessionStore,
+) *desktopremote.AuthClient {
+	return desktopremote.NewAuthClient(profiles, credentials, sessions, http.DefaultClient)
+}
+
+func newDesktopRemoteManager(
+	profiles *desktopremote.ProfileStore,
+	authClient *desktopremote.AuthClient,
+) *desktopremote.Manager {
+	return desktopremote.NewManager(profiles, authClient, http.DefaultClient)
+}
+
+func newDesktopRemoteGateway(
+	profiles *desktopremote.ProfileStore,
+	sessions *desktopremote.SessionStore,
+	authClient *desktopremote.AuthClient,
+) *desktopremote.Gateway {
+	return desktopremote.NewGatewayWithAuth(profiles, sessions, authClient, http.DefaultClient)
 }
 
 func initRedisClient() (*redis.Client, error) {

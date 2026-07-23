@@ -51,6 +51,34 @@
         <div v-if="filteredKnowledgeBases.length === 0" class="kb-empty">
           {{ searchQuery ? $t('knowledgeBase.noMatch') : $t('knowledgeBase.noKnowledge') }}
         </div>
+
+        <!-- 企业知识库分组 -->
+        <template v-if="enterpriseKBs.length > 0">
+          <div class="kb-group-title">{{ $t('enterprise.originEnterprise') }}</div>
+          <div
+            v-for="kb in enterpriseKBs"
+            :key="enterpriseKbId(kb)"
+            :class="['kb-item', { selected: isSelected(enterpriseKbId(kb)) }]"
+            @click="toggleKb(enterpriseKbId(kb))"
+          >
+            <div class="kb-item-left">
+              <div class="checkbox" :class="{ checked: isSelected(enterpriseKbId(kb)) }">
+                <svg v-if="isSelected(enterpriseKbId(kb))" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M10 3L4.5 8.5L2 6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="kb-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M17.5 19a4.5 4.5 0 1 0-.42-8.98 6 6 0 1 0-11.06 3.1A3.5 3.5 0 0 0 6.5 19h11Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="kb-name-wrap">
+                <span class="kb-name">{{ kb.name }}</span>
+                <ResourceOriginBadge variant="enterprise" :server-name="kb.server_name" :org-name="kb.org_name" />
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- 底部操作 -->
@@ -66,6 +94,8 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { listKnowledgeBases } from '@/api/knowledge-base'
+import { useEnterpriseStore, type AggregatedResource } from '@/stores/enterprise'
+import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 import { useI18n } from 'vue-i18n'
 import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom'
 
@@ -80,6 +110,13 @@ interface KnowledgeBase {
 }
 
 const { t } = useI18n()
+const enterpriseStore = useEnterpriseStore()
+
+// 企业知识库（来自已连接的企业服务器）
+const enterpriseKBs = computed<AggregatedResource[]>(() => enterpriseStore.enterpriseKBs)
+
+// 企业知识库使用前缀 ID，避免与本地知识库 ID 冲突
+const enterpriseKbId = (kb: AggregatedResource) => `enterprise:${kb.server_id}:${kb.id}`
 
 const props = defineProps<{
   visible: boolean
@@ -470,6 +507,15 @@ watch(() => props.visible, async (v) => {
 .kb-docs { font-size: 11px; color: var(--td-text-color-placeholder); flex-shrink: 0; }
 
 .kb-empty { padding: 20px 8px; text-align: center; color: var(--td-text-color-placeholder); font-size: 12px; }
+
+.kb-group-title {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--td-text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 .kb-actions {
   display: flex;

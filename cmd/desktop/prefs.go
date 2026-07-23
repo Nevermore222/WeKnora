@@ -10,8 +10,9 @@ import (
 const desktopPrefsFileName = "desktop-prefs.json"
 
 type desktopPrefs struct {
-	HTTPPort       int  `json:"http_port"`
-	HTTPBindPublic bool `json:"http_bind_public"`
+	HTTPPort       int    `json:"http_port"`
+	HTTPBindPublic bool   `json:"http_bind_public"`
+	SandboxMode    string `json:"sandbox_mode"`
 }
 
 func desktopPrefsDir() (string, error) {
@@ -19,7 +20,7 @@ func desktopPrefsDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(cfg, "Xelora Lite")
+	dir := filepath.Join(cfg, "Xelora Personal")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
@@ -90,4 +91,29 @@ func SaveDesktopHTTPBindPublicPreference(v bool) error {
 	cur := loadDesktopPrefs()
 	cur.HTTPBindPublic = v
 	return saveDesktopPrefs(cur)
+}
+
+// LoadDesktopSandboxMode returns the saved skill execution mode ("local" or "docker").
+// Returns "local" if unset.
+func LoadDesktopSandboxMode() string {
+	mode := loadDesktopPrefs().SandboxMode
+	if mode == "" {
+		return "local"
+	}
+	return mode
+}
+
+// SaveDesktopSandboxModePreference persists the skill execution mode preference.
+// Valid values: "local", "docker".
+func SaveDesktopSandboxModePreference(mode string) error {
+	if mode != "local" && mode != "docker" {
+		return fmt.Errorf("invalid sandbox mode: %s (must be local or docker)", mode)
+	}
+	cur := loadDesktopPrefs()
+	cur.SandboxMode = mode
+	if err := saveDesktopPrefs(cur); err != nil {
+		return err
+	}
+	_ = os.Setenv("XELORA_SANDBOX_MODE", mode)
+	return nil
 }

@@ -8,6 +8,10 @@ import { reloadFontFromStorage } from '@/composables/useFont'
 import { reloadThemeFromStorage } from '@/composables/useTheme'
 import { resetMigrationLatch } from '@/composables/preferenceStorage'
 import { BUILTIN_QUICK_ANSWER_ID } from '@/api/agent'
+import {
+  applyDesktopIdentitySnapshot as mapDesktopIdentitySnapshot,
+  type DesktopIdentitySnapshot,
+} from '@/api/desktop-remote'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useOrganizationStore } from '@/stores/organization'
@@ -45,6 +49,11 @@ export const useAuthStore = defineStore('auth', () => {
   // so PR 3 can render a tenant-switcher UI without a store migration.
   const memberships = ref<Array<{ tenant_id: number; tenant_name?: string; role: string }>>([])
   const isLiteMode = ref(false)
+  // isPersonalMode distinguishes the personal desktop edition (standard
+  // registration/login, needs a logout entry) from the lite edition
+  // (auto-setup login, no logout). Both set isLiteMode for shared desktop
+  // behaviors; only personal keeps the logout menu item.
+  const isPersonalMode = ref(false)
   // pendingInvitationCount is the number of pending tenant invitations
   // addressed to the current user. Renders as a badge next to the
   // avatar; updated by fetchPendingInvitationCount, which runs after
@@ -52,10 +61,11 @@ export const useAuthStore = defineStore('auth', () => {
   // (vs SSE) is fine — the count is checked rarely and a 1-2 minute
   // staleness window is acceptable for an inbox indicator.
   const pendingInvitationCount = ref<number>(0)
+  const desktopIdentityAuthenticated = ref(false)
 
   // 计算属性
   const isLoggedIn = computed(() => {
-    return !!token.value && !!user.value
+    return (!!token.value || desktopIdentityAuthenticated.value) && !!user.value
   })
 
   const hasValidTenant = computed(() => {
@@ -294,6 +304,32 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('xelora_memberships', JSON.stringify(memberships.value))
   }
 
+  const applyDesktopIdentitySnapshot = (snapshot: DesktopIdentitySnapshot) => {
+    const state = mapDesktopIdentitySnapshot(snapshot)
+    desktopIdentityAuthenticated.value = state.isLoggedIn
+    token.value = ''
+    refreshToken.value = ''
+    user.value = state.user
+    tenant.value = state.tenant
+    memberships.value = state.memberships
+    selectedTenantId.value = state.tenant?.id ? Number(state.tenant.id) : null
+    selectedTenantName.value = state.tenant?.name || null
+    localStorage.removeItem('xelora_user')
+    localStorage.removeItem('xelora_tenant')
+    localStorage.removeItem('xelora_token')
+    localStorage.removeItem('xelora_refresh_token')
+    localStorage.removeItem('xelora_memberships')
+  }
+
+  const clearDesktopIdentity = () => {
+    desktopIdentityAuthenticated.value = false
+    user.value = null
+    tenant.value = null
+    memberships.value = []
+    selectedTenantId.value = null
+    selectedTenantName.value = null
+  }
+
   // setPendingInvitationCount is the explicit setter used by the
   // polling composable below. Keeping the mutation behind a setter
   // matches the pattern of every other piece of auth state and lets
@@ -377,6 +413,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const setPersonalMode = (value: boolean) => {
+    isPersonalMode.value = value
+    if (value) {
+      localStorage.setItem('xelora_personal_mode', 'true')
+    } else {
+      localStorage.removeItem('xelora_personal_mode')
+    }
+  }
+
   const logout = () => {
     // 清空状态
     user.value = null
@@ -390,6 +435,7 @@ export const useAuthStore = defineStore('auth', () => {
     allTenants.value = []
     memberships.value = []
     pendingInvitationCount.value = 0
+    desktopIdentityAuthenticated.value = false
     clearSessionResourceCaches()
 
     // 清空localStorage
@@ -494,6 +540,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     isLiteMode.value = localStorage.getItem('xelora_lite_mode') === 'true'
+    isPersonalMode.value = localStorage.getItem('xelora_personal_mode') === 'true'
+  }
+
+  const resetForRuntimeContext = () => {
+    knowledgeBases.value = []
+    currentKnowledgeBase.value = null
+    selectedTenantId.value = null
+    selectedTenantName.value = null
+    allTenants.value = []
+    pendingInvitationCount.value = 0
+    desktopIdentityAuthenticated.value = false
+    clearSessionResourceCaches()
+    localStorage.removeItem('xelora_knowledge_bases')
+    localStorage.removeItem('xelora_current_kb')
+    localStorage.removeItem('xelora_selected_tenant_id')
+    localStorage.removeItem('xelora_selected_tenant_name')
   }
 
   // 初始化时从localStorage恢复状态
@@ -512,6 +574,7 @@ export const useAuthStore = defineStore('auth', () => {
     allTenants,
     memberships,
     pendingInvitationCount,
+    desktopIdentityAuthenticated,
 
     // 计算属性
     isLoggedIn,
@@ -525,6 +588,7 @@ export const useAuthStore = defineStore('auth', () => {
     hasRole,
     effectiveTenantId,
     isLiteMode,
+    isPersonalMode,
 
     // 方法
     setUser,
@@ -536,12 +600,16 @@ export const useAuthStore = defineStore('auth', () => {
     setSelectedTenant,
     setAllTenants,
     setMemberships,
+    applyDesktopIdentitySnapshot,
+    clearDesktopIdentity,
     setPendingInvitationCount,
     fetchPendingInvitationCount,
     refreshFromAuthMe,
     getSelectedTenant,
     setLiteMode,
+    setPersonalMode,
     logout,
-    initFromStorage
+    initFromStorage,
+    resetForRuntimeContext
   }
 })

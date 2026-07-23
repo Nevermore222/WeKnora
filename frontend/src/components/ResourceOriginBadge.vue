@@ -38,15 +38,20 @@ import { useAuthStore } from '@/stores/auth'
  */
 const props = withDefaults(
   defineProps<{
-    variant: 'mine' | 'tenant' | 'creator' | 'space' | 'shared'
+    variant: 'mine' | 'tenant' | 'creator' | 'space' | 'shared' | 'enterprise'
     /** Used in `space` variant — the organization (space) display name. */
     spaceName?: string
+    /** Used in `enterprise` variant — the enterprise server display name. */
+    serverName?: string
+    /** Used in `enterprise` variant — the granting organization name when the
+     * resource is shared via an organization (marks it as shared). */
+    orgName?: string
     /** Optional creator display name, surfaces in tooltip for `tenant` variant. */
     creatorName?: string
     /** Optional source tenant name, surfaces in tooltip for cross-tenant. */
     sourceTenantName?: string
   }>(),
-  { spaceName: '', creatorName: '', sourceTenantName: '' }
+  { spaceName: '', serverName: '', orgName: '', creatorName: '', sourceTenantName: '' }
 )
 
 const { t } = useI18n()
@@ -64,6 +69,8 @@ const iconName = computed(() => {
       return 'building'
     case 'shared':
       return 'share'
+    case 'enterprise':
+      return props.orgName ? 'share' : 'cloud'
     default:
       return 'usergroup'
   }
@@ -88,6 +95,10 @@ const displayText = computed(() => {
       return props.spaceName || t('resourceOrigin.space')
     case 'shared':
       return props.sourceTenantName || t('resourceOrigin.shared')
+    case 'enterprise':
+      // Shared-via-org resources show the granting org name; otherwise the
+      // server name.
+      return props.orgName || props.serverName || t('resourceOrigin.enterprise')
     default:
       return ''
   }
@@ -118,6 +129,11 @@ const tooltipText = computed(() => {
       return t('resourceOrigin.spaceTooltip', { space: props.spaceName })
     case 'shared':
       return t('resourceOrigin.sharedTooltip')
+    case 'enterprise':
+      if (props.orgName) {
+        return t('resourceOrigin.enterpriseSharedTooltip', { org: props.orgName, server: props.serverName })
+      }
+      return t('resourceOrigin.enterpriseTooltip', { server: props.serverName })
     default:
       return ''
   }
@@ -169,6 +185,11 @@ const tooltipText = computed(() => {
   &.origin-shared {
     color: var(--td-text-color-secondary);
     background: var(--td-bg-color-secondarycontainer);
+  }
+
+  &.origin-enterprise {
+    color: var(--td-brand-color-7, #6b3fa0);
+    background: var(--td-brand-color-light, #f3e8ff);
   }
 }
 </style>

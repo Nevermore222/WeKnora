@@ -161,6 +161,10 @@
                   </div>
 
                   <!-- MCP 服务 -->
+                  <div v-if="currentSection === 'enterprise'" class="section">
+                    <EnterpriseServerManager />
+                  </div>
+
                   <div v-if="currentSection === 'mcp'" class="section">
                     <McpSettings />
                   </div>
@@ -196,6 +200,7 @@ import StorageEngineSettings from './StorageEngineSettings.vue'
 import XeloraCloudSettings from './XeloraCloudSettings.vue'
 import TenantMembers from './TenantMembers.vue'
 import SystemSettings from '@/views/system/SystemSettings.vue'
+import EnterpriseServerManager from '@/components/EnterpriseServerManager.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -251,6 +256,7 @@ const SECTION_MIN_ROLE: Record<string, RoleKey> = {
   tenant: 'viewer',
   members: 'viewer',
   api: 'owner',
+  enterprise: 'viewer',
 }
 
 const SYSTEM_ADMIN_SECTIONS = new Set(['system-global'])
@@ -287,6 +293,9 @@ const navItems = computed(() => {
     { key: 'tenant', icon: 'user-circle', label: t('settings.tenantInfo') },
     { key: 'members', icon: 'usergroup', label: t('tenantMember.title') },
     { key: 'api', icon: 'secured', label: t('settings.apiInfo') },
+    ...(authStore.isPersonalMode
+      ? [{ key: 'enterprise', icon: 'server', label: t('enterprise.title') }]
+      : []),
   ]
   // currentTenantRole 为空表示「membership 还没加载」—— 比起渲染整套
   // viewer 入口然后角色一返回又消失，先卡住不渲染更稳，跟原先 members
@@ -313,7 +322,7 @@ const navGroups = computed<NavGroup[]>(() => {
     {
       key: 'workspace',
       label: t('settings.navGroups.workspace'),
-      items: pickItems(['tenant', 'members', 'chathistory']),
+      items: pickItems(['tenant', 'members', 'enterprise', 'chathistory']),
     },
     {
       key: 'models_runtime',

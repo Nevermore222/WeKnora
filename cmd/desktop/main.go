@@ -27,6 +27,7 @@ import (
 
 	"github.com/Tencent/Xelora/internal/config"
 	"github.com/Tencent/Xelora/internal/container"
+	"github.com/Tencent/Xelora/internal/handler"
 	"github.com/Tencent/Xelora/internal/logger"
 	"github.com/Tencent/Xelora/internal/runtime"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
@@ -160,8 +161,18 @@ func main() {
 		}
 	}
 
-	// Load .env explicitly for the desktop app so DB_DRIVER gets loaded
-	_ = godotenv.Load()
+	// Load .env explicitly for the desktop app so DB_DRIVER gets loaded.
+	// Try .env first; fall back to .env.personal for the personal edition.
+	if _, err := os.Stat(".env"); err == nil {
+		_ = godotenv.Load()
+	} else {
+		_ = godotenv.Load(".env.personal")
+	}
+	applyPersonalDefaults()
+	// Apply the user's saved sandbox mode preference (overrides .env default).
+	if savedMode := LoadDesktopSandboxMode(); savedMode != "" {
+		_ = os.Setenv("XELORA_SANDBOX_MODE", savedMode)
+	}
 	configureDesktopStorage(execPath)
 	logger.ConfigureFromEnv()
 
@@ -181,6 +192,9 @@ func main() {
 
 	// Initialize the Xelora App struct
 	app := NewApp()
+	_ = c.Invoke(func(desktopRemoteHandler *handler.DesktopRemoteHandler) {
+		app.desktopSessionSecret = desktopRemoteHandler.SessionSecret()
+	})
 
 	// Error channel to capture server startup errors
 	serverErrCh := make(chan error, 1)
@@ -262,15 +276,15 @@ func main() {
 	// Create application with options
 	// macOS app menu
 	AppMenu := menu.NewMenu()
-	FileMenu := AppMenu.AddSubmenu("Xelora Lite")
+	FileMenu := AppMenu.AddSubmenu("Xelora Personal")
 	FileMenu.AddText("About Xelora", keys.CmdOrCtrl("i"), func(_ *menu.CallbackData) {
 		if app.ctx == nil {
 			return
 		}
 		choice, err := wailsruntime.MessageDialog(app.ctx, wailsruntime.MessageDialogOptions{
 			Type:          wailsruntime.InfoDialog,
-			Title:         "Xelora Lite",
-			Message:       fmt.Sprintf("Xelora Lite — Desktop Edition\n\nA RAG framework for document understanding and semantic Q&A over complex, heterogeneous content.\n\nVersion %s\n© 2026 Tencent\n\nGitHub:\n%s", desktopAboutVersion(), xeloraGitHubRepoURL),
+			Title:         "Xelora Personal",
+			Message:       fmt.Sprintf("Xelora Personal — Desktop Edition\n\nA local-first RAG framework for document understanding and semantic Q&A over complex, heterogeneous content.\n\nVersion %s\n© 2026 Xelora\n\nGitHub:\n%s", desktopAboutVersion(), xeloraGitHubRepoURL),
 			Buttons:       []string{"Open GitHub", "OK"},
 			DefaultButton: "OK",
 		})
@@ -310,7 +324,7 @@ func main() {
 	// Start Wails application
 	// We use a Reverse Proxy to seamlessly proxy Wails' frontend to our Go backend
 	err := wails.Run(&options.App{
-		Title:         "Xelora Lite",
+		Title:         "Xelora Personal",
 		Width:         1280,
 		Height:        800,
 		DisableResize: false,
@@ -386,7 +400,7 @@ func defaultMacAppSupportDir(execPath string) (string, error) {
 		return "", err
 	}
 
-	appName := "Xelora Lite"
+	appName := "Xelora Personal"
 	if idx := strings.Index(execPath, ".app/Contents/MacOS"); idx >= 0 {
 		bundleName := filepath.Base(execPath[:idx+4])
 		if trimmed := strings.TrimSuffix(bundleName, ".app"); trimmed != "" {

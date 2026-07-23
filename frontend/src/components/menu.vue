@@ -4,7 +4,7 @@
         <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
             <div class="logo_box" @click="router.push('/platform/knowledge-bases')" style="cursor: pointer;">
                 <img class="logo" :src="logoSrc" alt="">
-                <sup v-if="isLiteEdition" class="lite-badge">Lite</sup>
+                <sup v-if="isLiteEdition" class="lite-badge">{{ editionBadge }}</sup>
             </div>
             <div class="logo_actions">
                 <t-tooltip placement="bottom">
@@ -50,6 +50,7 @@
         </t-tooltip>
 
         <!-- 租户选择器：仅在用户可切换租户时显示 -->
+        <RuntimeContextSelector v-if="!uiStore.sidebarCollapsed && authStore.isPersonalMode" />
         <TenantSelector v-if="canAccessAllTenants && !uiStore.sidebarCollapsed" />
 
         <!-- 折叠时右侧拖拽展开手柄 -->
@@ -288,6 +289,7 @@ import { useCommandPaletteStore } from '@/stores/commandPalette';
 import { MessagePlugin, DialogPlugin, Icon as TIcon } from "tdesign-vue-next";
 import UserMenu from '@/components/UserMenu.vue';
 import TenantSelector from '@/components/TenantSelector.vue';
+import RuntimeContextSelector from '@/components/RuntimeContextSelector.vue';
 import { useI18n } from 'vue-i18n';
 import { getSystemInfo } from '@/api/system';
 import { useTheme } from '@/composables/useTheme';
@@ -396,6 +398,7 @@ type MenuItem = { title: string; icon: string; path: string; childrenPath?: stri
 const { menuArr, visibleMenuArr } = storeToRefs(usemenuStore);
 let activeSubmenu = ref<string>('');
 const isLiteEdition = ref(false);
+const editionBadge = ref('Lite');
 
 // 批量管理状态
 const batchMode = ref(false)
@@ -984,9 +987,14 @@ onMounted(async () => {
 
     isLiteEdition.value = authStore.isLiteMode
     getSystemInfo().then(res => {
-        if (res.data?.edition === 'lite') {
+        const edition = res.data?.edition
+        if (edition === 'lite' || edition === 'personal') {
             isLiteEdition.value = true
+            editionBadge.value = edition === 'personal' ? 'Personal' : 'Lite'
             authStore.setLiteMode(true)
+            if (edition === 'personal') {
+                authStore.setPersonalMode(true)
+            }
         }
     }).catch(() => { })
 

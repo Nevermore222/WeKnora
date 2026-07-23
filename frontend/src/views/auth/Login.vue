@@ -345,7 +345,9 @@ import {
   registerByInvite,
   type InviteLookup,
 } from '@/api/auth'
+import { getDesktopAuthConfig, loginDesktopProfile, registerDesktopProfile } from '@/api/desktop-remote'
 import { useAuthStore } from '@/stores/auth'
+import { getRuntimeContext, isDefaultEnterpriseRequired } from '@/utils/api-context'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '@/composables/useTheme'
 
@@ -614,7 +616,10 @@ const loadOIDCConfig = async () => {
 // network glitch doesn't lock new users out of an open deployment.
 const loadAuthConfig = async () => {
   try {
-    const response = await getAuthConfig()
+    const runtimeContext = getRuntimeContext()
+    const response = runtimeContext.kind === 'enterprise'
+      ? await getDesktopAuthConfig(runtimeContext.profileId)
+      : await getAuthConfig()
     registrationEnabled.value = response.registration_mode !== 'invite_only'
   } catch {
     registrationEnabled.value = true
@@ -648,6 +653,22 @@ const handleLogin = async () => {
     if (valid !== true) return
 
     loading.value = true
+
+    const runtimeContext = getRuntimeContext()
+    if (isDefaultEnterpriseRequired() && runtimeContext.kind !== 'enterprise') {
+      MessagePlugin.error(t('enterprise.connectFailed'))
+      return
+    }
+    if (runtimeContext.kind === 'enterprise') {
+      const snapshot = await loginDesktopProfile(runtimeContext.profileId, {
+        email: formData.email,
+        password: formData.password,
+      })
+      authStore.applyDesktopIdentitySnapshot(snapshot)
+      await nextTick()
+      router.replace('/platform/knowledge-bases')
+      return
+    }
 
     const response = await login({
       email: formData.email,
@@ -698,11 +719,22 @@ const handleRegister = async () => {
       return
     }
 
-    const response = await register({
-      username: registerData.username,
-      email: registerData.email,
-      password: registerData.password
-    })
+    const runtimeContext = getRuntimeContext()
+    if (isDefaultEnterpriseRequired() && runtimeContext.kind !== 'enterprise') {
+      MessagePlugin.error(t('enterprise.connectFailed'))
+      return
+    }
+    const response = runtimeContext.kind === 'enterprise'
+      ? await registerDesktopProfile(runtimeContext.profileId, {
+          username: registerData.username,
+          email: registerData.email,
+          password: registerData.password
+        })
+      : await register({
+          username: registerData.username,
+          email: registerData.email,
+          password: registerData.password
+        })
 
     if (response.success) {
       MessagePlugin.success(t('auth.registerSuccess'))
@@ -765,6 +797,12 @@ onMounted(async () => {
 
   if (authStore.isLoggedIn) {
     router.replace('/platform/knowledge-bases')
+    return
+  }
+
+  if (isDefaultEnterpriseRequired() || getRuntimeContext().kind === 'enterprise') {
+    loadOIDCConfig()
+    loadAuthConfig()
     return
   }
 

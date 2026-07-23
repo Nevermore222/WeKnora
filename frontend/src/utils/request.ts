@@ -3,6 +3,8 @@ import axios from "axios";
 import { generateRandomString, MAX_FILE_SIZE_MB } from "./index";
 import i18n from '@/i18n'
 import { getApiBaseUrl } from './api-base';
+import { desktopSessionHeader, getRuntimeContext, resolveApiUrl } from './api-context';
+import { registerContextAborter } from './context-reset';
 
 const t = (key: string) => i18n.global.t(key)
 
@@ -28,12 +30,35 @@ function getCurrentLanguage(): string {
 
 instance.interceptors.request.use(
   (config) => {
+    const runtimeContext = getRuntimeContext();
+    const isEnterpriseContext = runtimeContext.kind === 'enterprise';
+    const isDesktopRemotePath = isDesktopRemoteRequest(config.url);
+    if (typeof config.url === 'string' && !/^https?:\/\//i.test(config.url) && !isDesktopRemotePath) {
+      config.url = resolveApiUrl(runtimeContext, config.url);
+    }
+    if (isEnterpriseContext || isDesktopRemotePath) {
+      Object.entries(desktopSessionHeader()).forEach(([key, value]) => {
+        config.headers[key] = value;
+      });
+    }
+    if (isEnterpriseContext && !isDesktopRemotePath) {
+      config.headers["X-Xelora-Context-Generation"] = String(runtimeContext.generation);
+      if (!config.signal) {
+        const controller = new AbortController();
+        config.signal = controller.signal;
+        registerContextAborter(controller);
+      }
+      if (runtimeContext.tenantId !== null) {
+        config.headers["X-Tenant-ID"] = String(runtimeContext.tenantId);
+      }
+    }
+
     const existingAuth = config.headers?.Authorization ?? config.headers?.authorization;
     const isEmbedAuth = typeof existingAuth === 'string' && existingAuth.startsWith('Embed ');
     const isEmbedPath = typeof config.url === 'string' && config.url.includes('/api/v1/embed/');
 
     // 嵌入渠道使用 Embed token；勿用本地 JWT 覆盖（否则调试页会 401）
-    if (!isEmbedAuth) {
+    if (!isEmbedAuth && !isEnterpriseContext && !isDesktopRemotePath) {
       const token = localStorage.getItem('xelora_token');
       if (token) {
         config.headers["Authorization"] = `Bearer ${token}`;
@@ -52,7 +77,7 @@ instance.interceptors.request.use(
     // 换之后只有第一批请求带 X-Tenant-ID"调成永久状态。
     // 后端 IsTenantAccessible 已经允许 header 指向 home 租户（自家），
     // 所以无脑附不会引入新风险。
-    if (!isEmbedAuth && !isEmbedPath) {
+    if (!isEmbedAuth && !isEmbedPath && !isEnterpriseContext && !isDesktopRemotePath) {
       const selectedTenantId = localStorage.getItem('xelora_selected_tenant_id');
       if (selectedTenantId) {
         config.headers["X-Tenant-ID"] = selectedTenantId;
@@ -81,6 +106,10 @@ const PUBLIC_AUTH_PATHS = ['/auth/auto-setup', '/auth/login', '/auth/register', 
 function isPublicAuthRequest(url?: string): boolean {
   if (!url) return false;
   return PUBLIC_AUTH_PATHS.some(p => url.includes(p));
+}
+
+function isDesktopRemoteRequest(url?: string): boolean {
+  return !!url && url.includes('/desktop/remote/');
 }
 
 // 处理队列中的请求
@@ -145,6 +174,11 @@ instance.interceptors.response.use(
     }
 
     // 如果是401错误且不是刷新token的请求，尝试刷新token
+    if (error.response.status === 401 && isDesktopRemoteRequest(originalRequest?.url)) {
+      const { status, data } = error.response;
+      return Promise.reject({ status, ...(typeof data === 'object' ? data : { message: data }) });
+    }
+
     if (error.response.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
       if (isRefreshing) {
         // 如果正在刷新token，将请求加入队列

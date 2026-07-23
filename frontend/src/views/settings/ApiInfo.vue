@@ -157,6 +157,19 @@
         <div v-if="showLanUrlUnavailableHint" class="setting-row lan-url-hint-row">
           <t-alert theme="warning" :message="$t('tenant.api.lanUrlUnavailable')" />
         </div>
+
+        <div v-if="showSandboxModeSetting" class="setting-row">
+          <div class="setting-info">
+            <label>{{ $t('tenant.api.sandboxModeLabel') }}</label>
+            <p class="desc">{{ $t('tenant.api.sandboxModeDescription') }}</p>
+          </div>
+          <div class="setting-control">
+            <t-select v-model="sandboxModeInput" style="width: 160px;" @change="onSandboxModeChange">
+              <t-option value="local" :label="$t('tenant.api.sandboxModeLocal')" />
+              <t-option value="docker" :label="$t('tenant.api.sandboxModeDocker')" />
+            </t-select>
+          </div>
+        </div>
       </template>
 
       <!-- API docs -->
@@ -198,7 +211,7 @@ const loading = ref(true)
 const error = ref('')
 const showApiKey = ref(false)
 const resetting = ref(false)
-/** Xelora Lite (Wails): real API origin is loopback + dynamic port, not window.location.origin */
+/** Xelora Personal (Wails): real API origin is loopback + dynamic port, not window.location.origin */
 const wailsApiBaseURL = ref<string | null>(null)
 const showDesktopPortSetting = ref(false)
 const showDesktopBindPublicSetting = ref(false)
@@ -206,6 +219,8 @@ const desktopPortInput = ref<number | undefined>(0)
 const desktopBindPublicInput = ref(false)
 const wailsApiLanBaseURL = ref<string | null>(null)
 const desktopListenPublicActive = ref(false)
+const showSandboxModeSetting = ref(false)
+const sandboxModeInput = ref('local')
 
 // Computed
 const displayApiKey = computed(() => {
@@ -324,6 +339,14 @@ function desktopBindPublicBindingsAvailable(win: XeloraDesktopWindow) {
   )
 }
 
+function sandboxModeBindingsAvailable(win: XeloraDesktopWindow) {
+  const app = win.go?.main?.App
+  return (
+    typeof (app as any)?.GetDesktopSandboxMode === 'function' &&
+    typeof (app as any)?.SetDesktopSandboxMode === 'function'
+  )
+}
+
 async function loadDesktopApiPrefs() {
   const win = window as XeloraDesktopWindow
   if (desktopPortBindingsAvailable(win)) {
@@ -344,6 +367,15 @@ async function loadDesktopApiPrefs() {
       desktopBindPublicInput.value = false
     }
   }
+  if (sandboxModeBindingsAvailable(win)) {
+    showSandboxModeSetting.value = true
+    try {
+      const mode = await Promise.resolve((win.go!.main!.App as any)!.GetDesktopSandboxMode!())
+      sandboxModeInput.value = typeof mode === 'string' && mode ? mode : 'local'
+    } catch {
+      sandboxModeInput.value = 'local'
+    }
+  }
 }
 
 const onDesktopBindPublicChange = async (value: boolean) => {
@@ -357,6 +389,19 @@ const onDesktopBindPublicChange = async (value: boolean) => {
   } catch (err: unknown) {
     MessagePlugin.error(err instanceof Error ? err.message : t('tenant.api.desktopBindPublicSaveFailed'))
     desktopBindPublicInput.value = !v
+  }
+}
+
+const onSandboxModeChange = async (value: string) => {
+  const win = window as XeloraDesktopWindow
+  const fn = (win.go?.main?.App as any)?.SetDesktopSandboxMode
+  if (typeof fn !== 'function') return
+  try {
+    await Promise.resolve(fn(value))
+    MessagePlugin.success(t('tenant.api.sandboxModeSaved'))
+  } catch (err: unknown) {
+    MessagePlugin.error(err instanceof Error ? err.message : t('tenant.api.sandboxModeSaveFailed'))
+    sandboxModeInput.value = value === 'docker' ? 'local' : 'docker'
   }
 }
 

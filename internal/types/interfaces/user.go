@@ -10,6 +10,10 @@ import (
 type UserService interface {
 	// Register creates a new user account
 	Register(ctx context.Context, req *types.RegisterRequest) (*types.User, error)
+	// ProvisionClientUser idempotently provisions a client user onto the server
+	// (create-or-reset password + ensure tenant membership). Powers the personal
+	// client's auto-registration flow.
+	ProvisionClientUser(ctx context.Context, email, username, password string, tenantID uint64, role types.TenantRole) (*types.User, error)
 	// Login authenticates a user and returns tokens
 	Login(ctx context.Context, req *types.LoginRequest) (*types.LoginResponse, error)
 	// GetOIDCAuthorizationURL builds the third-party OIDC authorization URL

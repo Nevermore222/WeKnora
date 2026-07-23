@@ -155,6 +155,119 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 	return user, nil
 }
 
+// ProvisionClientUser idempotently provisions a client user onto the server.
+// It is the server-side half of the personal client's auto-registration flow
+// (exposed via an Admin-gated endpoint, callable with an API token):
+//
+//  1. If no user with the given email exists, create one with its OWN home
+//     tenant (named "<username>'s Workspace") and an Owner membership of that
+//     home tenant - the same shape as Register(). The user is NOT added to the
+//     admin tenant (tenantID is the tenant the API token is bound to; it is
+//     only used to authorize the call, not to house the user).
+//  2. If the user already exists, reset its password to the client-owned
+//     password so the client can (re)authenticate. The user's home tenant is
+//     preserved (no re-homing) so the server admin's organization invites stay
+//     valid across re-provisioning.
+//  3. The admin shares spaces with the provisioned user the normal way: invite
+//     the user's home tenant into an organization (SearchTenantsForInvite finds
+//     it by username/email), then share KBs/agents into that org. The
+//     OrgMemberRole (viewer/editor/admin) governs per-space access - exactly the
+//     existing organization machinery, unchanged.
+func (s *userService) ProvisionClientUser(
+	ctx context.Context,
+	email, username, password string,
+	tenantID uint64,
+	role types.TenantRole,
+) (*types.User, error) {
+	email = strings.TrimSpace(email)
+	username = strings.TrimSpace(username)
+	if email == "" || username == "" || password == "" {
+		return nil, errors.New("email, username and password are required")
+	}
+	// role is accepted for API compatibility but is no longer used to join the
+	// admin tenant: the provisioned user owns their home tenant.
+	_ = role
+
+	user, err := s.userRepo.GetUserByEmail(ctx, email)
+	if err != nil && !errors.Is(err, apprepo.ErrUserNotFound) {
+		logger.Errorf(ctx, "ProvisionClientUser: lookup failed: email=%s err=%v",
+			secutils.SanitizeForLog(email), err)
+		return nil, err
+	}
+
+	if user == nil {
+		// Check for username collision before creating.
+		if existing, _ := s.userRepo.GetUserByUsername(ctx, username); existing != nil {
+			return nil, fmt.Errorf("username %q is already taken", username)
+		}
+
+		hashedPassword, herr := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if herr != nil {
+			logger.Errorf(ctx, "ProvisionClientUser: failed to hash password: %v", herr)
+			return nil, errors.New("failed to process password")
+		}
+
+		// Create the user's OWN home tenant (same shape as Register). The user
+		// lives in their home tenant, independent of the admin tenant, so the
+		// admin can share arbitrary organization spaces with them via
+		// SearchTenantsForInvite (which groups candidates by User.TenantID).
+		homeTenant, terr := s.tenantService.CreateTenant(ctx, &types.Tenant{
+			Name:        fmt.Sprintf("%s's Workspace", secutils.SanitizeForLog(username)),
+			Description: "Client user workspace",
+			Status:      "active",
+		})
+		if terr != nil {
+			logger.Errorf(ctx, "ProvisionClientUser: failed to create home tenant: %v", terr)
+			return nil, errors.New("failed to create client workspace")
+		}
+
+		user = &types.User{
+			ID:           uuid.New().String(),
+			Username:     username,
+			Email:        email,
+			PasswordHash: string(hashedPassword),
+			TenantID:     homeTenant.ID,
+			IsActive:     true,
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
+		if cerr := s.userRepo.CreateUser(ctx, user); cerr != nil {
+			logger.Errorf(ctx, "ProvisionClientUser: create user failed: %v", cerr)
+			return nil, errors.New("failed to create provisioned user")
+		}
+
+		// Owner membership in the user's home tenant so they can create/manage
+		// their own KBs and agents under g.Contributor()/g.OwnedKBOrAdmin().
+		if s.memberService != nil {
+			if _, oerr := s.memberService.EnsureOwner(ctx, user.ID, homeTenant.ID); oerr != nil {
+				logger.Errorf(ctx, "ProvisionClientUser: ensure owner failed: user=%s tenant=%d err=%v",
+					user.ID, homeTenant.ID, oerr)
+				return nil, oerr
+			}
+		}
+	} else {
+		hashed, herr := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if herr != nil {
+			logger.Errorf(ctx, "ProvisionClientUser: failed to hash password: %v", herr)
+			return nil, errors.New("failed to process password")
+		}
+		user.PasswordHash = string(hashed)
+		user.IsActive = true
+		// Preserve the user's existing home tenant: do NOT re-home into the
+		// admin tenant. Re-homing would orphan any organization invites the
+		// admin already created for the user and is the bug the previous
+		// co-tenancy model introduced.
+		if uerr := s.userRepo.UpdateUser(ctx, user); uerr != nil {
+			logger.Errorf(ctx, "ProvisionClientUser: update failed: user=%s err=%v", user.ID, uerr)
+			return nil, uerr
+		}
+	}
+
+	logger.Infof(ctx, "ProvisionClientUser: user %s provisioned into home tenant %d (admin tenant %d not joined)",
+		user.ID, user.TenantID, tenantID)
+	return user, nil
+}
+
 // Login authenticates a user and returns tokens
 func (s *userService) Login(ctx context.Context, req *types.LoginRequest) (*types.LoginResponse, error) {
 	logger.Info(ctx, "Start user login")

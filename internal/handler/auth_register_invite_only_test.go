@@ -21,11 +21,30 @@ import (
 // branching logic without dragging in the entire user service surface.
 type stubRegisterUserService struct {
 	interfaces.UserService
-	register func(ctx context.Context, req *types.RegisterRequest) (*types.User, error)
+	register       func(ctx context.Context, req *types.RegisterRequest) (*types.User, error)
+	getUserByEmail func(ctx context.Context, email string) (*types.User, error)
+	generateTokens func(ctx context.Context, user *types.User) (string, string, error)
 }
 
 func (s *stubRegisterUserService) Register(ctx context.Context, req *types.RegisterRequest) (*types.User, error) {
 	return s.register(ctx, req)
+}
+
+func (s *stubRegisterUserService) GetUserByEmail(ctx context.Context, email string) (*types.User, error) {
+	return s.getUserByEmail(ctx, email)
+}
+
+func (s *stubRegisterUserService) GenerateTokens(ctx context.Context, user *types.User) (string, string, error) {
+	return s.generateTokens(ctx, user)
+}
+
+type stubAutoSetupTenantService struct {
+	interfaces.TenantService
+	getTenantByID func(ctx context.Context, id uint64) (*types.Tenant, error)
+}
+
+func (s *stubAutoSetupTenantService) GetTenantByID(ctx context.Context, id uint64) (*types.Tenant, error) {
+	return s.getTenantByID(ctx, id)
 }
 
 // errorCapture mirrors gin's default ErrorHandler behaviour for tests:
@@ -52,6 +71,14 @@ func newRegisterTestRouter(h *AuthHandler) *gin.Engine {
 	r := gin.New()
 	r.Use(errorCapture())
 	r.POST("/auth/register", h.Register)
+	return r
+}
+
+func newAutoSetupTestRouter(h *AuthHandler) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(errorCapture())
+	r.POST("/auth/auto-setup", h.AutoSetup)
 	return r
 }
 
@@ -140,5 +167,62 @@ func TestRegister_NilAuthConfigDoesNotPanic(t *testing.T) {
 	w := doRegister(t, newRegisterTestRouter(h), validRegisterBody())
 	if w.Code != http.StatusCreated {
 		t.Fatalf("nil Auth config must fall back to allow, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAutoSetup_PersonalEditionAllowed(t *testing.T) {
+	previousEdition := Edition
+	Edition = "personal"
+	t.Cleanup(func() {
+		Edition = previousEdition
+	})
+
+	defaultUser := &types.User{
+		ID:       "u1",
+		Username: "personal",
+		Email:    "admin@xelora.local",
+		TenantID: 42,
+		IsActive: true,
+	}
+	us := &stubRegisterUserService{
+		getUserByEmail: func(_ context.Context, email string) (*types.User, error) {
+			if email != "admin@xelora.local" {
+				t.Fatalf("unexpected auto-setup email: %s", email)
+			}
+			return defaultUser, nil
+		},
+		generateTokens: func(_ context.Context, user *types.User) (string, string, error) {
+			if user != defaultUser {
+				t.Fatalf("GenerateTokens got unexpected user: %#v", user)
+			}
+			return "access-token", "refresh-token", nil
+		},
+	}
+	ts := &stubAutoSetupTenantService{
+		getTenantByID: func(_ context.Context, id uint64) (*types.Tenant, error) {
+			if id != 42 {
+				t.Fatalf("unexpected tenant id: %d", id)
+			}
+			return &types.Tenant{ID: id, Name: "Personal"}, nil
+		},
+	}
+	h := NewAuthHandler(&config.Config{}, us, ts, nil, nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/auto-setup", nil)
+	w := httptest.NewRecorder()
+	newAutoSetupTestRouter(h).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("personal edition auto-setup must be allowed, got %d body=%s", w.Code, w.Body.String())
+	}
+	var body types.LoginResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode auto-setup response: %v body=%s", err, w.Body.String())
+	}
+	if !body.Success || body.Token != "access-token" || body.RefreshToken != "refresh-token" {
+		t.Fatalf("unexpected auto-setup response: %+v", body)
+	}
+	if len(body.Memberships) != 1 || body.Memberships[0].TenantName != "Personal" {
+		t.Fatalf("unexpected memberships: %+v", body.Memberships)
 	}
 }

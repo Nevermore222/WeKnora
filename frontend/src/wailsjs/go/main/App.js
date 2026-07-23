@@ -14,6 +14,10 @@ export function GetAPIBaseURL() {
   return window['go']['main']['App']['GetAPIBaseURL']();
 }
 
+export function GetDesktopBootstrap() {
+  return window['go']['main']['App']['GetDesktopBootstrap']();
+}
+
 export function GetAPILanBaseURL() {
   return window['go']['main']['App']['GetAPILanBaseURL']();
 }

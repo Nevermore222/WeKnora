@@ -1,5 +1,22 @@
 basePath: /api/v1
 definitions:
+  handler.SystemCapabilitiesResponse:
+    properties:
+      api_contract_major:
+        description: Major version of the desktop-compatible API contract.
+        type: integer
+      api_contract_minor:
+        description: Minor version of the desktop-compatible API contract.
+        type: integer
+      features:
+        description: Stable server capabilities available to desktop clients.
+        items:
+          type: string
+        type: array
+      server_version:
+        description: Server build version, or dev for an unversioned build.
+        type: string
+    type: object
   github_com_Tencent_Xelora_internal_application_service.WikiLintIssue:
     properties:
       auto_fixable:
@@ -4952,6 +4969,19 @@ info:
   title: Xelora API
   version: "1.0"
 paths:
+  /system/capabilities:
+    get:
+      description: Returns public, data-free contract metadata for desktop compatibility checks before login.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Desktop API contract and supported features.
+          schema:
+            $ref: '#/definitions/handler.SystemCapabilitiesResponse'
+      summary: Get desktop API capabilities
+      tags:
+      - System
   /agent/tool-approvals/{pending_id}:
     post:
       consumes:

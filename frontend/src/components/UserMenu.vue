@@ -163,7 +163,7 @@
             </svg>
           </span>
         </div>
-        <template v-if="!authStore.isLiteMode">
+        <template v-if="!authStore.isLiteMode || authStore.isPersonalMode">
           <div class="menu-divider"></div>
           <div class="menu-item danger" @click="handleLogout">
             <t-icon name="logout" class="menu-icon" />

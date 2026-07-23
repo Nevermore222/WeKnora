@@ -7,11 +7,12 @@ import (
 
 // App holds Wails-bound state for the desktop shell.
 type App struct {
-	ctx           context.Context
-	backendURL    string
-	apiLanBaseURL string
-	listenPublic  bool
-	shutdownCh    chan struct{}
+	ctx                  context.Context
+	backendURL           string
+	apiLanBaseURL        string
+	desktopSessionSecret string
+	listenPublic         bool
+	shutdownCh           chan struct{}
 }
 
 // NewApp creates a new App application struct.
@@ -39,6 +40,26 @@ func (a *App) GetAPIBaseURL() string {
 	return strings.TrimRight(a.backendURL, "/") + "/api/v1"
 }
 
+type DesktopBootstrap struct {
+	APIBaseURL                      string `json:"api_base_url"`
+	Session                         string `json:"session"`
+	DefaultEnterpriseServerURL      string `json:"default_enterprise_server_url,omitempty"`
+	DefaultEnterpriseServerName     string `json:"default_enterprise_server_name,omitempty"`
+	DefaultEnterpriseServerRequired bool   `json:"default_enterprise_server_required"`
+	DefaultEnterpriseAllowInsecure  bool   `json:"default_enterprise_allow_insecure"`
+}
+
+func (a *App) GetDesktopBootstrap() DesktopBootstrap {
+	return DesktopBootstrap{
+		APIBaseURL:                      strings.TrimRight(a.backendURL, "/"),
+		Session:                         a.desktopSessionSecret,
+		DefaultEnterpriseServerURL:      defaultEnterpriseServerURL(),
+		DefaultEnterpriseServerName:     defaultEnterpriseServerName(),
+		DefaultEnterpriseServerRequired: defaultEnterpriseServerURL() != "",
+		DefaultEnterpriseAllowInsecure:  defaultEnterpriseAllowInsecure(),
+	}
+}
+
 // GetDesktopHTTPPortSetting returns the saved local API port (0 = random port each launch).
 func (a *App) GetDesktopHTTPPortSetting() int {
 	return LoadDesktopPrefsHTTPPort()
@@ -57,6 +78,17 @@ func (a *App) GetDesktopHTTPBindPublicSetting() bool {
 // SetDesktopHTTPBindPublicSetting saves LAN/public listen preference. Restart the app for it to take effect.
 func (a *App) SetDesktopHTTPBindPublicSetting(v bool) error {
 	return SaveDesktopHTTPBindPublicPreference(v)
+}
+
+// GetDesktopSandboxMode returns the saved skill execution mode ("local" or "docker").
+func (a *App) GetDesktopSandboxMode() string {
+	return LoadDesktopSandboxMode()
+}
+
+// SetDesktopSandboxMode saves the skill execution mode and applies it immediately
+// by updating the XELORA_SANDBOX_MODE environment variable.
+func (a *App) SetDesktopSandboxMode(mode string) error {
+	return SaveDesktopSandboxModePreference(mode)
 }
 
 // GetAPILanBaseURL returns a suggested base URL for other devices on the LAN (…/api/v1), or empty if not in bind-public mode or IP detection failed.

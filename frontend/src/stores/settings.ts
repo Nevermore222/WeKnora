@@ -521,6 +521,16 @@ export const useSettingsStore = defineStore("settings", {
     clearSessionWorkspaceBinding() {
       this.activeSessionWorkspaceBinding = null;
     },
+
+    resetForRuntimeContext() {
+      this.settings.selectedKnowledgeBases = [];
+      this.settings.selectedFiles = [];
+      this.settings.selectedFileKbMap = {};
+      this.settings.knowledgeBaseId = "";
+      this.settings.selectedAgentId = BUILTIN_QUICK_ANSWER_ID;
+      this.settings.selectedAgentSourceTenantId = null;
+      this.activeSessionWorkspaceBinding = null;
+    },
   },
 });
 

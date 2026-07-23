@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { autoSetup, getCurrentUser, userInfoFromApi } from '@/api/auth'
+import { getDesktopProfileSession } from '@/api/desktop-remote'
+import { getRuntimeContext, isDefaultEnterpriseRequired } from '@/utils/api-context'
 
 /** Lite /桌面 WebView 硬刷新时可能只打开 `/`，用 session 记住上次页面以便恢复 */
 const LITE_LAST_PATH_KEY = 'xelora_lite_last_path'
@@ -206,6 +208,21 @@ function persistLoginResponse(authStore: ReturnType<typeof useAuthStore>, respon
 }
 
 async function hydrateSessionFromToken(authStore: ReturnType<typeof useAuthStore>) {
+  const runtimeContext = getRuntimeContext()
+  if (runtimeContext.kind === 'enterprise') {
+    try {
+      const snapshot = await getDesktopProfileSession(runtimeContext.profileId)
+      if (snapshot?.authenticated) {
+        authStore.applyDesktopIdentitySnapshot(snapshot)
+        return authStore.isLoggedIn
+      }
+      authStore.clearDesktopIdentity()
+    } catch {
+      authStore.clearDesktopIdentity()
+    }
+    return false
+  }
+
   const token = localStorage.getItem('xelora_token')
   if (!token) return false
 
@@ -308,7 +325,7 @@ router.beforeEach(async (to, from, next) => {
         return
       }
 
-      if (!autoSetupAttempted && shouldTryAutoSetup()) {
+      if (!isDefaultEnterpriseRequired() && getRuntimeContext().kind !== 'enterprise' && !autoSetupAttempted && shouldTryAutoSetup()) {
         autoSetupAttempted = true
         try {
           const response = await autoSetup()

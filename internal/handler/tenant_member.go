@@ -67,6 +67,17 @@ type updateMemberRoleRequest struct {
 	Role types.TenantRole `json:"role" binding:"required"`
 }
 
+// provisionClientUserRequest is the JSON body for POST /tenants/:id/client-users.
+// The personal client calls this (with an API token) to auto-register its local
+// user onto the server. Password is generated and owned by the client. Role is
+// optional and defaults to contributor.
+type provisionClientUserRequest struct {
+	Email    string           `json:"email" binding:"required,email"`
+	Username string           `json:"username" binding:"required"`
+	Password string           `json:"password" binding:"required"`
+	Role     types.TenantRole `json:"role"`
+}
+
 // parseTenantIDFromPath reads :id from the gin route and validates it as
 // a tenant ID. Returning (0, false) means we already wrote the error to
 // the gin context and the caller should `return` immediately.
@@ -267,6 +278,64 @@ func (h *TenantMemberHandler) AddMember(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
 		"data":    resp,
+	})
+}
+
+// ProvisionClientUser godoc
+// @Summary      配置客户端用户（个人版自动注册）
+// @Description  个人版客户端用 API token 调用，幂等地把其本地用户注册为独立用户：
+// @Description  用户不存在则创建（含独立 home 租户 + Owner），存在则重置为客户端持有的密码。
+// @Description  用户不被加入管理员租户；管理员通过组织邀请该用户 home 租户、再共享空间，
+// @Description  并以 OrgMemberRole 控制其 per-space 权限（既有组织机制，不变）。
+// @Tags         TenantMembers
+// @Accept       json
+// @Produce      json
+// @Param        id        path  string  true  "租户ID"
+// @Param        request   body  provisionClientUserRequest  true  "配置请求"
+// @Success      200  {object}  map[string]interface{}
+// @Security     Bearer
+// @Router       /tenants/{id}/client-users [post]
+func (h *TenantMemberHandler) ProvisionClientUser(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID, ok := parseTenantIDFromPath(c)
+	if !ok {
+		return
+	}
+
+	var req provisionClientUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(apperrors.NewValidationError("invalid request body").WithDetails(err.Error()))
+		return
+	}
+
+	role := req.Role
+	if !role.IsValid() {
+		role = types.TenantRoleContributor
+	}
+
+	user, err := h.userService.ProvisionClientUser(ctx,
+		strings.TrimSpace(req.Email), strings.TrimSpace(req.Username), req.Password, tenantID, role)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidTenantRole):
+			c.Error(apperrors.NewValidationError(err.Error()))
+		default:
+			logger.Errorf(ctx, "ProvisionClientUser failed: email=%s tenant=%d err=%v",
+				secutils.SanitizeForLog(req.Email), tenantID, err)
+			c.Error(apperrors.NewInternalServerError("failed to provision client user").WithDetails(err.Error()))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"user_id":   user.ID,
+			"email":     user.Email,
+			"username":  user.Username,
+			"tenant_id": user.TenantID,
+			"role":      role,
+		},
 	})
 }
 

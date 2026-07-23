@@ -17,12 +17,16 @@ import i18n from "./i18n";
 import { initTheme } from "@/composables/useTheme";
 import { initFont } from "@/composables/useFont";
 import { installTDesignIconOfflineGuard } from "@/utils/tdesign-icon-offline";
+import { setDesktopBootstrap, setRuntimeContext } from "@/utils/api-context";
+import { ensureDefaultDesktopProfile } from "@/api/desktop-remote";
 
 // 必须在 Vue 组件挂载之前执行，避免 tdesign-icons 运行时请求 tdesign.gtimg.com
 installTDesignIconOfflineGuard();
 
 initTheme();
 initFont();
+
+await initDesktopBootstrap();
 
 const app = createApp(App);
 
@@ -35,3 +39,37 @@ app.use(i18n);
 router.isReady().finally(() => {
   app.mount("#app");
 });
+
+async function initDesktopBootstrap() {
+  const w = window as any;
+  const fn = w.go?.main?.App?.GetDesktopBootstrap;
+  if (typeof fn !== 'function') return;
+  try {
+    const bootstrap = await Promise.resolve(fn());
+    setDesktopBootstrap(bootstrap);
+    await initDefaultEnterpriseProfile(bootstrap);
+  } catch {
+    setDesktopBootstrap(null);
+  }
+}
+
+async function initDefaultEnterpriseProfile(bootstrap: any) {
+  const baseURL = String(bootstrap?.default_enterprise_server_url || '').trim();
+  if (!baseURL) return;
+  try {
+    const profile = await ensureDefaultDesktopProfile({
+      name: String(bootstrap?.default_enterprise_server_name || 'Xelora Server'),
+      base_url: baseURL,
+      allow_insecure_transport: bootstrap?.default_enterprise_allow_insecure === true,
+    });
+    setRuntimeContext({
+      kind: 'enterprise',
+      profileId: profile.id,
+      userId: null,
+      tenantId: null,
+      generation: 0,
+    });
+  } catch (error) {
+    console.error('failed to initialize default enterprise profile:', error);
+  }
+}

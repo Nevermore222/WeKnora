@@ -3,6 +3,8 @@ import { ref, onUnmounted } from 'vue';
 import { generateRandomString } from '@/utils/index';
 import i18n from '@/i18n';
 import { getApiBaseUrl } from '@/utils/api-base';
+import { desktopSessionHeader, getRuntimeContext, resolveApiUrl } from '@/utils/api-context';
+import { registerContextAborter } from '@/utils/context-reset';
 import {
   sanitizeStreamRequestBody,
   type StreamRequestMeta,
@@ -46,10 +48,12 @@ export function useStream() {
 
     // 获取API配置
     const apiUrl = getApiBaseUrl();
+    const runtimeContext = getRuntimeContext();
+    const isEnterpriseContext = runtimeContext.kind === 'enterprise';
     
     const embedToken = params.embed_token;
     const token = embedToken || localStorage.getItem('xelora_token');
-    if (!token) {
+    if (!token && !isEnterpriseContext) {
       error.value = i18n.global.t('error.tokenNotFound');
       stopStream();
       return;
@@ -73,12 +77,15 @@ export function useStream() {
     const sentAt = performance.now();
     const requestID = generateRandomString(12);
     let firstAnswerLogged = false;
+    if (isEnterpriseContext) {
+      registerContextAborter(controller)
+    }
 
     try {
       let url =
         params.method == "POST"
-          ? `${apiUrl}${params.url}/${params.session_id}`
-          : `${apiUrl}${params.url}/${params.session_id}?message_id=${params.query}`;
+          ? `${apiUrl}${resolveApiUrl(runtimeContext, `${params.url}/${params.session_id}`)}`
+          : `${apiUrl}${resolveApiUrl(runtimeContext, `${params.url}/${params.session_id}`)}?message_id=${params.query}`;
       console.log(`[TTFB] request:start request_id=${requestID} url=${url} sent_at=${Date.now()}`);
       
       // Prepare POST body with required fields for agent-chat
@@ -141,11 +148,14 @@ export function useStream() {
         method: params.method,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": embedToken ? `Embed ${embedToken}` : `Bearer ${token}`,
+          ...(!isEnterpriseContext ? { "Authorization": embedToken ? `Embed ${embedToken}` : `Bearer ${token}` } : {}),
           "Accept-Language": i18n.global.locale?.value || localStorage.getItem('locale') || 'zh-CN',
           "X-Request-ID": requestID,
-          ...(!embedToken && tenantIdHeader ? { "X-Tenant-ID": tenantIdHeader } : {}),
+          ...(!embedToken && tenantIdHeader && !isEnterpriseContext ? { "X-Tenant-ID": tenantIdHeader } : {}),
+          ...(isEnterpriseContext ? { "X-Xelora-Context-Generation": String(runtimeContext.generation) } : {}),
+          ...(isEnterpriseContext && runtimeContext.tenantId !== null ? { "X-Tenant-ID": String(runtimeContext.tenantId) } : {}),
           ...(params.embed_session_sig ? { "X-Embed-Session": params.embed_session_sig } : {}),
+          ...desktopSessionHeader(),
         },
         body:
           params.method == "POST"

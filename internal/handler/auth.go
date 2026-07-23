@@ -725,8 +725,8 @@ func (h *AuthHandler) SwitchTenant(c *gin.Context) {
 func (h *AuthHandler) AutoSetup(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	if Edition != "lite" {
-		appErr := errors.NewForbiddenError("auto-setup is only available in lite edition")
+	if Edition != "lite" && Edition != "personal" {
+		appErr := errors.NewForbiddenError("auto-setup is only available in lite/personal edition")
 		c.Error(appErr)
 		return
 	}

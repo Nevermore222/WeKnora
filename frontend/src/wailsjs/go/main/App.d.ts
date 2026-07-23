@@ -7,6 +7,8 @@ export function CheckForUpdates():Promise<void>;
 
 export function GetAPIBaseURL():Promise<string>;
 
+export function GetDesktopBootstrap():Promise<Record<string, any>>;
+
 export function GetAPILanBaseURL():Promise<string>;
 
 export function GetDesktopHTTPBindPublicSetting():Promise<boolean>;

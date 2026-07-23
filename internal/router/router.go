@@ -87,6 +87,7 @@ type RouterParams struct {
 	DataSourceCredentialsHandler *handler.DataSourceCredentialsHandler
 	XeloraCloudHandler           *handler.XeloraCloudHandler
 	WikiPageHandler              *handler.WikiPageHandler
+	DesktopRemoteHandler         *handler.DesktopRemoteHandler `optional:"true"`
 }
 
 // NewRouter 创建新的路由
@@ -108,7 +109,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key", "X-Request-ID", "X-Tenant-ID", "X-Embed-Session"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key", "X-Request-ID", "X-Tenant-ID", "X-Embed-Session", handler.DesktopSessionHeader},
 		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -146,8 +147,8 @@ func NewRouter(params RouterParams) *gin.Engine {
 		r.Use(embedFrameAncestorsMiddleware(params.EmbedChannelService))
 	}
 
-	// 前端静态文件（仅 Lite 版本内嵌前端）
-	if handler.Edition == "lite" {
+	// 前端静态文件（Lite / Personal 版本内嵌前端）
+	if handler.Edition == "lite" || handler.Edition == "personal" {
 		serveFrontendStatic(r)
 	}
 
@@ -156,6 +157,15 @@ func NewRouter(params RouterParams) *gin.Engine {
 
 	// Web embed 公开路由（使用 publish token 鉴权，不走全局 Auth）
 	RegisterEmbedPublicRoutes(r, params.EmbedChannelHandler, params.EmbedChannelService, params.TenantService, params.RedisClient, params.FileService)
+
+	// Desktop clients use this public, data-free endpoint to negotiate the API
+	// contract before a user signs in.
+	r.GET("/api/v1/system/capabilities", handler.GetSystemCapabilities)
+
+	if handler.Edition == "personal" && params.DesktopRemoteHandler != nil {
+		desktopRemote := r.Group("/desktop/remote", params.DesktopRemoteHandler.RequireDesktopSession())
+		params.DesktopRemoteHandler.RegisterRoutes(desktopRemote)
+	}
 
 	// 认证中间件
 	r.Use(middleware.Auth(params.TenantService, params.UserService, params.TenantMemberService, params.Config))
@@ -599,6 +609,10 @@ func RegisterTenantRoutes(
 				tenantByID.PUT("/members/:user_id", g.Owner(), memberHandler.UpdateMemberRole)
 				tenantByID.DELETE("/members/:user_id", g.Owner(), memberHandler.RemoveMember)
 				tenantByID.POST("/leave", g.Viewer(), memberHandler.LeaveTenant)
+				// Personal-client auto-provisioning: Admin-gated (an API token
+				// carries TenantRoleAdmin) so the client can register its local
+				// user into its own tenant without Owner credentials.
+				tenantByID.POST("/client-users", g.Admin(), memberHandler.ProvisionClientUser)
 			}
 
 			// Tenant invitation flow. The UI-driven "Invite Member"
