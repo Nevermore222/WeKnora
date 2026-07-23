@@ -19,6 +19,7 @@ import { initFont } from "@/composables/useFont";
 import { installTDesignIconOfflineGuard } from "@/utils/tdesign-icon-offline";
 import { setDesktopBootstrap, setRuntimeContext } from "@/utils/api-context";
 import { ensureDefaultDesktopProfile } from "@/api/desktop-remote";
+import { initializeDefaultEnterpriseProfile } from "@/utils/default-enterprise-bootstrap";
 
 // 必须在 Vue 组件挂载之前执行，避免 tdesign-icons 运行时请求 tdesign.gtimg.com
 installTDesignIconOfflineGuard();
@@ -54,20 +55,10 @@ async function initDesktopBootstrap() {
 }
 
 async function initDefaultEnterpriseProfile(bootstrap: any) {
-  const baseURL = String(bootstrap?.default_enterprise_server_url || '').trim();
-  if (!baseURL) return;
   try {
-    const profile = await ensureDefaultDesktopProfile({
-      name: String(bootstrap?.default_enterprise_server_name || 'Xelora Server'),
-      base_url: baseURL,
-      allow_insecure_transport: bootstrap?.default_enterprise_allow_insecure === true,
-    });
-    setRuntimeContext({
-      kind: 'enterprise',
-      profileId: profile.id,
-      userId: null,
-      tenantId: null,
-      generation: 0,
+    await initializeDefaultEnterpriseProfile(bootstrap, {
+      ensureProfile: ensureDefaultDesktopProfile,
+      setContext: setRuntimeContext,
     });
   } catch (error) {
     console.error('failed to initialize default enterprise profile:', error);

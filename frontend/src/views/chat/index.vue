@@ -165,6 +165,7 @@ import { useChatStreamHandler } from '@/composables/useChatStreamHandler';
 import { useStickyBottomOnResize } from '@/composables/useStickyBottomOnResize';
 import { clearCitationChunkCache } from '@/utils/citationChunkCache';
 import { sanitizeSkillDirectiveDisplay } from '@/utils/skillDirectiveDisplay';
+import { resolveContinuableAssistantMessageId } from '@/utils/chat-runtime';
 
 const props = defineProps({
     session_id: { type: String, default: '' },
@@ -530,11 +531,15 @@ const {
     onAfterMsgList: async () => {
         const lastMessage = messagesList[messagesList.length - 1];
         if (lastMessage && !lastMessage.is_completed) {
-            isReplying.value = true;
-            if (lastMessage.role === 'assistant') {
-                currentAssistantMessageId.value = lastMessage.id;
-                console.log('[Continue Stream] Set assistant message ID:', lastMessage.id);
+            const messageId = resolveContinuableAssistantMessageId(lastMessage);
+            if (!messageId) {
+                isReplying.value = false;
+                loading.value = false;
+                return;
             }
+            isReplying.value = true;
+            currentAssistantMessageId.value = messageId;
+            console.log('[Continue Stream] Set assistant message ID:', messageId);
             // Only IM-originated replies (channel === 'im') get the quiet poll-to-recover
             // path: their answer is generated on the IM side and never streams through
             // this server, so continue-stream always 404s even though the reply *is*
@@ -543,7 +548,7 @@ const {
             isAttachingImStream.value = lastMessage.channel === 'im';
             await startStream({
                 session_id: session_id.value,
-                query: lastMessage.id,
+                query: messageId,
                 method: 'GET',
                 url: '/api/v1/sessions/continue-stream',
             });
@@ -843,10 +848,11 @@ onBeforeMount(async () => {
     // 若从智能体列表点击共享智能体进入，URL 带 agent_id 与 source_tenant_id，同步到 store
     const agentIdFromQuery = props.agentId || (route.query.agent_id && String(route.query.agent_id));
     const sourceTenantIdFromQuery = route.query.source_tenant_id && String(route.query.source_tenant_id);
+    const agentModeFromQuery = route.query.agent_mode && String(route.query.agent_mode);
     if (agentIdFromQuery && sourceTenantIdFromQuery) {
-        useSettingsStoreInstance.selectAgent(agentIdFromQuery, sourceTenantIdFromQuery);
+        useSettingsStoreInstance.selectAgent(agentIdFromQuery, sourceTenantIdFromQuery, agentModeFromQuery);
     } else if (agentIdFromQuery) {
-        useSettingsStoreInstance.selectAgent(agentIdFromQuery, null);
+        useSettingsStoreInstance.selectAgent(agentIdFromQuery, null, agentModeFromQuery);
     }
 
     if (props.kbIds && props.kbIds.length > 0) {

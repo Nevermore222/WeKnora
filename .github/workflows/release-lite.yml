@@ -239,13 +239,13 @@ jobs:
             -platform "${{ matrix.platform }}" \
             ${NSIS_FLAG} \
             -ldflags="${LDFLAGS}" \
-            -o "Xelora Lite"
+            -o "Xelora Personal"
 
       # ── macOS: bundle .app with resources, then create DMG ──
       - name: Package macOS app
         if: runner.os == 'macOS'
         run: |
-          APP_BUNDLE="Xelora Lite.app"
+          APP_BUNDLE="Xelora Personal.app"
           SRC="cmd/desktop/build/bin/${APP_BUNDLE}"
           RESOURCES="${SRC}/Contents/Resources"
 
@@ -269,7 +269,7 @@ jobs:
           cp -R "cmd/desktop/build/bin/${APP_BUNDLE}" "${DMG_SRC}/"
           ln -s /Applications "${DMG_SRC}/Applications"
 
-          hdiutil create -volname "Xelora Lite" \
+          hdiutil create -volname "Xelora Personal" \
             -srcfolder "${DMG_SRC}" \
             -ov -format UDZO \
             "${DMG_NAME}.dmg"
@@ -282,7 +282,7 @@ jobs:
         run: |
           ARCHIVE="Xelora-Lite-App_${{ steps.ver.outputs.version }}_${{ matrix.arch_label }}"
           mkdir -p "${ARCHIVE}"
-          cp "cmd/desktop/build/bin/Xelora Lite" "${ARCHIVE}/"
+          cp "cmd/desktop/build/bin/Xelora Personal" "${ARCHIVE}/"
           if [ -f .env.lite.example ]; then
             cp .env.lite.example "${ARCHIVE}/"
           fi
@@ -304,12 +304,12 @@ jobs:
         run: |
           ARCHIVE="Xelora-Lite-App_${{ steps.ver.outputs.version }}_${{ matrix.arch_label }}"
           # Wails -nsis generates an installer named {app}-amd64-installer.exe
-          INSTALLER="cmd/desktop/build/bin/Xelora Lite-amd64-installer.exe"
+          INSTALLER="cmd/desktop/build/bin/Xelora Personal-amd64-installer.exe"
           if [ -f "$INSTALLER" ]; then
             cp "$INSTALLER" "${ARCHIVE}_setup.exe"
             sha256sum "${ARCHIVE}_setup.exe" > "${ARCHIVE}_setup.exe.sha256"
           else
-            cp "cmd/desktop/build/bin/Xelora Lite.exe" "${ARCHIVE}.exe"
+            cp "cmd/desktop/build/bin/Xelora Personal.exe" "${ARCHIVE}.exe"
             sha256sum "${ARCHIVE}.exe" > "${ARCHIVE}.exe.sha256"
           fi
 
@@ -351,7 +351,7 @@ jobs:
         id: notes
         run: |
           cat > notes.md << 'NOTES'
-          ## Xelora Lite ${{ steps.ver.outputs.version }}
+          ## Xelora Personal ${{ steps.ver.outputs.version }}
 
           ### Web CLI 版（命令行 / 服务器部署）
 
@@ -406,7 +406,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.ver.outputs.version }}" \
-            --title "Xelora Lite ${{ steps.ver.outputs.version }}" \
+            --title "Xelora Personal ${{ steps.ver.outputs.version }}" \
             --notes-file notes.md \
             Xelora-lite_*.tar.gz \
             Xelora-lite_*.tar.gz.sha256 \

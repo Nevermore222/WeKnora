@@ -4,6 +4,7 @@ import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent
 import { getApiBaseUrl } from "@/utils/api-base";
 import { updateMyPreferences, type UserPreferences } from "@/api/auth";
 import type { SessionWorkspaceBindingPayload } from "@/api/chat/index";
+import { resolveAgentModeEnabled } from "@/utils/chat-runtime";
 
 // 定义设置接口
 interface Settings {
@@ -414,16 +415,14 @@ export const useSettingsStore = defineStore("settings", {
     },
     
     // 选择智能体（sourceTenantId 仅在使用共享智能体时传入）
-    selectAgent(agentId: string, sourceTenantId?: string | null) {
+    selectAgent(agentId: string, sourceTenantId?: string | null, agentMode?: string | null) {
       this.settings.selectedAgentId = agentId;
       this.settings.selectedAgentSourceTenantId = (sourceTenantId != null && sourceTenantId !== "") ? sourceTenantId : null;
-      // 根据智能体类型自动切换 Agent 模式
-      if (agentId === BUILTIN_QUICK_ANSWER_ID) {
-        this.settings.isAgentEnabled = false;
-      } else if (agentId === BUILTIN_SMART_REASONING_ID) {
-        this.settings.isAgentEnabled = true;
-      }
-      // 自定义智能体需要根据其配置来决定
+      this.settings.isAgentEnabled = resolveAgentModeEnabled(
+        agentId,
+        agentMode,
+        this.settings.isAgentEnabled,
+      );
       
       // 切换智能体时重置知识库和文件选择状态
       // 因为不同智能体关联的知识库不同，需要清空用户之前的选择

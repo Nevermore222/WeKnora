@@ -128,15 +128,19 @@ assert(
   "workflow prompt must demand detailed parameter descriptions and relationships",
 );
 assert(
-  serialized.includes("description\u548crelationship_notes") &&
-    (serialized.includes("\u4e2d\u6587\u8bf4\u660e") || serialized.includes("\u4e2d\u6587\u8865\u5145\u89e3\u91ca")),
-  "workflow prompt must require Chinese descriptions and relationship notes",
+  serialized.includes("description\u3001relationship_notes\u3001value_range\u3001default_value") &&
+    serialized.includes("\u5fc5\u987b\u4f7f\u7528\u4e2d\u6587\u53e5\u5b50") &&
+    serialized.includes("\u5e73\u5047\u540d\u6216\u7247\u5047\u540d"),
+  "workflow prompt must require Chinese explanatory fields and forbid Japanese kana",
 );
 assert(
   serialized.includes("non_chinese_explanation") &&
     serialized.includes("needsChineseRewrite") &&
-    serialized.includes("hasJapaneseSentence"),
-  "workflow must reject Japanese explanatory sentences in description and relationship_notes",
+    serialized.includes("hasJapaneseSentence") &&
+    serialized.includes("hasGarbledText") &&
+    serialized.includes("value_range") &&
+    serialized.includes("default_value"),
+  "workflow must reject Japanese explanatory sentences or garbled text in explanatory fields",
 );
 assert(
   serialized.includes("\u7d42\u4e86\u4ee3\u7801") &&

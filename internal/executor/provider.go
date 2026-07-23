@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/Tencent/Xelora/internal/agent/skills"
@@ -66,7 +67,11 @@ func (p *LocalProvider) Capability(ctx context.Context) ProviderCapability {
 func selectProvider(providerName string, providers map[string]Provider) (Provider, error) {
 	name := providerName
 	if name == "" {
-		name = ControlledDockerProviderName
+		if os.Getenv("XELORA_SANDBOX_MODE") == "local" {
+			name = LocalProviderName
+		} else {
+			name = ControlledDockerProviderName
+		}
 	}
 
 	provider, ok := providers[name]

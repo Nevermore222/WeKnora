@@ -58,15 +58,19 @@ export const useMenuStore = defineStore('menuStore', () => {
     }
   )
 
-  const liteHiddenPaths = new Set(['logout', 'organizations'])
-
   // 共享空间 (organizations) 仅对当前租户的 admin / owner 暴露入口。
   // viewer / contributor 即便在共享空间里拥有资源，也无需自行管理共享关系，
   // 入口在侧栏只会徒增噪音；后端 RBAC 才是权限的最终来源（见 middleware/rbac.go）。
+  //
+  // logout：lite 版自动登录（auto-setup），登出无意义，隐藏；personal 版走
+  // 标准注册/登录流程，需要登出入口，保留。organizations 两个桌面版都隐藏。
   const visibleMenuArr = computed(() => {
     const authStore = useAuthStore()
     return menuArr.filter(item => {
-      if (authStore.isLiteMode && liteHiddenPaths.has(item.path)) {
+      if (item.path === 'logout' && authStore.isLiteMode && !authStore.isPersonalMode) {
+        return false
+      }
+      if (item.path === 'organizations' && authStore.isLiteMode) {
         return false
       }
       if (item.path === 'organizations' && !authStore.hasRole('admin')) {

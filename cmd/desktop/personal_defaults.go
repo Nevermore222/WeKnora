@@ -27,7 +27,11 @@ func applyPersonalDefaults() {
 }
 
 func defaultEnterpriseServerURL() string {
-	return strings.TrimRight(strings.TrimSpace(os.Getenv("XELORA_PERSONAL_SERVER_URL")), "/")
+	value := strings.TrimSpace(os.Getenv("XELORA_PERSONAL_SERVER_URL"))
+	if value == "" {
+		value = "http://localhost:8080"
+	}
+	return strings.TrimRight(value, "/")
 }
 
 func defaultEnterpriseServerName() string {

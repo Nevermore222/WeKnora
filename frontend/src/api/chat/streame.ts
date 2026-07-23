@@ -3,8 +3,9 @@ import { ref, onUnmounted } from 'vue';
 import { generateRandomString } from '@/utils/index';
 import i18n from '@/i18n';
 import { getApiBaseUrl } from '@/utils/api-base';
-import { desktopSessionHeader, getRuntimeContext, resolveApiUrl } from '@/utils/api-context';
+import { desktopAPIBaseURL, desktopSessionHeader, getRuntimeContext, resolveApiUrl } from '@/utils/api-context';
 import { registerContextAborter } from '@/utils/context-reset';
+import { resolveStreamApiBaseUrl } from '@/utils/chat-runtime';
 import {
   sanitizeStreamRequestBody,
   type StreamRequestMeta,
@@ -47,7 +48,11 @@ export function useStream() {
     isLoading.value = true;
 
     // 获取API配置
-    const apiUrl = getApiBaseUrl();
+    // Wails' WebView AssetServer finalizes proxied responses only after the
+    // handler returns, which buffers an entire SSE response. Desktop streams
+    // therefore connect directly to the embedded Gin server; browser builds
+    // keep their configured base URL.
+    const apiUrl = resolveStreamApiBaseUrl(desktopAPIBaseURL(), getApiBaseUrl());
     const runtimeContext = getRuntimeContext();
     const isEnterpriseContext = runtimeContext.kind === 'enterprise';
     

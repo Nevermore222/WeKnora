@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "Xelora Lite",
-  "outputfilename": "Xelora Lite",
+  "name": "Xelora Personal",
+  "outputfilename": "Xelora Personal",
   "frontend:dir": "../../frontend",
   "wailsjsdir": "../../frontend/src",
   "author": {
@@ -9,11 +9,11 @@
     "email": ""
   },
   "info": {
-    "companyName": "Tencent",
-    "productName": "Xelora Lite",
+    "companyName": "Xelora",
+    "productName": "Xelora Personal",
     "productVersion": "1.0.0",
-    "copyright": "Copyright 2026 Tencent",
-    "comments": "Xelora Desktop Edition"
+    "copyright": "Copyright 2026 Xelora",
+    "comments": "Xelora Personal Desktop Edition"
   },
   "mac": {
     "category": "public.app-category.productivity",

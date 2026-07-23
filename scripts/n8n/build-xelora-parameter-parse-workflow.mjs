@@ -204,13 +204,17 @@ return [{
   "请基于Manual_ASP知识库深度解析CL命令" + $json.command + "的全部参数。",
   "必须输出可直接落入前台参数详情表的高质量数据：参数说明要完整，取值范围、默认值、必填性、枚举值和参数间关系必须尽量从知识库抽取。",
   "description字段需要说明用途、指定规则、格式/长度/类型约束、典型值或注意事项；relationship_notes字段需要说明依赖、互斥、联动、前置条件、错误条件和与其他参数/系统变量的关系。",
-  "description和relationship_notes必须使用中文说明；可以保留必要的日文原文术语、参数名、关键字和示例，但不能只输出英文或日文短句。",
-  "不要把Manual_ASP中的日文说明句直接复制到description或relationship_notes；必须先翻译并整理为中文。日文假名或原文短语只能作为术语、关键字、示例保留，并且必须配套中文解释。",
+  "最终JSON面向中文前台系统：除JSON字段名、命令名、参数名、枚举关键字、data_type原文类型名外，所有说明性内容都必须使用中文。",
+  "description、relationship_notes、value_range、default_value必须使用中文句子，禁止输出日文说明、日文句子、平假名或片假名。",
+  "Manual中的日文概念必须翻译成中文，例如ワンタッチ記述名翻译为一键描述名、ライブラリ名翻译为库名、省略時翻译为省略时。",
+  "不要把Manual_ASP中的日文说明句直接复制到description、relationship_notes、value_range或default_value；必须先翻译并整理为中文。",
+  "严禁输出OCR/编码乱码片段，例如縺、繧、譁、蜿、蛹、譛、隸、螟、莉、荳、逧、窶、ï、þ、�。如果检索到的Manual_ASP内容存在乱码，必须理解后改写为中文；无法可靠理解时对应字段留空，不能复制乱码。",
   $json.retry_reason ? ("上一次输出未通过校验，失败原因：" + $json.retry_reason + "。本次必须修正后再输出。") : "",
   "data_type字段必须尽量使用Manual_ASP原文中的日语类型/分类名称，例如名前型、文字ストリング型、整数型、論理型等；不要把原文类型泛化成STRING、NUMBER、BOOLEAN。",
-  "不要只输出简单英文短句；优先保留手册中的日文术语，并用中文补充解释。",
+  "不要只输出简单英文短句或日文短句；除参数名、关键字、枚举值和data_type原文外，其他说明性内容必须使用中文。",
   "如果知识库存在证据，不得把description、value_range、default_value、relationship_notes留空。",
   "Return exactly one JSON object and no Markdown.",
+  "输出第一个字符必须是{，最后一个字符必须是}；禁止输出Markdown代码块围栏或json代码块包装。",
   "Schema: {command, language, parameters:[{parameter_name, parameter_type, data_type, enum_value, value_range, default_value, description, is_required, relationship_notes}]}."
 ].join(" ");
 
@@ -375,10 +379,14 @@ function hasJapaneseSentence(text) {
   return kanaCount >= 10 || /します|ください|場合|対象|省略時|指定した|指定します|異なります|できません|必要です/.test(value);
 }
 
+function hasGarbledText(text) {
+  return /�|ï|þ|ü|蜻|譁|縺|繧|莠|螂|窶|讎|閭|菴|荳|隸|譛|蜿|蠑|逧|莉|蛹|螟/.test(String(text || ""));
+}
+
 function needsChineseRewrite(text) {
   const value = String(text || "").trim();
   if (!value) return false;
-  return hasJapaneseSentence(value) && !hasChineseExplanation(value);
+  return hasGarbledText(value) || (hasJapaneseSentence(value) && !hasChineseExplanation(value));
 }
 
 let parsed;
@@ -431,7 +439,7 @@ const parameters = Array.from(dedup.values()).map((entry, index) => ({
 
 const nonChineseFields = [];
 for (const parameter of parameters) {
-  for (const field of ["description", "relationship_notes"]) {
+  for (const field of ["description", "relationship_notes", "value_range", "default_value"]) {
     if (needsChineseRewrite(parameter[field])) {
       nonChineseFields.push((parameter.parameter_name || "<unknown>") + "." + field);
     }
@@ -444,7 +452,7 @@ if (nonChineseFields.length) {
       ...$json,
       valid: false,
       error_type: "non_chinese_explanation",
-      error_message: "description/relationship_notes must be translated into Chinese: " + nonChineseFields.slice(0, 20).join(", "),
+      error_message: "description/relationship_notes/value_range/default_value must be Chinese and must not contain Japanese explanatory sentences or garbled text: " + nonChineseFields.slice(0, 20).join(", "),
       parsed_command: normalizeString(parsed.command) || $json.command,
       parsed_language: normalizeString(parsed.language) || $json.language,
       parameters,

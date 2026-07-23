@@ -161,14 +161,12 @@ func main() {
 		}
 	}
 
-	// Load .env explicitly for the desktop app so DB_DRIVER gets loaded.
-	// Try .env first; fall back to .env.personal for the personal edition.
-	if _, err := os.Stat(".env"); err == nil {
-		_ = godotenv.Load()
-	} else {
-		_ = godotenv.Load(".env.personal")
-	}
+	// Load desktop env next to the EXE before falling back to cwd. Windows
+	// shortcuts can start from the repo root, where `.env` would otherwise hide
+	// the packaged `.env.personal` and drop the default server profile.
+	loadDesktopEnv(execPath)
 	applyPersonalDefaults()
+	configureDesktopWebDir(execPath)
 	// Apply the user's saved sandbox mode preference (overrides .env default).
 	if savedMode := LoadDesktopSandboxMode(); savedMode != "" {
 		_ = os.Setenv("XELORA_SANDBOX_MODE", savedMode)
@@ -363,6 +361,61 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
+}
+
+func loadDesktopEnv(execPath string) {
+	candidates := desktopEnvCandidates(execPath)
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			_ = godotenv.Load(candidate)
+			return
+		}
+	}
+}
+
+func desktopEnvCandidates(execPath string) []string {
+	var candidates []string
+	seen := map[string]bool{}
+	add := func(path string) {
+		if path == "" {
+			return
+		}
+		cleaned := filepath.Clean(path)
+		key := strings.ToLower(cleaned)
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		candidates = append(candidates, cleaned)
+	}
+
+	if execPath != "" {
+		exeDir := filepath.Dir(execPath)
+		add(filepath.Join(exeDir, ".env"))
+		add(filepath.Join(exeDir, ".env.personal"))
+	}
+	add(".env")
+	add(".env.personal")
+	return candidates
+}
+
+func configureDesktopWebDir(execPath string) {
+	if execPath == "" {
+		return
+	}
+
+	webDir := strings.TrimSpace(os.Getenv("XELORA_WEB_DIR"))
+	if webDir == "" {
+		webDir = "web"
+	}
+	if !filepath.IsAbs(webDir) {
+		webDir = filepath.Join(filepath.Dir(execPath), webDir)
+	}
+	webDir = filepath.Clean(webDir)
+	if _, err := os.Stat(filepath.Join(webDir, "index.html")); err != nil {
+		return
+	}
+	_ = os.Setenv("XELORA_WEB_DIR", webDir)
 }
 
 func configureDesktopStorage(execPath string) {

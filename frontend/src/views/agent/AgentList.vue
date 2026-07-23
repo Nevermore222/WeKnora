@@ -1253,7 +1253,8 @@ async function handleUseSharedAgentInChat(shared: SharedAgentInfo) {
   closeSharedAgentDetail()
   const settingsStore = useSettingsStore()
   const menuStore = useMenuStore()
-  settingsStore.selectAgent(shared.agent.id, String(shared.source_tenant_id))
+  const agentMode = shared.agent.config?.agent_mode
+  settingsStore.selectAgent(shared.agent.id, String(shared.source_tenant_id), agentMode)
   try {
     const res = await createSessions({})
     if (res?.data?.id) {
@@ -1271,7 +1272,11 @@ async function handleUseSharedAgentInChat(shared: SharedAgentInfo) {
       menuStore.changeIsFirstSession(false)
       router.push({
         path: `/platform/chat/${sessionId}`,
-        query: { agent_id: shared.agent.id, source_tenant_id: String(shared.source_tenant_id) }
+        query: {
+          agent_id: shared.agent.id,
+          source_tenant_id: String(shared.source_tenant_id),
+          agent_mode: agentMode,
+        }
       })
     } else {
       MessagePlugin.error(t('createChat.messages.createFailed'))

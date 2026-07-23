@@ -67,6 +67,7 @@ services:
       dockerfile: docker/Dockerfile.app
       args:
         - APK_MIRROR_ARG=${APK_MIRROR_ARG:-}
+        - PRELOAD_DUCKDB_EXTENSIONS_ARG=${PRELOAD_DUCKDB_EXTENSIONS_ARG:-1}
     container_name: Xelora-app
     ports:
       - "${APP_PORT:-8080}:8080"

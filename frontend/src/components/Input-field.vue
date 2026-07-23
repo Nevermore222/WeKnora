@@ -161,6 +161,22 @@ const selectedAgent = computed(() => {
   } as CustomAgent;
 });
 
+watch(
+  [
+    selectedAgentId,
+    () => selectedAgent.value?.config?.agent_mode,
+    () => settingsStore.isAgentEnabled,
+  ],
+  ([, agentMode, enabled]) => {
+    if (!agentMode) return;
+    const shouldEnable = agentMode === 'smart-reasoning';
+    if (shouldEnable !== enabled) {
+      settingsStore.toggleAgent(shouldEnable);
+    }
+  },
+  { immediate: true },
+);
+
 // 判断是否为自定义智能体（非内置）
 const isCustomAgent = computed(() => {
   const agent = selectedAgent.value;
@@ -1926,8 +1942,7 @@ const handleSelectAgent = (agent: CustomAgent, sourceTenantId?: string) => {
     return;
   }
 
-  settingsStore.selectAgent(agent.id, sourceTenantId);
-  settingsStore.toggleAgent(!!isAgentType);
+  settingsStore.selectAgent(agent.id, sourceTenantId, agent.config?.agent_mode);
 
   // 同步智能体的配置状态（含内置、自定义、共享智能体）：模型、网络搜索、知识库由 watch 同步
   // 1. 同步网络搜索状态
