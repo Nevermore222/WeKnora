@@ -120,6 +120,7 @@ document.addEventListener('click',function(e){
   if(!el||!el.href)return;
   var href=el.href;
   if(href.indexOf('http://')===0||href.indexOf('https://')===0){
+    if(href.indexOf(window.location.origin)===0)return;
     if(window.runtime&&window.runtime.BrowserOpenURL){
       e.preventDefault();
       e.stopPropagation();

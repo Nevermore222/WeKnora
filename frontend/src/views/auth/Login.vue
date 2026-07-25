@@ -1,125 +1,14 @@
 <template>
-  <div class="login-layout">
-    <div class="animated-bg">
-      <div class="knowledge-node node-1">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-2">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-3">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" />
-          <path d="M2 17l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-4">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <ellipse cx="12" cy="5" rx="9" ry="3" />
-          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-5">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-6">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path
-            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-          <line x1="12" y1="22.08" x2="12" y2="12" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-7">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-8">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-9">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-10">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3" />
-          <path
-            d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-11">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 11l3 3L22 4" />
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-12">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon
-            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      </div>
-
-      <svg class="knowledge-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <line class="connection-line line-1" x1="20" y1="15" x2="35" y2="25" />
-        <line class="connection-line line-2" x1="35" y1="25" x2="55" y2="20" />
-        <line class="connection-line line-3" x1="55" y1="20" x2="85" y2="12" />
-        <line class="connection-line line-4" x1="8" y1="35" x2="25" y2="45" />
-        <line class="connection-line line-5" x1="25" y1="45" x2="65" y2="48" />
-        <line class="connection-line line-6" x1="20" y1="60" x2="60" y2="75" />
-        <line class="connection-line line-7" x1="20" y1="15" x2="20" y2="60" />
-        <line class="connection-line line-8" x1="55" y1="20" x2="45" y2="50" />
-        <line class="connection-line line-9" x1="65" y1="48" x2="90" y2="38" />
-        <line class="connection-line line-10" x1="40" y1="70" x2="75" y2="80" />
-        <line class="connection-line line-11" x1="35" y1="25" x2="25" y2="45" />
-        <line class="connection-line line-12" x1="75" y1="30" x2="65" y2="48" />
-      </svg>
-    </div>
+  <div class="login-layout login-layout--app" :class="{ 'login-layout--register': isRegisterMode }">
+    <LoginParticleBackground />
 
     <!-- Logo - Top Left -->
-    <a href="https://github.com/Tencent/Xelora" target="_blank" class="header-logo" :title="$t('common.github')">
-      <img :src="logoSrc" alt="Xelora" class="logo-image" />
-    </a>
+    <div class="header-logo" aria-hidden="true">
+      <img :src="headerLogoSrc" alt="Xelora" class="logo-image" />
+    </div>
 
     <!-- Header Links - Top Right -->
     <div class="header-links">
-      <a href="https://xelora.weixin.qq.com" target="_blank" class="header-link" :title="$t('common.website')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-          stroke-linecap="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="2" y1="12" x2="22" y2="12" />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-        <span class="link-text">{{ $t('common.website') }}</span>
-      </a>
-
-      <a href="https://github.com/Tencent/Xelora" target="_blank" class="header-link" :title="$t('common.info')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-          <path
-            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
-        </svg>
-        <span class="link-text">GitHub</span>
-      </a>
-
       <div class="language-switch">
         <button @click="toggleLanguageMenu" class="header-link" :title="currentLangOption?.label">
           <span class="lang-flag-icon">{{ currentLangOption?.flag }}</span>
@@ -142,57 +31,45 @@
       </div>
     </div>
 
-    <!-- Left Showcase Section -->
-    <div class="showcase-section">
-      <div class="showcase-content">
-        <p class="showcase-subtitle">{{ $t('platform.subtitle') }}</p>
-        <p class="showcase-description">{{ $t('platform.description') }}</p>
+    <main class="login-shell">
+      <div class="login-panel">
+        <div class="login-panel__glow" aria-hidden="true" />
+        <div class="login-panel__grain" aria-hidden="true" />
 
-        <div class="feature-tags">
-          <span class="tag">{{ $t('platform.rag') }}</span>
-          <span class="tag">{{ $t('platform.agent') }}</span>
-          <span class="tag">{{ $t('platform.wiki') }}</span>
-          <span class="tag">{{ $t('platform.hybridSearch') }}</span>
-        </div>
-
-        <!-- Swiper Carousel -->
-        <div class="carousel-container">
-          <swiper :modules="modules" :slides-per-view="1" :loop="true" :autoplay="{
-            delay: 4000,
-            disableOnInteraction: false,
-          }" :effect="'fade'" :fade-effect="{ crossFade: true }"
-            :pagination="{ clickable: true, dynamicBullets: false }" :speed="800" class="screenshot-swiper">
-            <swiper-slide v-for="(slide, index) in slides" :key="index">
-              <div class="slide-content">
-                <img :src="slide.image" :alt="slide.title" class="slide-image" />
-              </div>
-            </swiper-slide>
-          </swiper>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right Form Section -->
-    <div class="form-section">
-      <div class="form-panel">
         <!-- Login Card -->
         <div class="form-card" v-if="!isRegisterMode">
           <div class="form-header">
+            <div class="form-brand">
+              <span class="form-brand__mark">X</span>
+              <span class="form-brand__name">Xelora</span>
+            </div>
             <h2 class="form-title">{{ $t('auth.login') }}</h2>
             <p class="form-welcome">{{ $t('auth.subtitle') }}</p>
-            <p v-if="registrationEnabled" class="form-hint">{{ $t('auth.loginHint') }}</p>
+            <div class="feature-pills">
+              <span class="feature-pill">{{ $t('platform.rag') }}</span>
+              <span class="feature-pill">{{ $t('platform.agent') }}</span>
+              <span class="feature-pill">{{ $t('platform.wiki') }}</span>
+            </div>
           </div>
 
           <div class="form-content">
             <t-form ref="formRef" :data="formData" :rules="formRules" @submit="handleLogin" layout="vertical">
               <t-form-item :label="$t('auth.email')" name="email">
                 <t-input v-model="formData.email" :placeholder="$t('auth.emailPlaceholder')" type="text"
-                  autocomplete="email" size="large" :disabled="loading" />
+                  autocomplete="email" size="large" :disabled="loading" class="login-field">
+                  <template #prefix-icon>
+                    <t-icon name="mail" class="login-field__icon" />
+                  </template>
+                </t-input>
               </t-form-item>
 
               <t-form-item :label="$t('auth.password')" name="password">
                 <t-input v-model="formData.password" :placeholder="$t('auth.passwordPlaceholder')" type="password"
-                  size="large" :disabled="loading" @enter="handleLogin" />
+                  size="large" :disabled="loading" class="login-field" @enter="handleLogin">
+                  <template #prefix-icon>
+                    <t-icon name="lock-on" class="login-field__icon" />
+                  </template>
+                </t-input>
               </t-form-item>
 
               <t-button type="submit" theme="primary" size="large" block :loading="loading" class="submit-button">
@@ -200,13 +77,12 @@
               </t-button>
 
               <div class="register-cta" v-if="registrationEnabled">
-                <div class="register-cta__divider">
-                  <span>{{ $t('auth.firstTime') }}</span>
-                </div>
-                <t-button theme="default" variant="outline" size="large" block class="register-cta__button"
-                  :disabled="loading" @click="toggleMode">
-                  {{ $t('auth.createAccount') }}
-                </t-button>
+                <p class="register-cta__text">
+                  {{ $t('auth.firstTime') }}
+                  <button type="button" class="register-cta__link" :disabled="loading" @click="toggleMode">
+                    {{ $t('auth.createAccount') }}
+                  </button>
+                </p>
               </div>
 
               <div v-if="oidcEnabled" class="oidc-divider">
@@ -218,34 +94,11 @@
                 {{ oidcLoading ? $t('auth.redirectingToOIDC') : oidcLoginText }}
               </t-button>
             </t-form>
-
-            <!-- Features list -->
-            <div class="login-features">
-              <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <span class="feature-text">{{ $t('platform.multimodalParsing') }}</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <span class="feature-text">{{ $t('platform.hybridSearchEngine') }}</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <span class="feature-text">{{ $t('platform.ragQandA') }}</span>
-              </div>
-            </div>
           </div>
         </div>
 
-        <!-- Register Card. Renders when the user is in register mode
-             AND either self-service registration is enabled OR they
-             arrived with a valid share-link token (which bypasses the
-             invite_only gate). -->
+        <!-- Register Card -->
         <div class="form-card" v-if="isRegisterMode && (registrationEnabled || inviteLookup)">
-          <!-- Share-link banner: shown only when ?token= resolved to a
-               real invitation row. Sits above the form header so the
-               invitee instantly sees who invited them and into which
-               workspace, without bumping the existing register UX. -->
           <div v-if="inviteLookup" class="invite-banner">
             <t-icon name="link" class="invite-banner__icon" />
             <div class="invite-banner__text">
@@ -260,9 +113,18 @@
           <div v-else-if="inviteLookupError" class="invite-banner invite-banner--error">
             {{ inviteLookupError }}
           </div>
+
           <div class="form-header">
+            <div class="form-brand">
+              <span class="form-brand__mark">X</span>
+              <span class="form-brand__name">Xelora</span>
+            </div>
             <h2 class="form-title">{{ $t('auth.createAccount') }}</h2>
             <p class="form-subtitle">{{ $t('auth.registerSubtitle') }}</p>
+            <div class="feature-pills">
+              <span class="feature-pill">{{ $t('platform.independentTenant') }}</span>
+              <span class="feature-pill">{{ $t('platform.fullApiAccess') }}</span>
+            </div>
           </div>
 
           <div class="form-content">
@@ -270,22 +132,38 @@
               layout="vertical">
               <t-form-item :label="$t('auth.username')" name="username">
                 <t-input v-model="registerData.username" :placeholder="$t('auth.usernamePlaceholder')" size="large"
-                  :disabled="loading" />
+                  :disabled="loading" class="login-field">
+                  <template #prefix-icon>
+                    <t-icon name="user" class="login-field__icon" />
+                  </template>
+                </t-input>
               </t-form-item>
 
               <t-form-item :label="$t('auth.email')" name="email">
                 <t-input v-model="registerData.email" :placeholder="$t('auth.emailPlaceholder')" type="text"
-                  autocomplete="email" size="large" :disabled="loading" />
+                  autocomplete="email" size="large" :disabled="loading" class="login-field">
+                  <template #prefix-icon>
+                    <t-icon name="mail" class="login-field__icon" />
+                  </template>
+                </t-input>
               </t-form-item>
 
               <t-form-item :label="$t('auth.password')" name="password">
                 <t-input v-model="registerData.password" :placeholder="$t('auth.passwordPlaceholder')" type="password"
-                  size="large" :disabled="loading" />
+                  size="large" :disabled="loading" class="login-field">
+                  <template #prefix-icon>
+                    <t-icon name="lock-on" class="login-field__icon" />
+                  </template>
+                </t-input>
               </t-form-item>
 
               <t-form-item :label="$t('auth.confirmPassword')" name="confirmPassword">
                 <t-input v-model="registerData.confirmPassword" :placeholder="$t('auth.confirmPasswordPlaceholder')"
-                  type="password" size="large" :disabled="loading" @enter="handleRegister" />
+                  type="password" size="large" :disabled="loading" class="login-field" @enter="handleRegister">
+                  <template #prefix-icon>
+                    <t-icon name="secured" class="login-field__icon" />
+                  </template>
+                </t-input>
               </t-form-item>
 
               <t-button type="submit" theme="primary" size="large" block :loading="loading" class="submit-button">
@@ -295,30 +173,14 @@
 
             <div class="form-footer">
               <span>{{ $t('auth.haveAccount') }}</span>
-              <a href="#" @click.prevent="toggleMode" class="link-button">
+              <button type="button" class="link-button" :disabled="loading" @click="toggleMode">
                 {{ $t('auth.backToLogin') }}
-              </a>
-            </div>
-
-            <!-- Features list for register -->
-            <div class="login-features">
-              <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <span class="feature-text">{{ $t('platform.independentTenant') }}</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <span class="feature-text">{{ $t('platform.fullApiAccess') }}</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <span class="feature-text">{{ $t('platform.knowledgeBaseManagement') }}</span>
-              </div>
+              </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -328,11 +190,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useRoleLabel } from '@/composables/useRoleLabel'
 import { notifyLoginSuccess } from '@/utils/loginNotify'
-import { Swiper, SwiperSlide } from 'swiper/vue'
-import { Autoplay, EffectFade, Pagination } from 'swiper/modules'
-import 'swiper/css'
-import 'swiper/css/effect-fade'
-import 'swiper/css/pagination'
+import LoginParticleBackground from '@/components/auth/LoginParticleBackground.vue'
 import {
   login,
   register,
@@ -349,56 +207,15 @@ import { getDesktopAuthConfig, loginDesktopProfile, registerDesktopProfile } fro
 import { useAuthStore } from '@/stores/auth'
 import { getRuntimeContext, isDefaultEnterpriseRequired } from '@/utils/api-context'
 import { useI18n } from 'vue-i18n'
-import { useTheme } from '@/composables/useTheme'
 
-// Import screenshot images
-import xeloraLogo from '@/assets/img/xelora.png'
 import xeloraDarkLogo from '@/assets/img/xelora-dark.png'
-import screenshot1 from '@/assets/img/screenshot-1.svg'
-import screenshot2 from '@/assets/img/screenshot-2.svg'
-import screenshot3 from '@/assets/img/screenshot-3.svg'
-import screenshot4 from '@/assets/img/screenshot-4.svg'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const { t, tm, locale } = useI18n()
-const { currentTheme } = useTheme()
 const { formatRole, roleIcon } = useRoleLabel()
-const systemDark = ref(
-  typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
-)
-const logoSrc = computed(() => {
-  const effectiveDark = currentTheme.value === 'dark' || (currentTheme.value === 'system' && systemDark.value)
-  return effectiveDark ? xeloraDarkLogo : xeloraLogo
-})
-
-// Swiper modules
-const modules = [Autoplay, EffectFade, Pagination]
-
-// Carousel slides data
-const slides = [
-  {
-    image: screenshot4,
-    title: t('platform.carousel.agenticRagTitle'),
-    description: t('platform.carousel.agenticRagDesc')
-  },
-  {
-    image: screenshot2,
-    title: t('platform.carousel.hybridSearchTitle'),
-    description: t('platform.carousel.hybridSearchDesc')
-  },
-  {
-    image: screenshot3,
-    title: t('platform.carousel.wikiTitle'),
-    description: t('platform.carousel.wikiDesc')
-  },
-  {
-    image: screenshot1,
-    title: t('platform.carousel.smartDocRetrievalTitle'),
-    description: t('platform.carousel.smartDocRetrievalDesc')
-  }
-]
+const headerLogoSrc = computed(() => xeloraDarkLogo)
 
 // Form references
 const formRef = ref()
@@ -513,6 +330,8 @@ const toggleMode = () => {
   Object.keys(registerData).forEach(key => {
     (registerData as any)[key] = ''
   })
+
+  window.scrollTo(0, 0)
 }
 
 // Toggle language menu
@@ -536,19 +355,13 @@ const handleClickOutside = (event: MouseEvent) => {
   }
 }
 
-const handleSystemThemeChange = (event: MediaQueryListEvent) => {
-  systemDark.value = event.matches
-}
-
 // Add click outside listener
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', handleSystemThemeChange)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
-  window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', handleSystemThemeChange)
 })
 
 const persistLoginResponse = async (response: any) => {
@@ -829,364 +642,109 @@ onMounted(async () => {
 
 <style lang="less" scoped>
 .login-layout {
-  display: flex;
+  position: relative;
   width: 100%;
   min-height: 100%;
   overflow: hidden;
-  position: relative;
-  background: linear-gradient(225deg, #022c22 0%, #064e3b 15%, #065f46 25%, #047857 38%, #059669 50%, #07C05F 65%, #10B981 78%, #34D399 90%, #6EE7B7 100%);
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.06) 0%, transparent 50%),
-      radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.04) 0%, transparent 50%);
-    pointer-events: none;
-  }
 }
 
-.animated-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  z-index: 1;
-  overflow: hidden;
-  contain: strict;
-}
-
-.knowledge-node {
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  box-shadow:
-    0 0 15px rgba(255, 255, 255, 0.35),
-    0 0 30px rgba(16, 185, 129, 0.2),
-    inset 0 0 8px rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: nodePulse 5s infinite ease-in-out;
-  will-change: transform, opacity;
-}
-
-.node-icon {
-  width: 20px;
-  height: 20px;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.node-1 {
-  top: 15%;
-  left: 20%;
-  animation-delay: 0s;
-}
-
-.node-2 {
-  top: 25%;
-  left: 35%;
-  animation-delay: 0.5s;
-}
-
-.node-3 {
-  top: 20%;
-  left: 55%;
-  animation-delay: 1s;
-}
-
-.node-4 {
-  top: 30%;
-  left: 75%;
-  animation-delay: 1.5s;
-}
-
-.node-5 {
-  top: 45%;
-  left: 25%;
-  animation-delay: 2s;
-}
-
-.node-6 {
-  top: 50%;
-  left: 45%;
-  animation-delay: 2.5s;
-}
-
-.node-7 {
-  top: 48%;
-  left: 65%;
-  animation-delay: 3s;
-}
-
-.node-8 {
-  top: 60%;
-  left: 20%;
-  animation-delay: 0.3s;
-}
-
-.node-9 {
-  top: 12%;
-  right: 15%;
-  animation-delay: 1.8s;
-}
-
-.node-10 {
-  top: 38%;
-  right: 10%;
-  animation-delay: 2.3s;
-}
-
-.node-11 {
-  top: 70%;
-  left: 40%;
-  animation-delay: 0.8s;
-}
-
-.node-12 {
-  top: 65%;
-  left: 80%;
-  animation-delay: 1.3s;
-}
-
-@keyframes nodePulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.65;
-  }
-
-  50% {
-    transform: scale(1.08);
-    opacity: 0.9;
-  }
-}
-
-.knowledge-lines {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0.35;
-}
-
-.connection-line {
-  stroke: rgba(255, 255, 255, 0.5);
-  stroke-width: 1.5;
-  stroke-dasharray: 6, 3;
-  stroke-linecap: round;
-  animation: lineFlow 10s infinite linear;
-  will-change: stroke-dashoffset;
-}
-
-.line-1 {
-  animation-delay: 0s;
-}
-
-.line-2 {
-  animation-delay: 0.5s;
-}
-
-.line-3 {
-  animation-delay: 1s;
-}
-
-.line-4 {
-  animation-delay: 0.3s;
-}
-
-.line-5 {
-  animation-delay: 0.8s;
-}
-
-.line-6 {
-  animation-delay: 1.3s;
-}
-
-.line-7 {
-  animation-delay: 1.8s;
-}
-
-.line-8 {
-  animation-delay: 2.3s;
-}
-
-.line-9 {
-  animation-delay: 0.2s;
-}
-
-.line-10 {
-  animation-delay: 0.7s;
-}
-
-.line-11 {
-  animation-delay: 0.9s;
-}
-
-.line-12 {
-  animation-delay: 1.5s;
-}
-
-@keyframes lineFlow {
-  0% {
-    stroke-dashoffset: 0;
-  }
-
-  100% {
-    stroke-dashoffset: 18;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .knowledge-node {
-    animation: none;
-    opacity: 0.65;
-  }
-
-  .connection-line {
-    animation: none;
-  }
-}
-
-/* Left Showcase Section */
-.showcase-section {
-  flex: 0 0 52%;
-  display: flex;
-  align-items: flex-end;
-  padding: 100px 30px 100px 50px;
-  box-sizing: border-box;
-  position: relative;
-}
-
-.showcase-content {
-  width: 100%;
-  max-width: 600px;
-  position: relative;
-  z-index: 2;
+.login-layout--app {
   display: flex;
   flex-direction: column;
-  margin-bottom: 60px;
-}
-
-.showcase-subtitle {
-  margin-top: 0;
-  font-size: 22px;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0 0 8px 0;
-  font-family: var(--app-font-family);
-  line-height: 1.4;
-  font-weight: 500;
-}
-
-.showcase-description {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0 0 28px 0;
-  font-family: var(--app-font-family);
-  line-height: 1.5;
-}
-
-.feature-tags {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 40px;
-  flex-wrap: wrap;
-}
-
-.tag {
-  display: inline-block;
-  padding: 8px 20px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
-  color: var(--td-text-color-anti);
-  font-size: 14px;
-  font-weight: 500;
-  font-family: var(--app-font-family);
-}
-
-/* Carousel */
-.carousel-container {
-  width: 100%;
-  margin-top: 48px;
-}
-
-.screenshot-swiper {
-  width: 100%;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  padding-bottom: 40px;
-
-  :deep(.swiper-wrapper) {
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  :deep(.swiper-pagination) {
-    bottom: 15px !important;
-    z-index: 10;
-  }
-
-  :deep(.swiper-pagination-bullet) {
-    width: 10px;
-    height: 10px;
-    background: rgba(255, 255, 255, 0.5);
-    opacity: 1;
-    transition: all 0.3s ease;
-    margin: 0 6px !important;
-  }
-
-  :deep(.swiper-pagination-bullet-active) {
-    background: var(--td-bg-color-container);
-    width: 28px;
-    border-radius: 5px;
-  }
-}
-
-.slide-content {
-  width: 100%;
-  height: 100%;
-  background: var(--td-bg-color-container);
-  border-radius: 16px;
-  overflow: hidden;
-  display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.slide-image {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: contain;
-}
-
-/* Right Form Section */
-.form-section {
-  flex: 0 0 48%;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 40px 50px 100px 30px;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 72px 24px 28px;
   box-sizing: border-box;
-  position: relative;
+  background: #050505;
+  --login-card-bg: #f3ebe0;
+  --login-card-bg-soft: #ebe1d3;
+  --login-card-surface: #fffaf3;
+  --login-card-border: rgba(120, 90, 55, 0.16);
+  --login-card-text: #241c14;
+  --login-card-muted: #6d5f4f;
+  --login-card-accent: #0a9f56;
 }
 
-.form-panel {
-  width: 100%;
-  max-width: 480px;
-  margin-bottom: 60px;
+.login-layout--register {
+  padding: 56px 24px 20px;
+
+  .form-card {
+    padding: 22px 28px 18px;
+  }
+
+  .form-header {
+    margin-bottom: 18px;
+  }
+
+  .form-brand {
+    margin-bottom: 12px;
+  }
+
+  .feature-pills {
+    margin-top: 12px;
+  }
+
+  .form-title {
+    font-size: 26px;
+    margin-bottom: 6px;
+  }
+
+  .form-content :deep(.t-form-item) {
+    margin-bottom: 14px;
+  }
+
+  .form-content :deep(.t-input) {
+    min-height: 44px;
+  }
+
+  .form-footer {
+    margin-top: 12px;
+  }
+}
+
+.login-shell {
   position: relative;
   z-index: 2;
+  width: 100%;
+  max-width: 408px;
+}
+
+.login-panel {
+  position: relative;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(255, 220, 170, 0.42) 0%, transparent 55%),
+    radial-gradient(100% 70% at 100% 100%, rgba(7, 192, 95, 0.07) 0%, transparent 50%),
+    linear-gradient(165deg, #f9f2e8 0%, var(--login-card-bg) 48%, var(--login-card-bg-soft) 100%);
+  border-radius: 26px;
+  border: 1px solid var(--login-card-border);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.65) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 36px 90px rgba(0, 0, 0, 0.5),
+    0 14px 32px rgba(60, 30, 10, 0.16);
+  overflow: hidden;
+}
+
+.login-panel__glow {
+  position: absolute;
+  top: -40%;
+  left: 20%;
+  width: 60%;
+  height: 45%;
+  background: radial-gradient(circle, rgba(255, 236, 200, 0.7) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-panel__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 .header-logo {
@@ -1194,7 +752,8 @@ onMounted(async () => {
   top: 32px;
   left: 50px;
   z-index: 100;
-  cursor: pointer;
+  pointer-events: none;
+  user-select: none;
 
   .logo-image {
     width: 120px;
@@ -1218,9 +777,9 @@ onMounted(async () => {
   gap: 7px;
   padding: 9px 15px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: var(--td-text-color-anti);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
   text-decoration: none;
   font-size: 13px;
   font-weight: 600;
@@ -1238,9 +797,9 @@ onMounted(async () => {
   }
 
   &:hover {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.4);
-    color: var(--td-text-color-anti);
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
   }
 }
 
@@ -1248,9 +807,9 @@ onMounted(async () => {
   position: relative;
 
   button {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    color: var(--td-text-color-anti);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.92);
 
     .lang-flag-icon {
       font-size: 16px;
@@ -1259,8 +818,8 @@ onMounted(async () => {
     }
 
     &:hover {
-      background: rgba(255, 255, 255, 0.3);
-      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.22);
     }
 
     svg:last-child {
@@ -1320,37 +879,34 @@ onMounted(async () => {
 }
 
 .form-card {
-  background: rgba(255, 255, 255, 0.97);
-  border-radius: 16px;
-  padding: 40px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border-radius: 0;
+  padding: 30px 30px 28px;
+  box-shadow: none;
   box-sizing: border-box;
   border: none;
   width: 100%;
 }
 
-/* Share-link invitation banner. Sits above the register form when the
- * user arrived via /register?token=xxx; gives them confirmation of who
- * invited them before they fill anything in. Subtle, neutral card —
- * the page background is heavily brand-coloured already, so a loud
- * tinted banner clashes; we lean on the form's own surface tokens. */
 .invite-banner {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  margin-bottom: 20px;
-  border-radius: 10px;
-  background: var(--td-bg-color-container-hover, rgba(0, 0, 0, 0.03));
-  border: 1px solid var(--td-component-stroke);
-  color: var(--td-text-color-primary);
+  margin-bottom: 18px;
+  border-radius: 12px;
+  background: rgba(255, 250, 243, 0.85);
+  border: 1px solid rgba(120, 90, 55, 0.14);
+  color: var(--login-card-text);
 }
 
 .invite-banner__icon {
   margin-top: 2px;
   font-size: 18px;
   flex-shrink: 0;
-  color: var(--td-text-color-secondary);
+  color: var(--login-card-muted);
 }
 
 .invite-banner__text {
@@ -1364,130 +920,178 @@ onMounted(async () => {
   font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
-  color: var(--td-text-color-primary);
+  color: var(--login-card-text);
 }
 
 .invite-banner__hint {
   font-size: 12px;
-  color: var(--td-text-color-secondary);
+  color: var(--login-card-muted);
   line-height: 1.5;
 }
 
 .invite-banner--error {
-  background: var(--td-error-color-1, rgba(220, 38, 38, 0.06));
-  border-color: var(--td-error-color-3, rgba(220, 38, 38, 0.2));
-  color: var(--td-error-color, #b91c1c);
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.2);
+  color: #b91c1c;
   font-size: 13px;
 }
 
 .form-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 26px;
+}
+
+.form-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  background: rgba(255, 252, 246, 0.78);
+  border: 1px solid rgba(120, 90, 55, 0.1);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 2px 8px rgba(90, 60, 20, 0.05);
+}
+
+.form-brand__mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ef4444 0%, #f59e0b 55%, #07c05f 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.25);
+}
+
+.form-brand__name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--login-card-text);
+  letter-spacing: 0.04em;
+  font-family: var(--app-font-family);
 }
 
 .form-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--td-text-color-primary);
-  margin: 0 0 6px 0;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--login-card-text);
+  margin: 0 0 8px;
   font-family: var(--app-font-family);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
 }
 
-.form-welcome {
-  font-size: 13px;
-  color: var(--td-text-color-secondary);
-  margin: 0;
-  font-family: var(--app-font-family);
-}
-
-.form-hint {
-  margin: 10px 0 0;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--td-success-color-light, rgba(7, 192, 95, 0.08));
-  color: var(--td-brand-color-active);
-  font-size: 12.5px;
-  line-height: 1.5;
-  font-family: var(--app-font-family);
-}
-
-/* 注册入口：从底部小字链接升级为带分隔线的醒目次级按钮，
-   让首次访客一眼就能找到「创建账户」。 */
-.register-cta {
-  margin-top: 8px;
-
-  &__divider {
-    position: relative;
-    text-align: center;
-    margin: 4px 0 14px;
-    color: var(--td-text-color-secondary);
-    font-size: 13px;
-    font-family: var(--app-font-family);
-
-    span {
-      position: relative;
-      z-index: 1;
-      padding: 0 12px;
-      background: rgba(255, 255, 255, 0.97);
-    }
-
-    &::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 50%;
-      border-top: 1px solid var(--td-component-stroke);
-    }
-  }
-
-  &__button {
-    height: 46px;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 500;
-    border-color: var(--td-brand-color);
-    color: var(--td-brand-color);
-
-    &:hover {
-      border-color: var(--td-brand-color-active);
-      color: var(--td-brand-color-active);
-      background: var(--td-success-color-light, rgba(7, 192, 95, 0.08));
-    }
-  }
-}
-
+.form-welcome,
 .form-subtitle {
-  font-size: 13px;
-  color: var(--td-text-color-secondary);
-  margin: 0;
+  font-size: 13.5px;
+  color: var(--login-card-muted);
+  margin: 0 auto;
+  max-width: 300px;
+  line-height: 1.6;
   font-family: var(--app-font-family);
+}
+
+.feature-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.feature-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 252, 246, 0.72);
+  border: 1px solid rgba(120, 90, 55, 0.1);
+  color: #6a5a48;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-family: var(--app-font-family);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
+}
+
+.register-cta {
+  margin-top: 4px;
+
+  &__text {
+    margin: 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--login-card-muted);
+    font-family: var(--app-font-family);
+    line-height: 1.5;
+  }
+
+  &__link {
+    margin-left: 4px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--login-card-accent);
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--app-font-family);
+    cursor: pointer;
+    text-decoration: none;
+
+    &:hover:not(:disabled) {
+      text-decoration: underline;
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
 }
 
 .form-content {
   :deep(.t-form-item__label) {
-    font-size: 14px;
-    color: var(--td-text-color-primary);
-    font-weight: 500;
-    margin-bottom: 8px;
+    font-size: 12.5px;
+    color: #5a4d3f;
+    font-weight: 650;
+    margin-bottom: 7px;
     font-family: var(--app-font-family);
     display: block;
     text-align: left;
+    letter-spacing: 0.02em;
   }
 
   :deep(.t-input) {
-    border: 1px solid var(--td-component-stroke);
-    border-radius: 8px;
-    background: var(--td-bg-color-container);
-    transition: all 0.2s;
+    border: 1px solid rgba(120, 90, 55, 0.14);
+    border-radius: 14px;
+    background: linear-gradient(180deg, #fffdf8 0%, #fffaf2 100%);
+    min-height: 50px;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.8) inset,
+      0 1px 2px rgba(90, 60, 20, 0.04);
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 
     &:focus-within {
-      border-color: var(--td-brand-color);
-      box-shadow: 0 0 0 3px rgba(7, 192, 95, 0.1);
+      border-color: rgba(7, 192, 95, 0.55);
+      background: #fffefb;
+      box-shadow:
+        0 0 0 3px rgba(7, 192, 95, 0.11),
+        0 1px 0 rgba(255, 255, 255, 0.85) inset;
     }
 
     &:hover {
-      border-color: var(--td-brand-color);
+      border-color: rgba(7, 192, 95, 0.38);
+    }
+
+    .t-input__prefix {
+      margin-right: 2px;
     }
 
     .t-input__inner {
@@ -1495,8 +1099,13 @@ onMounted(async () => {
       box-shadow: none !important;
       outline: none !important;
       background: transparent;
-      font-size: 15px;
+      font-size: 14.5px;
+      color: var(--login-card-text);
       font-family: var(--app-font-family);
+
+      &::placeholder {
+        color: #b0a090;
+      }
 
       &:focus {
         border: none !important;
@@ -1511,8 +1120,18 @@ onMounted(async () => {
     }
   }
 
+  :deep(.login-field__icon) {
+    color: #9a8874;
+    font-size: 18px;
+    transition: color 0.2s;
+  }
+
+  :deep(.t-input:focus-within .login-field__icon) {
+    color: var(--login-card-accent);
+  }
+
   :deep(.t-form-item) {
-    margin-bottom: 18px;
+    margin-bottom: 15px;
 
     &:last-child {
       margin-bottom: 0;
@@ -1525,26 +1144,35 @@ onMounted(async () => {
 }
 
 .submit-button {
-  height: 46px;
-  border-radius: 8px;
+  height: 50px;
+  border-radius: 12px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 700;
   font-family: var(--app-font-family);
-  margin: 20px 0 16px 0;
+  margin: 20px 0 14px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 28px rgba(7, 192, 95, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(7, 192, 95, 0.34);
+  }
 }
 
 .oidc-divider {
   position: relative;
-  margin: 4px 0 6px;
+  margin: 10px 0 8px;
   text-align: center;
-  color: var(--td-text-color-placeholder);
+  color: #9a8b78;
   font-size: 12px;
 
   span {
     position: relative;
     z-index: 1;
     padding: 0 12px;
-    background: rgba(255, 255, 255, 0.95);
+    background: transparent;
+    color: #9a8b78;
   }
 
   &::before {
@@ -1553,36 +1181,49 @@ onMounted(async () => {
     left: 0;
     right: 0;
     top: 50%;
-    border-top: 1px solid var(--td-component-stroke);
+    border-top: 1px solid rgba(120, 90, 55, 0.16);
   }
 }
 
 .oidc-button {
-  height: 46px;
-  border-radius: 8px;
+  height: 48px;
+  border-radius: 12px;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
+  background: rgba(255, 250, 243, 0.8) !important;
+  border-color: rgba(120, 90, 55, 0.18) !important;
+  color: var(--login-card-text) !important;
 }
 
 .form-footer {
   text-align: center;
-  font-size: 14px;
-  color: var(--td-text-color-secondary);
+  font-size: 13px;
+  color: var(--login-card-muted);
   font-family: var(--app-font-family);
   margin-top: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--td-component-stroke);
+  padding-bottom: 0;
+  border-bottom: none;
 
   .link-button {
-    color: var(--td-brand-color);
-    text-decoration: none;
     margin-left: 4px;
-    font-weight: 500;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--login-card-accent);
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--app-font-family);
+    cursor: pointer;
+    text-decoration: none;
     transition: all 0.2s;
 
-    &:hover {
-      color: var(--td-brand-color);
+    &:hover:not(:disabled) {
       text-decoration: underline;
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
   }
 }
@@ -1593,55 +1234,10 @@ onMounted(async () => {
   margin-top: 12px;
 }
 
-.login-features {
-  margin-top: 20px;
-  padding: 0;
-
-  .feature-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 12px;
-    font-size: 13px;
-    color: var(--td-text-color-secondary);
-    font-family: var(--app-font-family);
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-
-    .feature-icon {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--td-success-color-light);
-      color: var(--td-brand-color-active);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
-      margin-right: 10px;
-      flex-shrink: 0;
-    }
-
-    .feature-text {
-      line-height: 1.4;
-    }
-  }
-}
-
 /* Responsive Design */
 @media (max-width: 1024px) {
-  .knowledge-node:nth-of-type(n + 13) {
-    display: none;
-  }
-
-  .connection-line:nth-of-type(n + 13) {
-    display: none;
-  }
-
-  .showcase-subtitle {
-    font-size: 18px;
+  .login-layout--app {
+    padding: 88px 20px 40px;
   }
 
   .header-logo {
@@ -1670,26 +1266,17 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .login-layout {
-    flex-direction: column;
+  .login-layout--app {
+    padding: 80px 16px 32px;
+    justify-content: flex-start;
   }
 
-  .knowledge-node:nth-of-type(n + 9) {
-    display: none;
-  }
-
-  .connection-line:nth-of-type(n + 9) {
-    display: none;
-  }
-
-  .showcase-section {
-    flex: 0 0 auto;
-    min-height: 50vh;
-    padding: 40px 24px;
-  }
-
-  .showcase-content {
+  .login-shell {
     max-width: 100%;
+  }
+
+  .login-panel {
+    border-radius: 16px;
   }
 
   .header-logo {
@@ -1701,41 +1288,23 @@ onMounted(async () => {
     }
   }
 
-  .showcase-subtitle {
-    font-size: 16px;
-    margin-bottom: 24px;
-  }
-
-  .feature-tags {
-    margin-bottom: 24px;
-  }
-
-  .carousel-container {
-    margin-top: 24px;
-  }
-
-  .form-section {
-    flex: 0 0 auto;
-    padding: 24px;
-  }
-
   .header-links {
     top: 18px;
     right: 18px;
     gap: 8px;
 
     .link-text {
-      display: inline;
+      display: none;
     }
 
     .header-link {
-      padding: 8px 12px;
+      padding: 8px 10px;
       font-size: 12px;
     }
   }
 
   .form-card {
-    padding: 32px 24px;
+    padding: 24px 20px 28px;
   }
 
   .form-title {
@@ -1744,12 +1313,8 @@ onMounted(async () => {
 }
 
 @media (max-width: 480px) {
-  .animated-bg {
-    display: none;
-  }
-
-  .showcase-section {
-    padding: 32px 20px;
+  .login-layout--app {
+    padding: 72px 12px 24px;
   }
 
   .header-logo {
@@ -1759,19 +1324,6 @@ onMounted(async () => {
     .logo-image {
       width: 70px;
     }
-  }
-
-  .showcase-subtitle {
-    font-size: 14px;
-  }
-
-  .tag {
-    font-size: 12px;
-    padding: 6px 16px;
-  }
-
-  .form-section {
-    padding: 20px;
   }
 
   .header-links {
@@ -1787,104 +1339,128 @@ onMounted(async () => {
   }
 
   .form-card {
-    padding: 28px 20px;
+    padding: 20px 16px 24px;
   }
 
   .form-header {
     margin-bottom: 24px;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-
-  .knowledge-node,
-  .connection-line {
-    animation: none !important;
-    transition: none !important;
-  }
-
-  .animated-bg {
-    display: none;
-  }
-}
 </style>
 
 <style lang="less">
 html[theme-mode="dark"] {
-  .login-layout {
-    background: linear-gradient(225deg, #011a14 0%, #032e22 15%, #043a2c 25%, #05503d 38%, #046647 50%, #038a56 65%, #049b60 78%, #06a06a 90%, #07b074 100%);
+  .login-layout--app {
+    background: #050505;
   }
 
-  .knowledge-node {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
-  }
-
-  .connection-line {
-    stroke: rgba(255, 255, 255, 0.25);
-  }
-
-  .header-logo .logo-image {
-    filter: none;
-  }
-
-  .header-link {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.15);
+  .login-layout--app .header-link {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.92);
 
     &:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.22);
     }
   }
 
-  .language-switch button {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.15);
+  .login-layout--app .language-switch button {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.92);
 
     &:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.22);
     }
   }
 
-  .language-dropdown {
-    background: rgba(36, 36, 36, 0.97) !important;
+  .login-layout--app .language-dropdown {
+    background: rgba(255, 255, 255, 0.97) !important;
     border-color: var(--td-component-stroke) !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
   }
 
-  .tag {
-    background: rgba(255, 255, 255, 0.12);
+  .login-layout--app .login-panel {
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(255, 220, 170, 0.45) 0%, transparent 55%),
+      radial-gradient(100% 70% at 100% 100%, rgba(7, 192, 95, 0.08) 0%, transparent 50%),
+      linear-gradient(165deg, #f8f0e6 0%, #f3ebe0 48%, #ebe1d3 100%) !important;
+    border: 1px solid rgba(120, 90, 55, 0.16) !important;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.55) inset,
+      0 30px 80px rgba(0, 0, 0, 0.48),
+      0 12px 28px rgba(60, 30, 10, 0.18) !important;
   }
 
-  .form-card {
-    background: rgba(36, 36, 36, 0.97) !important;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4) !important;
+  .login-layout--app .form-card {
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
-  .register-cta__divider span {
-    background: rgba(36, 36, 36, 0.97);
+  .login-layout--app .form-brand__name,
+  .login-layout--app .form-title,
+  .login-layout--app .form-content .t-form-item__label,
+  .login-layout--app .invite-banner__title {
+    color: #241c14 !important;
   }
 
-  .form-content .t-input {
-    background: var(--td-bg-color-page) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
+  .login-layout--app .form-welcome,
+  .login-layout--app .form-subtitle,
+  .login-layout--app .register-cta__text,
+  .login-layout--app .form-footer,
+  .login-layout--app .invite-banner__hint {
+    color: #6d5f4f !important;
+  }
+
+  .login-layout--app .feature-pill {
+    background: rgba(255, 250, 243, 0.8) !important;
+    border-color: rgba(120, 90, 55, 0.12) !important;
+    color: #5d4f40 !important;
+  }
+
+  .login-layout--app .form-content .t-input {
+    background: #fffaf3 !important;
+    border-color: rgba(120, 90, 55, 0.16) !important;
 
     &:hover {
-      border-color: var(--td-brand-color) !important;
+      border-color: rgba(7, 192, 95, 0.45) !important;
     }
 
     &:focus-within {
-      border-color: var(--td-brand-color) !important;
+      border-color: rgba(7, 192, 95, 0.65) !important;
+      background: #fffdf9 !important;
+      box-shadow: 0 0 0 3px rgba(7, 192, 95, 0.12) !important;
+    }
+
+    .t-input__inner {
+      color: #241c14 !important;
     }
   }
 
-  .screenshot-swiper .swiper-pagination-bullet-active {
-    background: rgba(255, 255, 255, 0.9) !important;
+  .login-layout--app .register-cta__link,
+  .login-layout--app .form-footer .link-button {
+    color: #0a9f56 !important;
   }
 
-  .login-features .feature-icon {
-    background: rgba(6, 176, 77, 0.15);
+  .login-layout--app .oidc-divider {
+    color: #9a8b78 !important;
+
+    span {
+      background: transparent !important;
+      color: #9a8b78 !important;
+    }
+  }
+
+  .login-layout--app .form-footer {
+    border-bottom: none !important;
+  }
+
+  .login-layout--app .invite-banner {
+    background: rgba(255, 250, 243, 0.85) !important;
+    border-color: rgba(120, 90, 55, 0.14) !important;
+    color: #241c14 !important;
   }
 }
 </style>

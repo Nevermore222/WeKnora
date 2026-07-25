@@ -74,3 +74,19 @@ func TestConfigureDesktopWebDirUsesExecutableDirectory(t *testing.T) {
 		t.Fatalf("expected executable web directory %q, got %q", webDir, got)
 	}
 }
+
+func TestDefaultEnterpriseServerURLFallsBackToLocalhost(t *testing.T) {
+	originalServerURL, hadServerURL := os.LookupEnv("XELORA_PERSONAL_SERVER_URL")
+	_ = os.Unsetenv("XELORA_PERSONAL_SERVER_URL")
+	t.Cleanup(func() {
+		if hadServerURL {
+			_ = os.Setenv("XELORA_PERSONAL_SERVER_URL", originalServerURL)
+		} else {
+			_ = os.Unsetenv("XELORA_PERSONAL_SERVER_URL")
+		}
+	})
+
+	if got := defaultEnterpriseServerURL(); got != "http://localhost:8080" {
+		t.Fatalf("expected localhost fallback URL, got %q", got)
+	}
+}
