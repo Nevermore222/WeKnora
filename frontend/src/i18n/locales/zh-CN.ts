@@ -5888,7 +5888,7 @@ export default {
     addSuccess: "服务器已添加",
     addFailed: "添加失败",
     connectSuccess: "已连接到企业服务器",
-    connectFailed: "连接失败，请检查地址和 Token",
+    connectFailed: "连接失败，请检查企业服务器地址是否可达",
     testReachable: "服务器可达",
     testUnreachable: "服务器不可达",
     testFailed: "测试失败",

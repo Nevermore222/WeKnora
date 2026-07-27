@@ -5874,7 +5874,7 @@ export default {
     addSuccess: 'Server added',
     addFailed: 'Failed to add server',
     connectSuccess: 'Connected to enterprise server',
-    connectFailed: 'Connection failed. Check the URL and token.',
+    connectFailed: 'Connection failed. Check whether the enterprise server URL is reachable.',
     testReachable: 'Server is reachable',
     testUnreachable: 'Server is unreachable',
     testFailed: 'Test failed',
