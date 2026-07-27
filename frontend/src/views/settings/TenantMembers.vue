@@ -53,8 +53,9 @@
       <p class="section-description">
         {{ $t('tenantMember.sectionDescription') }}
         <a
+          v-if="shouldShowExternalLink(rbacGuideUrl)"
           class="doc-link"
-          href="https://github.com/Tencent/Xelora/blob/main/docs/RBAC%E8%AF%B4%E6%98%8E.md"
+          :href="rbacGuideUrl"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -515,6 +516,9 @@ import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
+
+const rbacGuideUrl = 'https://github.com/Tencent/Xelora/blob/main/docs/RBAC%E8%AF%B4%E6%98%8E.md'
 import {
   listMembers,
   updateMemberRole,

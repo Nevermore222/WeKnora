@@ -180,7 +180,9 @@
               <t-icon name="check-circle-filled" class="hint-icon hint-icon--ok" />
               <div>
                 {{ $t('settings.xeloraCloud.modelHintConfigured') }}
-                <a href="https://developers.weixin.qq.com/doc/aispeech/knowledge/atomic_capability/atomic_interface.html"
+                <a
+                  v-if="shouldShowExternalLink(xeloraCloudDocsUrl)"
+                  :href="xeloraCloudDocsUrl"
                   target="_blank" rel="noopener noreferrer" class="doc-link">
                   {{ $t('settings.xeloraCloud.modelHintDocsLink') }}
                   <t-icon name="link" class="link-icon" />
@@ -400,6 +402,9 @@ import {
   type ThinkingControlValue,
 } from '@/utils/thinkingControl'
 import SettingDrawer from '@/components/settings/SettingDrawer.vue'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
+
+const xeloraCloudDocsUrl = 'https://developers.weixin.qq.com/doc/aispeech/knowledge/atomic_capability/atomic_interface.html'
 import CredentialResource, {
   type CredentialFieldDef,
   type CredentialResourceApi,

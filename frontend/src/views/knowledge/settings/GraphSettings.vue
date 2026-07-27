@@ -11,7 +11,11 @@
       >
         <template #message>
           <div>{{ t('graphSettings.disabledWarning') }}</div>
-          <t-link class="graph-guide-link" theme="primary" @click="handleOpenGraphGuide">
+          <t-link
+            v-if="shouldShowExternalLink(graphGuideUrl)"
+            class="graph-guide-link"
+            theme="primary"
+            @click="handleOpenGraphGuide">
             {{ t('graphSettings.howToEnable') }}
           </t-link>
         </template>
@@ -310,6 +314,7 @@ import { useI18n } from 'vue-i18n'
 import { extractTextRelations, fabriText, fabriTag, type Node, type Relation } from '@/api/initialization'
 import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useAuthStore } from '@/stores/auth'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -573,6 +578,7 @@ const graphGuideUrl =
 
 // Open guide documentation to show how to enable graph database
 const handleOpenGraphGuide = () => {
+  if (!shouldShowExternalLink(graphGuideUrl)) return
   window.open(graphGuideUrl, '_blank', 'noopener')
 }
 

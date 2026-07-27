@@ -11,8 +11,7 @@ const docTemplate = `{
         "title": "{{.Title}}",
         "termsOfService": "http://swagger.io/terms/",
         "contact": {
-            "name": "Xelora Github",
-            "url": "https://github.com/Tencent/Xelora"
+            "name": "Xelora Support"
         },
         "version": "{{.Version}}"
     },

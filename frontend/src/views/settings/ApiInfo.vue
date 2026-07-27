@@ -178,7 +178,7 @@
           <label>{{ $t('tenant.api.docLabel') }}</label>
           <p class="desc">
             {{ $t('tenant.api.docDescription') }}
-            <a @click="openApiDoc" class="doc-link">
+            <a v-if="shouldShowExternalLink(apiDocUrl)" @click="openApiDoc" class="doc-link">
               {{ $t('tenant.api.openDoc') }}
               <t-icon name="link" class="link-icon" />
             </a>
@@ -201,6 +201,9 @@ import { getApiBaseUrl } from '@/utils/api-base'
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
+
+const apiDocUrl = 'https://github.com/Tencent/Xelora/blob/main/docs/api/README.md'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -444,7 +447,8 @@ const loadInfo = async () => {
 }
 
 const openApiDoc = () => {
-  window.open('https://github.com/Tencent/Xelora/blob/main/docs/api/README.md', '_blank')
+  if (!shouldShowExternalLink(apiDocUrl)) return
+  window.open(apiDocUrl, '_blank')
 }
 
 const fallbackCopyText = (text: string) => {

@@ -185,7 +185,10 @@
         <!-- WeCom credentials -->
         <template v-if="formData.platform === 'wecom'">
           <div class="platform-link-hint">
-            <a href="https://work.weixin.qq.com/" target="_blank" rel="noopener noreferrer" class="doc-link">
+            <a
+              v-if="shouldShowExternalLink(wecomConsoleUrl)"
+              :href="wecomConsoleUrl"
+              target="_blank" rel="noopener noreferrer" class="doc-link">
               {{ $t('agentEditor.im.wecomConsole') }}
               <t-icon name="link" class="link-icon" />
             </a>
@@ -436,6 +439,9 @@ import { useChatResourcesStore } from '@/stores/chatResources';
 import type { IMChannel } from '@/api/agent';
 import { useAuthStore } from '@/stores/auth';
 import SettingDrawer from '@/components/settings/SettingDrawer.vue';
+import { shouldShowExternalLink } from '@/utils/externalLinks';
+
+const wecomConsoleUrl = 'https://work.weixin.qq.com/';
 
 const { t } = useI18n();
 const authStore = useAuthStore();

@@ -143,7 +143,11 @@
       >
         <template #message>
           <div>{{ $t('settings.memoryRequiresNeo4j') }}</div>
-          <t-link theme="primary" href="https://github.com/Tencent/Xelora/blob/main/docs/KnowledgeGraph.md" target="_blank">
+          <t-link
+            v-if="shouldShowExternalLink(knowledgeGraphGuideUrl)"
+            theme="primary"
+            :href="knowledgeGraphGuideUrl"
+            target="_blank">
             {{ $t('settings.memoryHowToEnable') }}
           </t-link>
         </template>
@@ -171,6 +175,9 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
+
+const knowledgeGraphGuideUrl = 'https://github.com/Tencent/Xelora/blob/main/docs/KnowledgeGraph.md'
 import { getSystemInfo } from '@/api/system'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import {

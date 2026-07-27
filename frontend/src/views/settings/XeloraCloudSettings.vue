@@ -5,8 +5,9 @@
       <p class="section-description">
         {{ $t('settings.xeloraCloud.description') }}
         <a
+          v-if="shouldShowExternalLink(xeloraCloudDocsUrl)"
           class="doc-link"
-          href="https://developers.weixin.qq.com/doc/aispeech/knowledge/atomic_capability/atomic_interface.html"
+          :href="xeloraCloudDocsUrl"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -218,6 +219,9 @@ import {
   existingWkcKinds,
   type WkcModelKind,
 } from '@/utils/xeloraCloudModels'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
+
+const xeloraCloudDocsUrl = 'https://developers.weixin.qq.com/doc/aispeech/knowledge/atomic_capability/atomic_interface.html'
 
 const { t } = useI18n()
 

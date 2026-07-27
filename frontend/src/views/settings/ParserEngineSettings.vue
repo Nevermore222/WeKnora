@@ -385,6 +385,7 @@ import {
   type ParserEngineConfig,
 } from '@/api/system'
 import { getXeloraCloudStatus } from '@/api/model'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
 
 const { t } = useI18n()
 const uiStore = useUIStore()
@@ -488,7 +489,8 @@ function hasConfigFields(engineName: string): boolean {
 }
 
 function engineDocLink(name: string): string | undefined {
-  return ENGINE_DOC_LINKS[name]
+  const url = ENGINE_DOC_LINKS[name]
+  return url && shouldShowExternalLink(url) ? url : undefined
 }
 
 function engineDocLabel(_name: string): string {

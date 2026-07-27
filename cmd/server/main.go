@@ -6,8 +6,7 @@
 // @description     Xelora 知识库管理系统 API 文档
 // @termsOfService  http://swagger.io/terms/
 //
-// @contact.name   Xelora Github
-// @contact.url    https://github.com/Tencent/Xelora
+// @contact.name   Xelora Support
 //
 // @BasePath  /api/v1
 //

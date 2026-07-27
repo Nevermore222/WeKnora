@@ -7,7 +7,11 @@
       <div class="builtin-models-hint" role="note">
         <p class="builtin-hint-label">{{ $t('modelSettings.builtinModels.title') }}</p>
         <p class="builtin-hint-text">{{ $t('modelSettings.builtinModels.description') }}</p>
-        <a class="doc-link" href="https://github.com/Tencent/Xelora/blob/main/docs/BUILTIN_MODELS.md" target="_blank"
+        <a
+          v-if="shouldShowExternalLink(builtinModelsGuideUrl)"
+          class="doc-link"
+          :href="builtinModelsGuideUrl"
+          target="_blank"
           rel="noopener noreferrer">
           {{ $t('modelSettings.builtinModels.viewGuide') }}
           <t-icon name="link" class="link-icon" />
@@ -126,6 +130,9 @@ import { useI18n } from 'vue-i18n'
 import ModelEditorDialog from '@/components/ModelEditorDialog.vue'
 import { listModels, createModel, updateModel as updateModelAPI, deleteModel as deleteModelAPI, type ModelConfig } from '@/api/model'
 import { useAuthStore } from '@/stores/auth'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
+
+const builtinModelsGuideUrl = 'https://github.com/Tencent/Xelora/blob/main/docs/BUILTIN_MODELS.md'
 
 const { t, te } = useI18n()
 const authStore = useAuthStore()

@@ -140,6 +140,7 @@
             <pre class="migration-error-detail">{{ systemInfo.db_migration_error }}</pre>
             <div class="migration-error-actions">
               <t-link
+                v-if="shouldShowExternalLink(troubleshootingDocsURL)"
                 theme="primary"
                 :href="troubleshootingDocsURL"
                 target="_blank"
@@ -147,6 +148,7 @@
               >{{ $t('system.dbMigrationViewDocs') }}</t-link>
               <span class="migration-error-actions-sep">·</span>
               <t-link
+                v-if="shouldShowExternalLink(reportIssueURL)"
                 theme="primary"
                 :href="reportIssueURL"
                 target="_blank"
@@ -198,6 +200,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getSystemInfo, type SystemInfo } from '@/api/system'
 import { useI18n } from 'vue-i18n'
+import { shouldShowExternalLink } from '@/utils/externalLinks'
 
 const { t, locale } = useI18n()
 

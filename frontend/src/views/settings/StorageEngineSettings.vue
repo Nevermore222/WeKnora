@@ -534,6 +534,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { providerLogo } from './providerLogos'
 import SettingDrawer from '@/components/settings/SettingDrawer.vue'
+import { filterExternalLinks } from '@/utils/externalLinks'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -708,7 +709,7 @@ const engineLinks = computed((): Array<{ label: string; url: string }> => {
   const result: Array<{ label: string; url: string }> = []
   if (links.console) result.push({ label: t('settings.storage.console'), url: links.console })
   if (links.docs) result.push({ label: t('settings.storage.docs'), url: links.docs })
-  return result
+  return filterExternalLinks(result)
 })
 
 // 是否在 footer 显示"测试连接"按钮 — 本地直接读写文件系统，无连接概念，
