@@ -21,6 +21,39 @@ export interface ClientUserRow {
   can_bind_model?: boolean
 }
 
+export type AdminUserFilter = 'all' | 'client' | 'non_client' | 'system_admin'
+
+export interface AdminUserRow {
+  id: string
+  username: string
+  email: string
+  is_system_admin?: boolean
+  is_client_provisioned?: boolean
+  can_create_knowledge_base?: boolean
+  can_create_agent?: boolean
+  can_bind_model?: boolean
+  home_tenant_id?: number
+  home_tenant_name?: string
+}
+
+export async function listAdminUsers(params?: {
+  q?: string
+  filter?: AdminUserFilter
+  offset?: number
+  limit?: number
+}): Promise<{ users: AdminUserRow[]; total: number }> {
+  const qs = new URLSearchParams()
+  if (params?.q) qs.set('q', params.q)
+  if (params?.filter) qs.set('filter', params.filter)
+  if (params?.offset != null) qs.set('offset', String(params.offset))
+  if (params?.limit != null) qs.set('limit', String(params.limit))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  return (await get(`/api/v1/system/admin/users${suffix}`)) as unknown as {
+    users: AdminUserRow[]
+    total: number
+  }
+}
+
 export async function getClientCapabilityDefaults(): Promise<ClientCapabilityDefaultsResponse> {
   return (await get(
     '/api/v1/system/admin/client-capabilities/defaults',
