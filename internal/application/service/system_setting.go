@@ -134,6 +134,23 @@ var registry = map[string]settingSpec{
 		Description: "自助注册模式。self_serve = 任何人可注册账号；invite_only = 关闭公网注册，" +
 			"仅 Owner/Admin 可邀请。修改后立即生效，但谨慎对待 self_serve（公网会接受 spam）。",
 	},
+	"auth.client_user_capability_defaults": {
+		Type:    "string",
+		EnvName: "",
+		Default: `{"can_create_knowledge_base":false,"can_create_agent":false,"can_bind_model":false}`,
+		Category: "auth",
+		Description: "Personal 客户端新用户的默认能力（JSON）。" +
+			"字段：can_create_knowledge_base / can_create_agent / can_bind_model。",
+	},
+	"auth.tighten_existing_client_users": {
+		Type:     "string",
+		EnvName:  "",
+		Default:  "false",
+		Enum:     []string{"true", "false"},
+		Category: "auth",
+		Description: "为 true 时，对未显式覆盖能力的客户端用户套用当前默认值（通常全关）。" +
+			"需通过系统管理「收紧存量」操作触发，不会在读设置时自动改写用户。",
+	},
 	// tenant.max_owned_per_user caps how many tenants a single non-superuser
 	// can create (and Own) via self-service POST /tenants. Read on every
 	// request — UI edits take effect immediately, no restart required. The

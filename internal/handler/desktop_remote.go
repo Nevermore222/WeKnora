@@ -140,7 +140,8 @@ func (h *DesktopRemoteHandler) AuthConfig(c *gin.Context) {
 }
 
 func (h *DesktopRemoteHandler) Register(c *gin.Context) {
-	h.forwardAnonymousAuth(c, http.MethodPost, "/api/v1/auth/register")
+	h.forwardAnonymousAuth(c, http.MethodPost, "/api/v1/auth/register",
+		map[string]string{"X-Xelora-Client": "personal"})
 }
 
 func (h *DesktopRemoteHandler) Logout(c *gin.Context) {
@@ -175,7 +176,7 @@ func (h *DesktopRemoteHandler) ProxyAPI(c *gin.Context) {
 	h.gateway.ServeHTTP(c.Writer, c.Request)
 }
 
-func (h *DesktopRemoteHandler) forwardAnonymousAuth(c *gin.Context, method, remotePath string) {
+func (h *DesktopRemoteHandler) forwardAnonymousAuth(c *gin.Context, method, remotePath string, extraHeaders ...map[string]string) {
 	profile, err := h.profiles.Get(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "server_profile_not_found"})
@@ -198,6 +199,11 @@ func (h *DesktopRemoteHandler) forwardAnonymousAuth(c *gin.Context, method, remo
 	}
 	if language := c.GetHeader("Accept-Language"); language != "" {
 		req.Header.Set("Accept-Language", language)
+	}
+	for _, hdrs := range extraHeaders {
+		for k, v := range hdrs {
+			req.Header.Set(k, v)
+		}
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

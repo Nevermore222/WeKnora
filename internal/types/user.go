@@ -192,6 +192,10 @@ type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=2,max=50"`
 	Email    string `json:"email"    binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
+	// ClientProvisioned marks Personal desktop client onboarding. When true,
+	// the new user gets is_client_provisioned + capability defaults (deny create/bind).
+	// Set by the desktop remote proxy header / personal edition handler — not a public trust boundary alone.
+	ClientProvisioned bool `json:"client_provisioned,omitempty"`
 }
 
 // LoginResponse represents a login response

@@ -61,6 +61,7 @@ type userService struct {
 	tokenRepo     interfaces.AuthTokenRepository
 	tenantService interfaces.TenantService
 	memberService interfaces.TenantMemberService
+	settings      interfaces.SystemSettingService
 	config        *config.Config
 }
 
@@ -71,14 +72,51 @@ func NewUserService(
 	tokenRepo interfaces.AuthTokenRepository,
 	tenantService interfaces.TenantService,
 	memberService interfaces.TenantMemberService,
+	settings interfaces.SystemSettingService,
 ) interfaces.UserService {
 	return &userService{
 		userRepo:      userRepo,
 		tokenRepo:     tokenRepo,
 		tenantService: tenantService,
 		memberService: memberService,
+		settings:      settings,
 		config:        configInfo,
 	}
+}
+
+const defaultClientCapabilityDefaultsJSON = `{"can_create_knowledge_base":false,"can_create_agent":false,"can_bind_model":false}`
+
+type clientCapabilityDefaults struct {
+	CanCreateKnowledgeBase bool `json:"can_create_knowledge_base"`
+	CanCreateAgent         bool `json:"can_create_agent"`
+	CanBindModel           bool `json:"can_bind_model"`
+}
+
+func (s *userService) loadClientCapabilityDefaults(ctx context.Context) clientCapabilityDefaults {
+	defs := clientCapabilityDefaults{}
+	raw := defaultClientCapabilityDefaultsJSON
+	if s.settings != nil {
+		raw = s.settings.GetString(ctx, "auth.client_user_capability_defaults", "", defaultClientCapabilityDefaultsJSON)
+	}
+	if err := json.Unmarshal([]byte(raw), &defs); err != nil {
+		logger.Warnf(ctx, "invalid auth.client_user_capability_defaults, using deny-all: %v", err)
+		return clientCapabilityDefaults{}
+	}
+	return defs
+}
+
+// applyClientCapabilityDefaults marks the user as client-provisioned and
+// copies system defaults into the three capability flags.
+func (s *userService) applyClientCapabilityDefaults(ctx context.Context, user *types.User) {
+	if user == nil {
+		return
+	}
+	defs := s.loadClientCapabilityDefaults(ctx)
+	user.IsClientProvisioned = true
+	user.CanCreateKnowledgeBase = defs.CanCreateKnowledgeBase
+	user.CanCreateAgent = defs.CanCreateAgent
+	user.CanBindModel = defs.CanBindModel
+	user.CapabilitiesOverriddenAt = nil
 }
 
 // Register creates a new user account
@@ -132,6 +170,9 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
+	}
+	if req.ClientProvisioned {
+		s.applyClientCapabilityDefaults(ctx, user)
 	}
 
 	err = s.userRepo.CreateUser(ctx, user)
@@ -231,6 +272,7 @@ func (s *userService) ProvisionClientUser(
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
 		}
+		s.applyClientCapabilityDefaults(ctx, user)
 		if cerr := s.userRepo.CreateUser(ctx, user); cerr != nil {
 			logger.Errorf(ctx, "ProvisionClientUser: create user failed: %v", cerr)
 			return nil, errors.New("failed to create provisioned user")

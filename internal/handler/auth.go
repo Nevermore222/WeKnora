@@ -146,6 +146,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 	req.Username = secutils.SanitizeForLog(req.Username)
 	req.Email = secutils.SanitizeForLog(req.Email)
+	// Personal edition servers and desktop remote proxy mark client onboarding.
+	if Edition == "personal" || strings.EqualFold(c.GetHeader("X-Xelora-Client"), "personal") {
+		req.ClientProvisioned = true
+	}
 	// Call service to register user
 	user, err := h.userService.Register(ctx, &req)
 	if err != nil {
