@@ -720,6 +720,8 @@
       </div>
     </div>
 
+    <CapabilityDeniedDialog v-model:visible="capabilityDeniedVisible" />
+
     <!-- 删除确认对话框 -->
     <t-dialog v-model:visible="deleteVisible" dialogClassName="del-agent-dialog" :closeBtn="false" :cancelBtn="null"
       :confirmBtn="null">
@@ -839,6 +841,7 @@ import AgentAvatar from '@/components/AgentAvatar.vue'
 import ListSpaceSidebar from '@/components/ListSpaceSidebar.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 import { useAuthStore } from '@/stores/auth'
+import CapabilityDeniedDialog from '@/components/CapabilityDeniedDialog.vue'
 import { useListUrlState } from '@/composables/useListUrlState'
 import { useResourcePins } from '@/composables/useResourcePins'
 
@@ -1527,8 +1530,14 @@ const openCreateModal = () => {
   editorVisible.value = true
 }
 
+const capabilityDeniedVisible = ref(false)
+
 // 创建智能体
 const handleCreateAgent = () => {
+  if (!authStore.hasCapability('can_create_agent')) {
+    capabilityDeniedVisible.value = true
+    return
+  }
   if (!isReadyForAgent.value) {
     MessagePlugin.warning(t('contextualGuide.tenantModels.needChatModelFirst'))
     uiStore.openSettings('models')

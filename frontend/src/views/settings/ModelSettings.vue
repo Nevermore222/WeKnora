@@ -119,6 +119,8 @@
     <ModelEditorDialog v-model:visible="showDialog" :model-type="currentModelType" :model-data="editingModel"
       @confirm="handleModelSave" />
 
+    <CapabilityDeniedDialog v-model:visible="capabilityDeniedVisible" />
+
   </div>
 </template>
 
@@ -130,6 +132,7 @@ import { useI18n } from 'vue-i18n'
 import ModelEditorDialog from '@/components/ModelEditorDialog.vue'
 import { listModels, createModel, updateModel as updateModelAPI, deleteModel as deleteModelAPI, type ModelConfig } from '@/api/model'
 import { useAuthStore } from '@/stores/auth'
+import CapabilityDeniedDialog from '@/components/CapabilityDeniedDialog.vue'
 import { shouldShowExternalLink } from '@/utils/externalLinks'
 
 const builtinModelsGuideUrl = 'https://github.com/Tencent/Xelora/blob/main/docs/BUILTIN_MODELS.md'
@@ -290,8 +293,14 @@ const loadModels = async () => {
   }
 }
 
+const capabilityDeniedVisible = ref(false)
+
 // 打开添加对话框；类型在抽屉内选择，此处仅按当前 Tab 预填默认值
 const openAddDialog = () => {
+  if (!authStore.hasCapability('can_bind_model')) {
+    capabilityDeniedVisible.value = true
+    return
+  }
   currentModelType.value = activeTypeFilter.value === 'all' ? 'chat' : activeTypeFilter.value
   editingModel.value = null
   showDialog.value = true

@@ -1,4 +1,14 @@
 export default {
+  capabilityDenied: {
+    title: "无权限",
+    message: "当前账号无此权限，请联系管理员",
+    ok: "知道了",
+  },
+  capability: {
+    canCreateKnowledgeBase: "创建知识库",
+    canCreateAgent: "创建智能体",
+    canBindModel: "绑定模型",
+  },
   menu: {
     knowledgeBase: "知识库",
     agents: "智能体",
@@ -2412,6 +2422,23 @@ export default {
         tier1: "在此页面保存过的项（带「已覆盖」徽章）— 始终以这里的值为准，环境变量会被忽略。",
         tier2: "未在此处保存过的项 — 如果环境变量里有就用环境变量，否则用程序内置默认值。",
         tier3: "若想让某项重新由环境变量控制，点击该行的「重置」按钮即可清除当前 UI 设置。",
+      },
+      clientCapabilities: {
+        title: "客户端用户权限",
+        description: "配置 Personal 客户端注册用户的默认能力，以及逐用户开关。客户端用户不可自提权；租户管理员也不可改其能力。",
+        defaultsLabel: "新客户端用户默认权限",
+        defaultsDesc: "仅影响此后新注册 / 开通的客户端用户。",
+        tightenLabel: "收紧存量客户端用户",
+        tightenDesc: "开启后可一键将尚未被管理员单独覆盖的客户端用户收紧为当前默认值。",
+        tightenConfirm: "将按当前默认值收紧未被覆盖的客户端用户，已单独配置的用户不受影响。确认执行？",
+        tightenRun: "立即收紧",
+        tightenDone: "已更新 {n} 位客户端用户",
+        usersLabel: "客户端用户列表",
+        usersDesc: "共 {n} 位；切换开关立即生效。",
+        colUser: "用户",
+        saved: "已保存",
+        saveFailed: "保存失败",
+        loadFailed: "加载失败",
       },
       keyLabels: {
         auth: {
@@ -5689,8 +5716,13 @@ export default {
       username: "姓名",
       email: "邮箱",
       role: "角色",
+      capabilities: "能力",
       joinedAt: "加入时间",
       operations: "操作",
+    },
+    capabilities: {
+      clientReadonlyTip: "由系统管理员配置",
+      updateFailed: "更新能力失败",
     },
     role: {
       owner: "所有者",

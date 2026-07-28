@@ -667,6 +667,8 @@
       </div>
     </div>
 
+    <CapabilityDeniedDialog v-model:visible="capabilityDeniedVisible" />
+
     <!-- 删除确认对话框 -->
     <t-dialog v-model:visible="deleteVisible" dialogClassName="del-knowledge-dialog" :closeBtn="false" :cancelBtn="null"
       :confirmBtn="null">
@@ -776,6 +778,7 @@ import { useChatResourcesStore } from '@/stores/chatResources'
 import { formatStringDate } from '@/utils/index'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import CapabilityDeniedDialog from '@/components/CapabilityDeniedDialog.vue'
 import { useOrganizationStore } from '@/stores/organization'
 import { listOrganizationSharedKnowledgeBases, type SharedKnowledgeBase, type OrganizationSharedKnowledgeBaseItem, type SourceFromAgentInfo } from '@/api/organization'
 import { mergeAllScopeKnowledgeBases, type OwnedKnowledgeBase, type SharedKnowledgeBaseLike } from './kbListMerge'
@@ -1632,8 +1635,14 @@ const goSettings = (id: string) => {
   uiStore.openKBSettings(id)
 }
 
+const capabilityDeniedVisible = ref(false)
+
 // 创建知识库
 const handleCreateKnowledgeBase = () => {
+  if (!authStore.hasCapability('can_create_knowledge_base')) {
+    capabilityDeniedVisible.value = true
+    return
+  }
   markContextualGuideDone('kbList')
   // 无模型时仍打开创建向导，并定位到模型配置页；用户可在向导内添加模型，无需先跳转系统设置
   const initialSection =

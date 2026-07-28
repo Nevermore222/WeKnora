@@ -1,4 +1,14 @@
 export default {
+  capabilityDenied: {
+    title: 'Permission denied',
+    message: 'Your account does not have this permission. Please contact an administrator.',
+    ok: 'OK',
+  },
+  capability: {
+    canCreateKnowledgeBase: 'Create knowledge base',
+    canCreateAgent: 'Create agent',
+    canBindModel: 'Bind model',
+  },
   menu: {
     knowledgeBase: 'Knowledge Base',
     agents: 'Agents',
@@ -3402,6 +3412,26 @@ export default {
         tier2: 'Items not saved here fall back to the environment variable, or to the built-in default if no env var is set.',
         tier3: 'To put an item back under environment-variable control, click the "Reset" button on its row.',
       },
+      clientCapabilities: {
+        title: 'Client user capabilities',
+        description:
+          'Defaults for Personal client-provisioned users, plus per-user toggles. Client users cannot self-elevate; tenant admins cannot change their capabilities.',
+        defaultsLabel: 'Defaults for new client users',
+        defaultsDesc: 'Applies only to users registered or provisioned after this change.',
+        tightenLabel: 'Tighten existing client users',
+        tightenDesc:
+          'When enabled, you can apply current defaults to client users that have not been individually overridden.',
+        tightenConfirm:
+          'Apply current defaults to non-overridden client users? Individually configured users are left unchanged.',
+        tightenRun: 'Tighten now',
+        tightenDone: 'Updated {n} client user(s)',
+        usersLabel: 'Client users',
+        usersDesc: '{n} total; toggles save immediately.',
+        colUser: 'User',
+        saved: 'Saved',
+        saveFailed: 'Save failed',
+        loadFailed: 'Failed to load',
+      },
       keyLabels: {
         auth: {
           registration_mode: 'Self-service registration mode',
@@ -5674,8 +5704,13 @@ export default {
       username: 'Name',
       email: 'Email',
       role: 'Role',
+      capabilities: 'Capabilities',
       joinedAt: 'Joined',
       operations: 'Actions',
+    },
+    capabilities: {
+      clientReadonlyTip: 'Configured by a system administrator',
+      updateFailed: 'Failed to update capabilities',
     },
     role: {
       owner: 'Owner',
