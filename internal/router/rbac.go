@@ -194,6 +194,21 @@ func (g *rbacGuards) Admin() gin.HandlerFunc {
 	return middleware.RequireRole(types.TenantRoleAdmin, g.cfg)
 }
 
+// CapabilityCreateKB / CapabilityCreateAgent / CapabilityBindModel are
+// per-user dual-gate checks. Chain AFTER the matching role guard on
+// create/bind routes (Contributor+ or Admin+).
+func (g *rbacGuards) CapabilityCreateKB() gin.HandlerFunc {
+	return middleware.RequireCapability(types.CapabilityCreateKnowledgeBase)
+}
+
+func (g *rbacGuards) CapabilityCreateAgent() gin.HandlerFunc {
+	return middleware.RequireCapability(types.CapabilityCreateAgent)
+}
+
+func (g *rbacGuards) CapabilityBindModel() gin.HandlerFunc {
+	return middleware.RequireCapability(types.CapabilityBindModel)
+}
+
 func (g *rbacGuards) Owner() gin.HandlerFunc {
 	return middleware.RequireRole(types.TenantRoleOwner, g.cfg)
 }

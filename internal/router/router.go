@@ -388,7 +388,7 @@ func RegisterKnowledgeBaseRoutes(r *gin.RouterGroup, handler *handler.KnowledgeB
 	kb := r.Group("/knowledge-bases")
 	{
 		// 创建知识库 — Contributor+ (no :id, role-only floor)
-		kb.POST("", g.Contributor(), handler.CreateKnowledgeBase)
+		kb.POST("", g.Contributor(), g.CapabilityCreateKB(), handler.CreateKnowledgeBase)
 		// 获取知识库列表 — Viewer+ (no :id, role-only floor)
 		kb.GET("", g.Viewer(), handler.ListKnowledgeBases)
 		// 获取知识库详情 — Viewer+ 且对 KB 有 read 权限
@@ -410,7 +410,7 @@ func RegisterKnowledgeBaseRoutes(r *gin.RouterGroup, handler *handler.KnowledgeB
 		kb.POST("/:id/hybrid-search", g.Viewer(), g.KBAccessRead("id"), handler.HybridSearch)
 		kb.GET("/:id/hybrid-search", g.Viewer(), g.KBAccessRead("id"), handler.HybridSearch)
 		// 拷贝知识库 — Contributor+ (副本归调用者所有；不需要原 KB 的所有权)
-		kb.POST("/copy", g.Contributor(), handler.CopyKnowledgeBase)
+		kb.POST("/copy", g.Contributor(), g.CapabilityCreateKB(), handler.CopyKnowledgeBase)
 		// 获取知识库复制进度 — Viewer+
 		kb.GET("/copy/progress/:task_id", g.Viewer(), handler.GetKBCloneProgress)
 		// 获取可移动目标知识库列表 — Viewer+ 且对 KB 有 read 权限
@@ -661,19 +661,19 @@ func RegisterModelRoutes(
 	{
 		// 获取模型厂商列表 — Viewer+
 		models.GET("/providers", g.Viewer(), handler.ListModelProviders)
-		// 创建模型 — Admin+
-		models.POST("", g.Admin(), handler.CreateModel)
+		// 创建模型 — Admin+ and can_bind_model
+		models.POST("", g.Admin(), g.CapabilityBindModel(), handler.CreateModel)
 		// 获取模型列表 — Viewer+
 		models.GET("", g.Viewer(), handler.ListModels)
 		// 获取单个模型 — Viewer+
 		models.GET("/:id", g.Viewer(), handler.GetModel)
-		// 更新模型 — Admin+
-		models.PUT("/:id", g.Admin(), handler.UpdateModel)
-		// 删除模型 — Admin+
-		models.DELETE("/:id", g.Admin(), handler.DeleteModel)
-		// Per-field credential subresource (see internal/handler/model_credentials.go) — Admin+
-		models.PUT("/:id/credentials", g.Admin(), credHandler.Put)
-		models.DELETE("/:id/credentials/:field", g.Admin(), credHandler.DeleteField)
+		// 更新模型 — Admin+ and can_bind_model
+		models.PUT("/:id", g.Admin(), g.CapabilityBindModel(), handler.UpdateModel)
+		// 删除模型 — Admin+ and can_bind_model
+		models.DELETE("/:id", g.Admin(), g.CapabilityBindModel(), handler.DeleteModel)
+		// Per-field credential subresource (see internal/handler/model_credentials.go) — Admin+ and can_bind_model
+		models.PUT("/:id/credentials", g.Admin(), g.CapabilityBindModel(), credHandler.Put)
+		models.DELETE("/:id/credentials/:field", g.Admin(), g.CapabilityBindModel(), credHandler.DeleteField)
 	}
 }
 
