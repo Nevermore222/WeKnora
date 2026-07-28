@@ -350,6 +350,52 @@
                   </t-tag>
                 </div>
               </template>
+              <template #capabilities="{ row }">
+                <div class="caps-cell">
+                  <t-tooltip
+                    v-if="row.is_client_provisioned"
+                    :content="$t('tenantMember.capabilities.clientReadonlyTip')"
+                    placement="top"
+                  >
+                    <div class="caps-switches caps-switches--readonly">
+                      <t-switch :value="!!row.can_create_knowledge_base" size="small" disabled />
+                      <t-switch :value="!!row.can_create_agent" size="small" disabled />
+                      <t-switch :value="!!row.can_bind_model" size="small" disabled />
+                    </div>
+                  </t-tooltip>
+                  <div
+                    v-else-if="canEditCapabilities && row.user_id !== currentUserId"
+                    class="caps-switches"
+                  >
+                    <t-tooltip :content="$t('capability.canCreateKnowledgeBase')" placement="top">
+                      <t-switch
+                        :value="!!row.can_create_knowledge_base"
+                        size="small"
+                        @change="(v: boolean) => onCapabilityChange(row, 'can_create_knowledge_base', v)"
+                      />
+                    </t-tooltip>
+                    <t-tooltip :content="$t('capability.canCreateAgent')" placement="top">
+                      <t-switch
+                        :value="!!row.can_create_agent"
+                        size="small"
+                        @change="(v: boolean) => onCapabilityChange(row, 'can_create_agent', v)"
+                      />
+                    </t-tooltip>
+                    <t-tooltip :content="$t('capability.canBindModel')" placement="top">
+                      <t-switch
+                        :value="!!row.can_bind_model"
+                        size="small"
+                        @change="(v: boolean) => onCapabilityChange(row, 'can_bind_model', v)"
+                      />
+                    </t-tooltip>
+                  </div>
+                  <div v-else class="caps-switches caps-switches--readonly">
+                    <t-switch :value="!!row.can_create_knowledge_base" size="small" disabled />
+                    <t-switch :value="!!row.can_create_agent" size="small" disabled />
+                    <t-switch :value="!!row.can_bind_model" size="small" disabled />
+                  </div>
+                </div>
+              </template>
               <template #joined_at="{ row }">{{ formatDate(row.joined_at) }}</template>
               <template #actions="{ row }">
                 <t-popconfirm
@@ -522,6 +568,7 @@ const rbacGuideUrl = 'https://github.com/Tencent/Xelora/blob/main/docs/RBAC%E8%A
 import {
   listMembers,
   updateMemberRole,
+  updateMemberCapabilities,
   removeMember,
   type TenantMember,
   type TenantRole,
@@ -658,6 +705,13 @@ const canViewAudit = computed(
     currentRole.value === 'admin' ||
     authStore.canAccessAllTenants === true,
 )
+// Admin+ can edit non-client other members' capabilities (mirrors g.Admin()).
+const canEditCapabilities = computed(
+  () =>
+    currentRole.value === 'owner' ||
+    currentRole.value === 'admin' ||
+    authStore.canAccessAllTenants === true,
+)
 const currentUserId = computed(() => authStore.user?.id ?? '')
 
 // Use the active tenant id from the auth store; the route only allows
@@ -732,9 +786,37 @@ function roleMatrixIcon(role: TenantRole): string {
 const columns = computed(() => [
   { colKey: 'member', title: t('tenantMember.columns.member'), ellipsis: true, minWidth: 132 },
   { colKey: 'role', title: t('tenantMember.columns.role'), width: 128 },
+  { colKey: 'capabilities', title: t('tenantMember.columns.capabilities'), width: 132 },
   { colKey: 'joined_at', title: t('tenantMember.columns.joinedAt'), width: 154 },
   { colKey: 'actions', title: t('tenantMember.columns.operations'), width: 88, align: 'left' },
 ])
+
+async function onCapabilityChange(
+  row: TenantMember,
+  key: 'can_create_knowledge_base' | 'can_create_agent' | 'can_bind_model',
+  value: boolean,
+) {
+  if (!activeTenantId.value) return
+  const prev = {
+    can_create_knowledge_base: !!row.can_create_knowledge_base,
+    can_create_agent: !!row.can_create_agent,
+    can_bind_model: !!row.can_bind_model,
+  }
+  row[key] = value
+  try {
+    const resp = await updateMemberCapabilities(activeTenantId.value, row.user_id, {
+      ...prev,
+      [key]: value,
+    })
+    if (!resp.success) {
+      row[key] = prev[key]
+      MessagePlugin.error(resp.message || t('tenantMember.capabilities.updateFailed'))
+    }
+  } catch (e: any) {
+    row[key] = prev[key]
+    MessagePlugin.error(e?.message || t('tenantMember.capabilities.updateFailed'))
+  }
+}
 
 function memberPrimary(row: { username?: string; email?: string }) {
   return row.username?.trim() || row.email?.trim() || '—'
@@ -1461,6 +1543,19 @@ watch(
 <style lang="less" scoped>
 .tenant-members {
   width: 100%;
+}
+
+.caps-cell {
+  display: flex;
+  align-items: center;
+}
+.caps-switches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.caps-switches--readonly {
+  opacity: 0.7;
 }
 
 .member-cell {

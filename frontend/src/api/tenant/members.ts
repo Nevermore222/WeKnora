@@ -17,6 +17,16 @@ export interface TenantMember {
   status: TenantMemberStatus
   invited_by?: string | null
   joined_at: string
+  is_client_provisioned?: boolean
+  can_create_knowledge_base?: boolean
+  can_create_agent?: boolean
+  can_bind_model?: boolean
+}
+
+export interface MemberCapabilitiesBody {
+  can_create_knowledge_base: boolean
+  can_create_agent: boolean
+  can_bind_model: boolean
 }
 
 export interface ListMembersResponse {
@@ -127,6 +137,22 @@ export async function updateMemberRole(
   role: TenantRole,
 ): Promise<SimpleResponse> {
   return (await put(`/api/v1/tenants/${tenantId}/members/${userId}`, { role })) as unknown as SimpleResponse
+}
+
+/**
+ * Update capability flags for a non-client other member.
+ * Backend: PUT /api/v1/tenants/:id/members/:user_id/capabilities (Admin+).
+ * Rejects self and is_client_provisioned targets with 403 capability_denied.
+ */
+export async function updateMemberCapabilities(
+  tenantId: number,
+  userId: string,
+  body: MemberCapabilitiesBody,
+): Promise<SimpleResponse> {
+  return (await put(
+    `/api/v1/tenants/${tenantId}/members/${userId}/capabilities`,
+    body,
+  )) as unknown as SimpleResponse
 }
 
 /**
