@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/Tencent/Xelora/internal/types"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
@@ -162,6 +163,42 @@ func (r *userRepository) ListSystemAdmins(ctx context.Context, offset, limit int
 		return nil, 0, err
 	}
 	return users, total, nil
+}
+
+// ListClientProvisionedUsers lists users where is_client_provisioned = true.
+func (r *userRepository) ListClientProvisionedUsers(ctx context.Context, offset, limit int) ([]*types.User, int64, error) {
+	var users []*types.User
+	var total int64
+
+	base := r.db.WithContext(ctx).Model(&types.User{}).Where("is_client_provisioned = ?", true)
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	query := base.Order("created_at DESC, id ASC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if err := query.Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+// TightenClientUserCapabilities applies defaults to non-overridden client users.
+func (r *userRepository) TightenClientUserCapabilities(ctx context.Context, canKB, canAgent, canModel bool) (int64, error) {
+	res := r.db.WithContext(ctx).Model(&types.User{}).
+		Where("is_client_provisioned = ? AND capabilities_overridden_at IS NULL", true).
+		Updates(map[string]interface{}{
+			"can_create_knowledge_base": canKB,
+			"can_create_agent":          canAgent,
+			"can_bind_model":            canModel,
+			"updated_at":               time.Now(),
+		})
+	return res.RowsAffected, res.Error
 }
 
 // RevokeSystemAdmin revokes system-admin privileges inside a transaction.

@@ -34,6 +34,7 @@ func GetSystemCapabilities(c *gin.Context) {
 			"organizations",
 			"shared_resources",
 			"sse_chat",
+			"client_user_capabilities",
 		},
 	})
 }

@@ -51,6 +51,10 @@ const (
 	// an overdue pending row to expired. Actor is empty (system).
 	AuditActionInvitationExpired AuditAction = "rbac.invitation_expired"
 
+	// Client capability admin actions (Personal client user dual-gate).
+	AuditActionClientCapabilitiesUpdated  AuditAction = "client.capabilities_updated"
+	AuditActionClientCapabilitiesTightened AuditAction = "client.capabilities_tightened"
+
 	// VectorStore lifecycle actions. Emitted by VectorStoreService.
 	// Cover both env-store-derived (__env_*) and DB store create /
 	// update / delete paths. Details payload identifies the store_id

@@ -74,6 +74,15 @@ type UserService interface {
 	// callers pass offset/limit to page through results. Used by the
 	// /api/v1/system/admin/list endpoint, gated to SystemAdmin callers.
 	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// ListClientProvisionedUsers lists Personal client-onboarded users.
+	ListClientProvisionedUsers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// UpdateUserCapabilities sets the three capability flags and marks
+	// capabilities_overridden_at. Used by system admin (any user) and
+	// tenant admin (non-client others only — enforced in handler).
+	UpdateUserCapabilities(ctx context.Context, userID string, canKB, canAgent, canModel bool) (*types.User, error)
+	// TightenExistingClientUsers applies current capability defaults to
+	// client users whose capabilities_overridden_at is null.
+	TightenExistingClientUsers(ctx context.Context) (int64, error)
 	// RevokeSystemAdmin removes system-admin privileges with the
 	// last-admin/self-revoke checks performed atomically.
 	RevokeSystemAdmin(ctx context.Context, userID, actorID string) (*types.User, error)
@@ -109,6 +118,11 @@ type UserRepository interface {
 	// the slice plus the total count for pagination metadata. Used by
 	// the system-admin management endpoint.
 	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// ListClientProvisionedUsers lists users where is_client_provisioned = true.
+	ListClientProvisionedUsers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// TightenClientUserCapabilities applies the given capability defaults to
+	// client users with capabilities_overridden_at IS NULL. Returns rows affected.
+	TightenClientUserCapabilities(ctx context.Context, canKB, canAgent, canModel bool) (int64, error)
 	// RevokeSystemAdmin removes system-admin privileges with the
 	// last-admin/self-revoke checks performed atomically.
 	RevokeSystemAdmin(ctx context.Context, userID, actorID string) (*types.User, error)

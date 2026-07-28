@@ -839,6 +839,14 @@ func RegisterSystemAdminRoutes(
 		adminRoutes.PUT("/settings/:key", handler.UpdateSystemSetting)
 		adminRoutes.DELETE("/settings/:key", handler.ResetSystemSetting)
 
+		// Personal client user capabilities (dual-gate with tenant RBAC)
+		adminRoutes.GET("/client-capabilities/defaults", handler.GetClientCapabilityDefaults)
+		adminRoutes.PUT("/client-capabilities/defaults", handler.UpdateClientCapabilityDefaults)
+		adminRoutes.POST("/client-capabilities/tighten-existing", handler.TightenExistingClientUsers)
+		adminRoutes.GET("/client-users", handler.ListClientUsers)
+		adminRoutes.GET("/users/:id/capabilities", handler.GetUserCapabilities)
+		adminRoutes.PUT("/users/:id/capabilities", handler.UpdateUserCapabilities)
+
 		// Bulk action — write the current default-quota setting onto
 		// every existing tenant. Lives under /tenants instead of
 		// /settings because it changes tenants, not the setting row.
@@ -996,7 +1004,7 @@ func RegisterCustomAgentRoutes(r *gin.RouterGroup, agentHandler *handler.CustomA
 		// List smart-reasoning agent type presets (rag-qa / wiki-qa / hybrid / custom) — Viewer+
 		agents.GET("/type-presets", g.Viewer(), agentHandler.GetAgentTypePresets)
 		// Create custom agent — Contributor+
-		agents.POST("", g.Contributor(), agentHandler.CreateAgent)
+		agents.POST("", g.Contributor(), g.CapabilityCreateAgent(), agentHandler.CreateAgent)
 		// List all agents (including built-in) — Viewer+
 		agents.GET("", g.Viewer(), agentHandler.ListAgents)
 		// Get agent by ID — Viewer+
@@ -1006,7 +1014,7 @@ func RegisterCustomAgentRoutes(r *gin.RouterGroup, agentHandler *handler.CustomA
 		// Delete agent — creator OR Admin+
 		agents.DELETE("/:id", g.OwnedAgentOrAdmin(), agentHandler.DeleteAgent)
 		// Copy agent — Contributor+ (copy is owned by the caller)
-		agents.POST("/:id/copy", g.Contributor(), agentHandler.CopyAgent)
+		agents.POST("/:id/copy", g.Contributor(), g.CapabilityCreateAgent(), agentHandler.CopyAgent)
 	}
 	// Registered outside the group to avoid Gin route conflict with /agents/:id/shares in organization routes
 	r.GET("/agents/:id/suggested-questions", g.Viewer(), agentHandler.GetSuggestedQuestions)
