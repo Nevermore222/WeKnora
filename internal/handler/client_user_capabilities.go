@@ -114,6 +114,40 @@ func (h *SystemHandler) ListClientUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"users": infos, "total": total})
 }
 
+// ListAdminUsers lists all users for the User permissions settings page.
+func (h *SystemHandler) ListAdminUsers(c *gin.Context) {
+	ctx := c.Request.Context()
+	q := c.Query("q")
+	filter := types.AdminUserListFilter(c.DefaultQuery("filter", "all"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	items, total, err := h.userSvc.ListAdminUsers(ctx, q, filter, offset, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	rows := make([]gin.H, 0, len(items))
+	for _, it := range items {
+		u := it.User
+		if u == nil {
+			continue
+		}
+		rows = append(rows, gin.H{
+			"id":                        u.ID,
+			"username":                  u.Username,
+			"email":                     u.Email,
+			"is_system_admin":           u.IsSystemAdmin,
+			"is_client_provisioned":     u.IsClientProvisioned,
+			"can_create_knowledge_base": u.CanCreateKnowledgeBase,
+			"can_create_agent":          u.CanCreateAgent,
+			"can_bind_model":            u.CanBindModel,
+			"home_tenant_id":            u.TenantID,
+			"home_tenant_name":          it.HomeTenantName,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"users": rows, "total": total})
+}
+
 // GetUserCapabilities returns capability fields for one user.
 func (h *SystemHandler) GetUserCapabilities(c *gin.Context) {
 	ctx := c.Request.Context()

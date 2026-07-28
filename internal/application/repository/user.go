@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Tencent/Xelora/internal/types"
@@ -197,6 +198,44 @@ func (r *userRepository) ListClientProvisionedUsers(ctx context.Context, offset,
 		query = query.Offset(offset)
 	}
 	if err := query.Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+// ListAdminUsers lists users for the system-admin permissions page.
+func (r *userRepository) ListAdminUsers(
+	ctx context.Context, q string, filter types.AdminUserListFilter, offset, limit int,
+) ([]*types.User, int64, error) {
+	base := r.db.WithContext(ctx).Model(&types.User{})
+	q = strings.TrimSpace(q)
+	if q != "" {
+		like := "%" + q + "%"
+		// Match SearchUsers: ILIKE works on Postgres; SQLite builds in this
+		// project historically use the same pattern via the GORM dialect.
+		base = base.Where("username ILIKE ? OR email ILIKE ?", like, like)
+	}
+	switch filter {
+	case types.AdminUserFilterClient:
+		base = base.Where("is_client_provisioned = ?", true)
+	case types.AdminUserFilterNonClient:
+		base = base.Where("is_client_provisioned = ?", false)
+	case types.AdminUserFilterSystemAdmin:
+		base = base.Where("is_system_admin = ?", true)
+	}
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	var users []*types.User
+	if err := base.Order("created_at DESC, id ASC").Offset(offset).Limit(limit).Find(&users).Error; err != nil {
 		return nil, 0, err
 	}
 	return users, total, nil

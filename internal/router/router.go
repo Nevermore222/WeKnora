@@ -845,6 +845,7 @@ func RegisterSystemAdminRoutes(
 		adminRoutes.PUT("/client-capabilities/defaults", handler.UpdateClientCapabilityDefaults)
 		adminRoutes.POST("/client-capabilities/tighten-existing", handler.TightenExistingClientUsers)
 		adminRoutes.GET("/client-users", handler.ListClientUsers)
+		adminRoutes.GET("/users", handler.ListAdminUsers)
 		adminRoutes.GET("/users/:id/capabilities", handler.GetUserCapabilities)
 		adminRoutes.PUT("/users/:id/capabilities", handler.UpdateUserCapabilities)
 

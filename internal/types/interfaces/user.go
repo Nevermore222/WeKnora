@@ -77,6 +77,9 @@ type UserService interface {
 	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
 	// ListClientProvisionedUsers lists Personal client-onboarded users.
 	ListClientProvisionedUsers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// ListAdminUsers lists users for the system-admin permissions page
+	// (search + filter + pagination), with home tenant display names.
+	ListAdminUsers(ctx context.Context, q string, filter types.AdminUserListFilter, offset, limit int) ([]types.AdminUserListItem, int64, error)
 	// UpdateUserCapabilities sets the three capability flags and marks
 	// capabilities_overridden_at. Used by system admin (any user) and
 	// tenant admin (non-client others only — enforced in handler).
@@ -124,6 +127,9 @@ type UserRepository interface {
 	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
 	// ListClientProvisionedUsers lists users where is_client_provisioned = true.
 	ListClientProvisionedUsers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// ListAdminUsers lists users with optional q/filter for the admin
+	// permissions page (no tenant name join — service layer enriches).
+	ListAdminUsers(ctx context.Context, q string, filter types.AdminUserListFilter, offset, limit int) ([]*types.User, int64, error)
 	// ApplyClientCapabilityDefaults marks the user client-provisioned and
 	// writes the three capability flags (false values must persist).
 	ApplyClientCapabilityDefaults(ctx context.Context, userID string, canKB, canAgent, canModel bool) error

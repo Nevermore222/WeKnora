@@ -700,6 +700,49 @@ func (s *userService) ListClientProvisionedUsers(
 	return s.userRepo.ListClientProvisionedUsers(ctx, offset, limit)
 }
 
+func (s *userService) ListAdminUsers(
+	ctx context.Context, q string, filter types.AdminUserListFilter, offset, limit int,
+) ([]types.AdminUserListItem, int64, error) {
+	users, total, err := s.userRepo.ListAdminUsers(ctx, q, filter, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	tenantIDs := make([]uint64, 0, len(users))
+	seen := make(map[uint64]struct{}, len(users))
+	for _, u := range users {
+		if u == nil || u.TenantID == 0 {
+			continue
+		}
+		if _, ok := seen[u.TenantID]; ok {
+			continue
+		}
+		seen[u.TenantID] = struct{}{}
+		tenantIDs = append(tenantIDs, u.TenantID)
+	}
+	names := map[uint64]string{}
+	if len(tenantIDs) > 0 && s.tenantService != nil {
+		tenants, terr := s.tenantService.GetTenantsByIDs(ctx, tenantIDs)
+		if terr != nil {
+			logger.Warnf(ctx, "ListAdminUsers: GetTenantsByIDs: %v", terr)
+		} else {
+			for id, t := range tenants {
+				if t != nil {
+					names[id] = t.Name
+				}
+			}
+		}
+	}
+	out := make([]types.AdminUserListItem, 0, len(users))
+	for _, u := range users {
+		item := types.AdminUserListItem{User: u}
+		if u != nil {
+			item.HomeTenantName = names[u.TenantID]
+		}
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
 func (s *userService) UpdateUserCapabilities(
 	ctx context.Context, userID string, canKB, canAgent, canModel bool,
 ) (*types.User, error) {
