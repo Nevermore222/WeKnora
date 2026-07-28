@@ -114,9 +114,19 @@ export interface UserInfo {
   can_access_all_tenants?: boolean
   preferences?: UserPreferences
   is_system_admin?: boolean
+  /** Personal client-onboarded user; capabilities configured by system admin. */
+  is_client_provisioned?: boolean
+  can_create_knowledge_base?: boolean
+  can_create_agent?: boolean
+  can_bind_model?: boolean
   created_at: string
   updated_at: string
 }
+
+export type UserCapabilityId =
+  | 'can_create_knowledge_base'
+  | 'can_create_agent'
+  | 'can_bind_model'
 
 /**
  * 把后端返回的 user JSON 规范化成前端 UserInfo。
@@ -144,6 +154,14 @@ export function userInfoFromApi(
     u?.tenant_id !== undefined && u?.tenant_id !== null && u.tenant_id !== ''
       ? u.tenant_id
       : fallbackTenantId ?? ''
+  const isClient = u?.is_client_provisioned === true
+  // Missing flags: non-client → true (forward-compat with old servers);
+  // client-provisioned → false (deny by default).
+  const cap = (key: UserCapabilityId): boolean => {
+    if (u?.[key] === true) return true
+    if (u?.[key] === false) return false
+    return !isClient
+  }
   return {
     id: u?.id || '',
     username: u?.username || '',
@@ -152,6 +170,10 @@ export function userInfoFromApi(
     tenant_id: String(tid) || '',
     can_access_all_tenants: u?.can_access_all_tenants === true,
     is_system_admin: u?.is_system_admin === true,
+    is_client_provisioned: isClient,
+    can_create_knowledge_base: cap('can_create_knowledge_base'),
+    can_create_agent: cap('can_create_agent'),
+    can_bind_model: cap('can_bind_model'),
     preferences: u?.preferences,
     created_at: u?.created_at || new Date().toISOString(),
     updated_at: u?.updated_at || new Date().toISOString(),

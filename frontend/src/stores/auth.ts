@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { UserInfo, TenantInfo, KnowledgeBaseInfo } from '@/api/auth'
+import type { UserInfo, TenantInfo, KnowledgeBaseInfo, UserCapabilityId } from '@/api/auth'
 import { userInfoFromApi } from '@/api/auth'
 import type { TenantInfo as TenantInfoFromAPI } from '@/api/tenant'
 import i18n from '@/i18n'
@@ -180,6 +180,19 @@ export const useAuthStore = defineStore('auth', () => {
   }
   const hasRole = (min: 'viewer' | 'contributor' | 'admin' | 'owner'): boolean => {
     return (ROLE_LEVEL[currentTenantRole.value] ?? 0) >= ROLE_LEVEL[min]
+  }
+
+  // hasCapability gates create-KB / create-agent / bind-model UI entry
+  // points. Client-provisioned users require an explicit true flag;
+  // non-client users default allow (missing → true via userInfoFromApi).
+  // SECURITY: UI-only — server RequireCapability is the source of truth.
+  const hasCapability = (id: UserCapabilityId): boolean => {
+    const u = user.value
+    if (!u) return false
+    if (u.is_client_provisioned) {
+      return u[id] === true
+    }
+    return u[id] !== false
   }
 
   const effectiveTenantId = computed(() => {
@@ -586,6 +599,7 @@ export const useAuthStore = defineStore('auth', () => {
     isSystemAdmin,
     currentTenantRole,
     hasRole,
+    hasCapability,
     effectiveTenantId,
     isLiteMode,
     isPersonalMode,
