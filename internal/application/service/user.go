@@ -119,6 +119,25 @@ func (s *userService) applyClientCapabilityDefaults(ctx context.Context, user *t
 	user.CapabilitiesOverriddenAt = nil
 }
 
+// EnsurePersonalClientCapabilities repairs Personal-edition users that were
+// created before capability columns existed (or via AutoSetup without the
+// ClientProvisioned flag). Only touches users that are not yet marked
+// client-provisioned and have never been explicitly overridden.
+func (s *userService) EnsurePersonalClientCapabilities(ctx context.Context, user *types.User) (*types.User, error) {
+	if user == nil {
+		return nil, nil
+	}
+	if user.IsClientProvisioned || user.CapabilitiesOverriddenAt != nil {
+		return user, nil
+	}
+	defs := s.loadClientCapabilityDefaults(ctx)
+	if err := s.userRepo.ApplyClientCapabilityDefaults(ctx, user.ID,
+		defs.CanCreateKnowledgeBase, defs.CanCreateAgent, defs.CanBindModel); err != nil {
+		return nil, err
+	}
+	return s.userRepo.GetUserByID(ctx, user.ID)
+}
+
 // Register creates a new user account
 func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) (*types.User, error) {
 	logger.Info(ctx, "Start user registration")
@@ -170,6 +189,11 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
+		// Non-client users must keep create/bind allowed (explicit true so
+		// CreateUser's post-insert force-write does not leave deny zeros).
+		CanCreateKnowledgeBase: true,
+		CanCreateAgent:         true,
+		CanBindModel:           true,
 	}
 	if req.ClientProvisioned {
 		s.applyClientCapabilityDefaults(ctx, user)
@@ -679,20 +703,14 @@ func (s *userService) ListClientProvisionedUsers(
 func (s *userService) UpdateUserCapabilities(
 	ctx context.Context, userID string, canKB, canAgent, canModel bool,
 ) (*types.User, error) {
-	user, err := s.userRepo.GetUserByID(ctx, userID)
-	if err != nil {
+	if _, err := s.userRepo.GetUserByID(ctx, userID); err != nil {
 		return nil, err
 	}
 	now := time.Now()
-	user.CanCreateKnowledgeBase = canKB
-	user.CanCreateAgent = canAgent
-	user.CanBindModel = canModel
-	user.CapabilitiesOverriddenAt = &now
-	user.UpdatedAt = now
-	if err := s.userRepo.UpdateUser(ctx, user); err != nil {
+	if err := s.userRepo.ApplyCapabilityOverride(ctx, userID, canKB, canAgent, canModel, now); err != nil {
 		return nil, err
 	}
-	return user, nil
+	return s.userRepo.GetUserByID(ctx, userID)
 }
 
 func (s *userService) TightenExistingClientUsers(ctx context.Context) (int64, error) {

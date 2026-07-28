@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"context"
+	"time"
 
 	"github.com/Tencent/Xelora/internal/types"
 )
@@ -83,6 +84,9 @@ type UserService interface {
 	// TightenExistingClientUsers applies current capability defaults to
 	// client users whose capabilities_overridden_at is null.
 	TightenExistingClientUsers(ctx context.Context) (int64, error)
+	// EnsurePersonalClientCapabilities marks a pre-feature Personal user as
+	// client-provisioned and applies capability defaults when not overridden.
+	EnsurePersonalClientCapabilities(ctx context.Context, user *types.User) (*types.User, error)
 	// RevokeSystemAdmin removes system-admin privileges with the
 	// last-admin/self-revoke checks performed atomically.
 	RevokeSystemAdmin(ctx context.Context, userID, actorID string) (*types.User, error)
@@ -120,6 +124,11 @@ type UserRepository interface {
 	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
 	// ListClientProvisionedUsers lists users where is_client_provisioned = true.
 	ListClientProvisionedUsers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// ApplyClientCapabilityDefaults marks the user client-provisioned and
+	// writes the three capability flags (false values must persist).
+	ApplyClientCapabilityDefaults(ctx context.Context, userID string, canKB, canAgent, canModel bool) error
+	// ApplyCapabilityOverride sets capability flags and capabilities_overridden_at.
+	ApplyCapabilityOverride(ctx context.Context, userID string, canKB, canAgent, canModel bool, at time.Time) error
 	// TightenClientUserCapabilities applies the given capability defaults to
 	// client users with capabilities_overridden_at IS NULL. Returns rows affected.
 	TightenClientUserCapabilities(ctx context.Context, canKB, canAgent, canModel bool) (int64, error)

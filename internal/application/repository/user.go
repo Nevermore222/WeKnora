@@ -30,9 +30,23 @@ func NewUserRepository(db *gorm.DB) interfaces.UserRepository {
 	return &userRepository{db: db}
 }
 
-// CreateUser creates a user
+// CreateUser creates a user.
+//
+// GORM treats bool zero-value (false) as "unset" when the column has
+// `default:true`, so an explicit deny (can_*=false) would otherwise be
+// overwritten by the schema default on INSERT. After Create we force-write
+// the capability columns from the in-memory struct so client deny-defaults
+// and non-client allow-defaults both persist accurately.
 func (r *userRepository) CreateUser(ctx context.Context, user *types.User) error {
-	return r.db.WithContext(ctx).Create(user).Error
+	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
+		return err
+	}
+	return r.db.WithContext(ctx).Model(user).Updates(map[string]interface{}{
+		"is_client_provisioned":     user.IsClientProvisioned,
+		"can_create_knowledge_base": user.CanCreateKnowledgeBase,
+		"can_create_agent":          user.CanCreateAgent,
+		"can_bind_model":            user.CanBindModel,
+	}).Error
 }
 
 // GetUserByID gets a user by ID
@@ -186,6 +200,37 @@ func (r *userRepository) ListClientProvisionedUsers(ctx context.Context, offset,
 		return nil, 0, err
 	}
 	return users, total, nil
+}
+
+// ApplyClientCapabilityDefaults marks a user as client-provisioned and writes
+// the three capability flags via map Updates (so false values persist).
+func (r *userRepository) ApplyClientCapabilityDefaults(
+	ctx context.Context, userID string, canKB, canAgent, canModel bool,
+) error {
+	return r.db.WithContext(ctx).Model(&types.User{}).Where("id = ?", userID).
+		Updates(map[string]interface{}{
+			"is_client_provisioned":      true,
+			"can_create_knowledge_base":  canKB,
+			"can_create_agent":           canAgent,
+			"can_bind_model":             canModel,
+			"capabilities_overridden_at": nil,
+			"updated_at":                time.Now(),
+		}).Error
+}
+
+// ApplyCapabilityOverride sets the three capability flags and records an
+// explicit admin override timestamp.
+func (r *userRepository) ApplyCapabilityOverride(
+	ctx context.Context, userID string, canKB, canAgent, canModel bool, at time.Time,
+) error {
+	return r.db.WithContext(ctx).Model(&types.User{}).Where("id = ?", userID).
+		Updates(map[string]interface{}{
+			"can_create_knowledge_base":  canKB,
+			"can_create_agent":           canAgent,
+			"can_bind_model":             canModel,
+			"capabilities_overridden_at": at,
+			"updated_at":                at,
+		}).Error
 }
 
 // TightenClientUserCapabilities applies defaults to non-overridden client users.

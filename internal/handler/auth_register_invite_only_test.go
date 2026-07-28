@@ -38,6 +38,12 @@ func (s *stubRegisterUserService) GenerateTokens(ctx context.Context, user *type
 	return s.generateTokens(ctx, user)
 }
 
+func (s *stubRegisterUserService) EnsurePersonalClientCapabilities(
+	_ context.Context, user *types.User,
+) (*types.User, error) {
+	return user, nil
+}
+
 type stubAutoSetupTenantService struct {
 	interfaces.TenantService
 	getTenantByID func(ctx context.Context, id uint64) (*types.Tenant, error)

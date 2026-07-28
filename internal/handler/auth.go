@@ -218,7 +218,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// User is already in the correct format from service
+	if Edition == "personal" && response.User != nil {
+		if repaired, err := h.userService.EnsurePersonalClientCapabilities(ctx, response.User); err != nil {
+			logger.Warnf(ctx, "Login: ensure personal client capabilities: %v", err)
+		} else if repaired != nil {
+			response.User = repaired
+		}
+	}
 
 	logger.Infof(ctx, "User logged in successfully, email: %s", email)
 	c.JSON(http.StatusOK, response)
@@ -496,6 +502,14 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
+	if Edition == "personal" {
+		if repaired, err := h.userService.EnsurePersonalClientCapabilities(ctx, user); err != nil {
+			logger.Warnf(ctx, "GetCurrentUser: ensure personal client capabilities: %v", err)
+		} else if repaired != nil {
+			user = repaired
+		}
+	}
+
 	// Get tenant information for the *active* tenant (the one the
 	// auth middleware resolved against the X-Tenant-ID header), not
 	// the user's home tenant. user.TenantID is the row stored on the
@@ -750,11 +764,18 @@ func (h *AuthHandler) AutoSetup(c *gin.Context) {
 		randomPassword := base64.RawURLEncoding.EncodeToString(randomBytes)
 		randomUsername := fmt.Sprintf("user_%s", base64.RawURLEncoding.EncodeToString(randomBytes[:6]))
 
-		_, err := h.userService.Register(ctx, &types.RegisterRequest{
+		regReq := &types.RegisterRequest{
 			Username: randomUsername,
 			Email:    defaultEmail,
 			Password: randomPassword,
-		})
+		}
+		// Personal AutoSetup bypasses AuthHandler.Register, so it must set
+		// ClientProvisioned here — otherwise the local Owner keeps full
+		// create/bind capabilities contrary to product defaults.
+		if Edition == "personal" {
+			regReq.ClientProvisioned = true
+		}
+		_, err := h.userService.Register(ctx, regReq)
 		if err != nil {
 			logger.Errorf(ctx, "Auto-setup: failed to register default user: %v", err)
 			appErr := errors.NewInternalServerError("auto-setup failed").WithDetails(err.Error())
@@ -766,6 +787,16 @@ func (h *AuthHandler) AutoSetup(c *gin.Context) {
 			appErr := errors.NewInternalServerError("auto-setup failed: user not found after registration")
 			c.Error(appErr)
 			return
+		}
+	}
+
+	// Repair pre-feature Personal users (migration left can_*=true and
+	// is_client_provisioned=false). Idempotent for already-marked users.
+	if Edition == "personal" {
+		if repaired, err := h.userService.EnsurePersonalClientCapabilities(ctx, user); err != nil {
+			logger.Warnf(ctx, "Auto-setup: ensure personal client capabilities: %v", err)
+		} else if repaired != nil {
+			user = repaired
 		}
 	}
 

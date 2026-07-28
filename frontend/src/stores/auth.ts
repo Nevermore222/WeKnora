@@ -183,12 +183,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // hasCapability gates create-KB / create-agent / bind-model UI entry
-  // points. Client-provisioned users require an explicit true flag;
-  // non-client users default allow (missing → true via userInfoFromApi).
+  // points. Client-provisioned / Personal users require an explicit true
+  // flag; non-client web users default allow (missing → true via
+  // userInfoFromApi). Personal also denies until is_client_provisioned
+  // is confirmed so stale localStorage cannot keep create open.
   // SECURITY: UI-only — server RequireCapability is the source of truth.
   const hasCapability = (id: UserCapabilityId): boolean => {
     const u = user.value
     if (!u) return false
+    if (u[id] === false) return false
+    if (isPersonalMode.value) {
+      return u.is_client_provisioned === true && u[id] === true
+    }
     if (u.is_client_provisioned) {
       return u[id] === true
     }
