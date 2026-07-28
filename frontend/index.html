@@ -17,7 +17,22 @@
 <body>
 <script>
 (function(){
-  var t=localStorage.getItem('Xelora_theme')||'light';
+  /* 一次性清掉临时「桌面默认深色」实验残留的主题偏好，恢复浅色默认 */
+  try{
+    if(!localStorage.getItem('Xelora_theme_light_default_restored_v1')){
+      localStorage.setItem('Xelora_theme_light_default_restored_v1','1');
+      var toRemove=[];
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i);
+        if(!k)continue;
+        if(k==='Xelora_theme'||(k.indexOf('Xelora_')===0&&k.slice(-6)==='_theme')) toRemove.push(k);
+      }
+      for(var j=0;j<toRemove.length;j++) localStorage.removeItem(toRemove[j]);
+    }
+  }catch(_){}
+  var uid='anon';
+  try{var u=JSON.parse(localStorage.getItem('xelora_user')||'null');if(u&&u.id)uid=String(u.id)}catch(_){}
+  var t=localStorage.getItem('Xelora_'+uid+'_theme')||localStorage.getItem('Xelora_theme')||'light';
   if(t==='system')t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
   document.documentElement.setAttribute('theme-mode',t);
   /* 与 theme.css 中 --td-bg-color-page 一致，避免样式加载后整页背景从 #fff 跳到 #eee 触发重绘闪动 */
@@ -66,7 +81,9 @@
 <div id="app"></div>
 <script>
 (function(){
-  var t=localStorage.getItem('Xelora_theme')||'light';
+  var uid='anon';
+  try{var u=JSON.parse(localStorage.getItem('xelora_user')||'null');if(u&&u.id)uid=String(u.id)}catch(_){}
+  var t=localStorage.getItem('Xelora_'+uid+'_theme')||localStorage.getItem('Xelora_theme')||'light';
   if(t==='system')t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
   var bg=t==='dark'?'#181818':'#eee';
   var el=document.getElementById('app');

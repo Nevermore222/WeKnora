@@ -9,7 +9,28 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 
 const THEME_KEY = 'theme'
 
+/** Drop theme keys left by the temporary desktop dark-default experiment. */
+function restoreLightThemeDefaultOnce() {
+  const flag = 'Xelora_theme_light_default_restored_v1'
+  try {
+    if (localStorage.getItem(flag)) return
+    localStorage.setItem(flag, '1')
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k) continue
+      if (k === 'Xelora_theme' || (k.startsWith('Xelora_') && k.endsWith('_theme'))) {
+        keys.push(k)
+      }
+    }
+    for (const k of keys) localStorage.removeItem(k)
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
 function loadTheme(): ThemeMode {
+  restoreLightThemeDefaultOnce()
   const v = loadPreference(THEME_KEY)
   if (v === 'light' || v === 'dark' || v === 'system') return v
   return 'light'
