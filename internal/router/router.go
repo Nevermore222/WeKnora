@@ -607,6 +607,7 @@ func RegisterTenantRoutes(
 				tenantByID.GET("/members", g.Viewer(), memberHandler.ListMembers)
 				tenantByID.POST("/members", g.Owner(), memberHandler.AddMember)
 				tenantByID.PUT("/members/:user_id", g.Owner(), memberHandler.UpdateMemberRole)
+				tenantByID.PUT("/members/:user_id/capabilities", g.Admin(), memberHandler.UpdateMemberCapabilities)
 				tenantByID.DELETE("/members/:user_id", g.Owner(), memberHandler.RemoveMember)
 				tenantByID.POST("/leave", g.Viewer(), memberHandler.LeaveTenant)
 				// Personal-client auto-provisioning: Admin-gated (an API token

@@ -126,12 +126,16 @@ type Membership struct {
 // the model directly would leak DeletedAt/UpdatedAt and lock the DB
 // schema into the public API. Use this for `/tenants/:id/members` only.
 type TenantMemberResponse struct {
-	UserID    string             `json:"user_id"`
-	Email     string             `json:"email"`
-	Username  string             `json:"username"`
-	Avatar    string             `json:"avatar,omitempty"`
-	Role      TenantRole         `json:"role"`
-	Status    TenantMemberStatus `json:"status"`
-	InvitedBy *string            `json:"invited_by,omitempty"`
-	JoinedAt  time.Time          `json:"joined_at"`
+	UserID                 string             `json:"user_id"`
+	Email                  string             `json:"email"`
+	Username               string             `json:"username"`
+	Avatar                 string             `json:"avatar,omitempty"`
+	Role                   TenantRole         `json:"role"`
+	Status                 TenantMemberStatus `json:"status"`
+	InvitedBy              *string            `json:"invited_by,omitempty"`
+	JoinedAt               time.Time          `json:"joined_at"`
+	IsClientProvisioned    bool               `json:"is_client_provisioned"`
+	CanCreateKnowledgeBase bool               `json:"can_create_knowledge_base"`
+	CanCreateAgent         bool               `json:"can_create_agent"`
+	CanBindModel           bool               `json:"can_bind_model"`
 }

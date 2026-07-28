@@ -67,6 +67,14 @@ type updateMemberRoleRequest struct {
 	Role types.TenantRole `json:"role" binding:"required"`
 }
 
+// updateMemberCapabilitiesRequest is the JSON body for
+// PUT /tenants/:id/members/:user_id/capabilities.
+type updateMemberCapabilitiesRequest struct {
+	CanCreateKnowledgeBase bool `json:"can_create_knowledge_base"`
+	CanCreateAgent         bool `json:"can_create_agent"`
+	CanBindModel           bool `json:"can_bind_model"`
+}
+
 // provisionClientUserRequest is the JSON body for POST /tenants/:id/client-users.
 // The personal client calls this (with an API token) to auto-register its local
 // user onto the server. Password is generated and owned by the client. Role is
@@ -157,6 +165,10 @@ func (h *TenantMemberHandler) ListMembers(c *gin.Context) {
 			row.Email = u.Email
 			row.Username = u.Username
 			row.Avatar = u.Avatar
+			row.IsClientProvisioned = u.IsClientProvisioned
+			row.CanCreateKnowledgeBase = u.CanCreateKnowledgeBase
+			row.CanCreateAgent = u.CanCreateAgent
+			row.CanBindModel = u.CanBindModel
 		}
 		resp = append(resp, row)
 	}
@@ -390,6 +402,57 @@ func (h *TenantMemberHandler) UpdateMemberRole(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// UpdateMemberCapabilities updates per-user capability flags for a
+// non-client other member. Client-provisioned users are system-admin only.
+func (h *TenantMemberHandler) UpdateMemberCapabilities(c *gin.Context) {
+	ctx := c.Request.Context()
+	if _, ok := parseTenantIDFromPath(c); !ok {
+		return
+	}
+	targetID := strings.TrimSpace(c.Param("user_id"))
+	if targetID == "" {
+		c.Error(apperrors.NewValidationError("user_id is required"))
+		return
+	}
+	actorID, _ := ctx.Value(types.UserIDContextKey).(string)
+	if actorID == "" {
+		if v, ok := c.Get(types.UserIDContextKey.String()); ok {
+			actorID, _ = v.(string)
+		}
+	}
+	if actorID != "" && actorID == targetID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    "capability_denied",
+			"message": "Cannot change your own capabilities",
+		})
+		return
+	}
+	target, err := h.userService.GetUserByID(ctx, targetID)
+	if err != nil {
+		c.Error(apperrors.NewNotFoundError("user not found"))
+		return
+	}
+	if target.IsClientProvisioned {
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    "capability_denied",
+			"message": "Client user capabilities are configured by a system administrator",
+		})
+		return
+	}
+	var req updateMemberCapabilitiesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(apperrors.NewValidationError("invalid request body").WithDetails(err.Error()))
+		return
+	}
+	user, err := h.userService.UpdateUserCapabilities(ctx, targetID,
+		req.CanCreateKnowledgeBase, req.CanCreateAgent, req.CanBindModel)
+	if err != nil {
+		c.Error(apperrors.NewInternalServerError("failed to update capabilities").WithDetails(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": user.ToUserInfo()})
 }
 
 // RemoveMember godoc

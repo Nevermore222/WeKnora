@@ -94,7 +94,8 @@ type stubMemberUserService struct {
 	// getByIDs lets tests override the batched lookup; when unset the
 	// stub falls back to fanning out to getByID so existing tests stay
 	// green without changes.
-	getByIDs func(ctx context.Context, ids []string) (map[string]*types.User, error)
+	getByIDs           func(ctx context.Context, ids []string) (map[string]*types.User, error)
+	updateCapabilities func(ctx context.Context, userID string, canKB, canAgent, canModel bool) (*types.User, error)
 }
 
 func (s *stubMemberUserService) GetUserByEmail(ctx context.Context, email string) (*types.User, error) {
@@ -152,6 +153,7 @@ func memberTestRouterWithCfg(h *TenantMemberHandler, cfg *config.Config) *gin.En
 	tenantByID.GET("/members", h.ListMembers)
 	tenantByID.POST("/members", h.AddMember)
 	tenantByID.PUT("/members/:user_id", h.UpdateMemberRole)
+	tenantByID.PUT("/members/:user_id/capabilities", h.UpdateMemberCapabilities)
 	tenantByID.DELETE("/members/:user_id", h.RemoveMember)
 	tenantByID.POST("/leave", h.LeaveTenant)
 	return r
