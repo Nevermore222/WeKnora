@@ -94,6 +94,17 @@ type User struct {
 	CanAccessAllTenants bool `json:"can_access_all_tenants" gorm:"default:false"`
 	// Whether the user is a system administrator (independent of tenant roles)
 	IsSystemAdmin bool `json:"is_system_admin" gorm:"default:false;index"`
+	// Whether the account was created via Personal client register / ProvisionClientUser.
+	IsClientProvisioned bool `json:"is_client_provisioned" gorm:"default:false;index"`
+	// Per-user capability flags (dual-gate with tenant RBAC). Non-client users
+	// default true so existing behaviour is unchanged; client provision paths
+	// overwrite from system defaults (typically false).
+	CanCreateKnowledgeBase bool `json:"can_create_knowledge_base" gorm:"default:true"`
+	CanCreateAgent         bool `json:"can_create_agent" gorm:"default:true"`
+	CanBindModel           bool `json:"can_bind_model" gorm:"default:true"`
+	// Set when an admin explicitly overrides capabilities (protects against
+	// re-applying defaults when tighten-existing runs).
+	CapabilitiesOverriddenAt *time.Time `json:"capabilities_overridden_at,omitempty"`
 	// Per-user UI/feature preferences (memory toggle, future knobs).
 	// Stored as JSON (jsonb on Postgres, TEXT on SQLite) via the
 	// driver.Valuer / sql.Scanner methods on UserPreferences.
@@ -214,32 +225,40 @@ type RegisterResponse struct {
 
 // UserInfo represents user information for API responses
 type UserInfo struct {
-	ID                  string          `json:"id"`
-	Username            string          `json:"username"`
-	Email               string          `json:"email"`
-	Avatar              string          `json:"avatar"`
-	TenantID            uint64          `json:"tenant_id"`
-	IsActive            bool            `json:"is_active"`
-	CanAccessAllTenants bool            `json:"can_access_all_tenants"`
-	IsSystemAdmin       bool            `json:"is_system_admin"`
-	Preferences         UserPreferences `json:"preferences"`
-	CreatedAt           time.Time       `json:"created_at"`
-	UpdatedAt           time.Time       `json:"updated_at"`
+	ID                     string          `json:"id"`
+	Username               string          `json:"username"`
+	Email                  string          `json:"email"`
+	Avatar                 string          `json:"avatar"`
+	TenantID               uint64          `json:"tenant_id"`
+	IsActive               bool            `json:"is_active"`
+	CanAccessAllTenants    bool            `json:"can_access_all_tenants"`
+	IsSystemAdmin          bool            `json:"is_system_admin"`
+	IsClientProvisioned    bool            `json:"is_client_provisioned"`
+	CanCreateKnowledgeBase bool            `json:"can_create_knowledge_base"`
+	CanCreateAgent         bool            `json:"can_create_agent"`
+	CanBindModel           bool            `json:"can_bind_model"`
+	Preferences            UserPreferences `json:"preferences"`
+	CreatedAt              time.Time       `json:"created_at"`
+	UpdatedAt              time.Time       `json:"updated_at"`
 }
 
 // ToUserInfo converts User to UserInfo (without sensitive data)
 func (u *User) ToUserInfo() *UserInfo {
 	return &UserInfo{
-		ID:                  u.ID,
-		Username:            u.Username,
-		Email:               u.Email,
-		Avatar:              u.Avatar,
-		TenantID:            u.TenantID,
-		IsActive:            u.IsActive,
-		CanAccessAllTenants: u.CanAccessAllTenants,
-		IsSystemAdmin:       u.IsSystemAdmin,
-		Preferences:         u.Preferences,
-		CreatedAt:           u.CreatedAt,
-		UpdatedAt:           u.UpdatedAt,
+		ID:                     u.ID,
+		Username:               u.Username,
+		Email:                  u.Email,
+		Avatar:                 u.Avatar,
+		TenantID:               u.TenantID,
+		IsActive:               u.IsActive,
+		CanAccessAllTenants:    u.CanAccessAllTenants,
+		IsSystemAdmin:          u.IsSystemAdmin,
+		IsClientProvisioned:    u.IsClientProvisioned,
+		CanCreateKnowledgeBase: u.CanCreateKnowledgeBase,
+		CanCreateAgent:         u.CanCreateAgent,
+		CanBindModel:           u.CanBindModel,
+		Preferences:            u.Preferences,
+		CreatedAt:              u.CreatedAt,
+		UpdatedAt:              u.UpdatedAt,
 	}
 }
