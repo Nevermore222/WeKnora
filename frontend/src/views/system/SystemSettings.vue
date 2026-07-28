@@ -78,8 +78,6 @@
       </ul>
     </div>
 
-    <ClientUserCapabilitiesSection />
-
     <div v-if="loading && settings.length === 0" class="loading-state">
       <t-loading :text="t('system.globalSettings.loading')" />
     </div>
@@ -515,7 +513,6 @@ import {
   type AuditOutcome,
 } from '@/api/system'
 import { useAuthStore } from '@/stores/auth'
-import ClientUserCapabilitiesSection from '@/views/system/ClientUserCapabilitiesSection.vue'
 
 const authStore = useAuthStore()
 const currentUserId = computed(() => authStore.currentUserId)
