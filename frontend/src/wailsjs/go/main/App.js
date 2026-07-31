@@ -41,3 +41,7 @@ export function SetDesktopHTTPBindPublicSetting(arg1) {
 export function SetDesktopHTTPPortSetting(arg1) {
   return window['go']['main']['App']['SetDesktopHTTPPortSetting'](arg1);
 }
+
+export function SelectDirectory() {
+  return window['go']['main']['App']['SelectDirectory']();
+}

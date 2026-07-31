@@ -88,6 +88,19 @@
                   :resolve-reason="event.resolve_reason" />
               </div>
 
+              <div v-else-if="event.type === 'workspace_mutation_required'" class="tool-event">
+                <WorkspaceMutationCard
+                  :proposal-id="event.proposal_id"
+                  :token="event.token"
+                  :op="event.op || ''"
+                  :from-path="event.from || ''"
+                  :to-path="event.to"
+                  :resolved="event.resolved"
+                  :approved="event.approved"
+                  @resolved="(payload) => { event.resolved = true; event.approved = payload.approved }"
+                />
+              </div>
+
               <!-- Tool Call Event (non-thinking) -->
               <div v-else-if="event.type === 'tool_call'" class="tool-event">
                 <div class="action-card" :class="{
@@ -232,6 +245,19 @@
                 :mcp-tool-name="event.mcp_tool_name || ''" :description="event.description" :args-json="event.args_json"
                 :timeout-seconds="event.timeout_seconds" :requested-at="event.requested_at" :resolved="event.resolved"
                 :approved="event.approved" :resolve-reason="event.resolve_reason" />
+            </div>
+
+            <div v-else-if="event.type === 'workspace_mutation_required'" class="tool-event">
+              <WorkspaceMutationCard
+                :proposal-id="event.proposal_id"
+                :token="event.token"
+                :op="event.op || ''"
+                :from-path="event.from || ''"
+                :to-path="event.to"
+                :resolved="event.resolved"
+                :approved="event.approved"
+                @resolved="(payload) => { event.resolved = true; event.approved = payload.approved }"
+              />
             </div>
 
             <!-- Thinking Tool Call -->
@@ -419,6 +445,7 @@ import { marked } from 'marked';
 import 'katex/dist/katex.min.css';
 import ToolResultRenderer from './ToolResultRenderer.vue';
 import ToolApprovalCard from './ToolApprovalCard.vue';
+import WorkspaceMutationCard from './WorkspaceMutationCard.vue';
 import ChatRequestInfoButton from '@/components/ChatRequestInfoButton.vue';
 import ChatCitationFloat from '@/components/ChatCitationFloat.vue';
 import picturePreview from '@/components/picture-preview.vue';
@@ -1405,6 +1432,9 @@ const getEventKey = (event: any, index: number): string => {
   if (event.tool_call_id) return `tool-${event.tool_call_id}`;
   if (event.type === 'tool_approval_required' && event.pending_id) {
     return `approval-${event.pending_id}`;
+  }
+  if (event.type === 'workspace_mutation_required' && event.proposal_id) {
+    return `mutation-${event.proposal_id}`;
   }
   return `event-${index}-${event.type || 'unknown'}`;
 };

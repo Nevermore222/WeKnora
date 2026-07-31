@@ -180,7 +180,6 @@ func TestCreateSessionResolvesWorkspaceBindingServerSide(t *testing.T) {
 		Title:    "workspace session",
 		WorkspaceBinding: &types.SessionWorkspaceBinding{
 			WorkspaceID: "ws-1",
-			RootPath:    "/forged/client/path",
 		},
 	})
 

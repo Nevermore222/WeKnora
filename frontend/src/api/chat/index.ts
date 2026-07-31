@@ -11,7 +11,8 @@ export interface SessionWorkspaceBindingPayload {
 }
 
 export interface SessionWorkspaceBindingInput {
-  workspace_id: string;
+  workspace_id?: string;
+  root_path?: string;
 }
 
 export async function createSessions(data: {

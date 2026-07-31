@@ -66,6 +66,7 @@ import type { SuggestedQuestion } from "@/api/agent/index";
 import { useMenuStore } from '@/stores/menu';
 import { useSettingsStore } from '@/stores/settings';
 import { useUIStore } from '@/stores/ui';
+import { useAuthStore } from '@/stores/auth';
 import { useRoute, useRouter } from 'vue-router';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useI18n } from 'vue-i18n';
@@ -77,6 +78,7 @@ const route = useRoute();
 const usemenuStore = useMenuStore();
 const settingsStore = useSettingsStore();
 const uiStore = useUIStore();
+const authStore = useAuthStore();
 const { t } = useI18n();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 const selectedWorkspaceId = ref('');
@@ -207,9 +209,9 @@ async function createNewSession(value: string, modelId: string, mentionedItems: 
     };
 
     if (selectedWorkspaceId.value) {
-        sessionData.workspace_binding = {
-            workspace_id: selectedWorkspaceId.value,
-        };
+        sessionData.workspace_binding = authStore.isPersonalMode
+            ? { root_path: selectedWorkspaceId.value }
+            : { workspace_id: selectedWorkspaceId.value };
     }
 
     try {

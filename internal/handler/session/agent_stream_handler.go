@@ -110,6 +110,7 @@ func (h *AgentStreamHandler) Subscribe() {
 	h.eventBus.On(event.EventAgentComplete, h.handleComplete)
 	h.eventBus.On(event.EventToolApprovalRequired, h.handleToolApprovalRequired)
 	h.eventBus.On(event.EventToolApprovalResolved, h.handleToolApprovalResolved)
+	h.eventBus.On(event.EventWorkspaceMutationRequired, h.handleWorkspaceMutationRequired)
 }
 
 // handleThought handles agent thought events
@@ -320,6 +321,28 @@ func (h *AgentStreamHandler) handleToolApprovalResolved(ctx context.Context, evt
 		Data:      meta,
 	}); err != nil {
 		logger.GetLogger(h.ctx).Error("Append tool approval resolved event failed", "error", err)
+	}
+	return nil
+}
+
+// handleWorkspaceMutationRequired persists Personal local-folder mutation confirmations for SSE.
+func (h *AgentStreamHandler) handleWorkspaceMutationRequired(ctx context.Context, evt event.Event) error {
+	data, ok := evt.Data.(event.WorkspaceMutationRequiredData)
+	if !ok {
+		return nil
+	}
+	meta := toolApprovalDataToMap(data)
+	meta["proposal_id"] = data.ProposalID
+	meta["token"] = data.Token
+	if err := h.streamManager.AppendEvent(h.ctx, h.sessionID, h.assistantMessageID, interfaces.StreamEvent{
+		ID:        evt.ID,
+		Type:      types.ResponseTypeWorkspaceMutationRequired,
+		Content:   "Workspace mutation requires confirmation",
+		Done:      true,
+		Timestamp: time.Now(),
+		Data:      meta,
+	}); err != nil {
+		logger.GetLogger(h.ctx).Error("Append workspace mutation required event failed", "error", err)
 	}
 	return nil
 }

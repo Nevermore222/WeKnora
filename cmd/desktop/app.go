@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"strings"
+
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App holds Wails-bound state for the desktop shell.
@@ -113,4 +115,15 @@ func (a *App) AutoCheckForUpdates() {
 	if a.ctx != nil {
 		checkUpdate(a.ctx, desktopAboutVersion(), false, true)
 	}
+}
+
+// SelectDirectory opens a native directory picker for Personal local workspaces.
+// Returns the chosen absolute path, or an empty string if the user cancels.
+func (a *App) SelectDirectory() (string, error) {
+	if a.ctx == nil {
+		return "", nil
+	}
+	return wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "选择工作区文件夹",
+	})
 }

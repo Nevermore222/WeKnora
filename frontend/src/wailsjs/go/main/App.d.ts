@@ -20,3 +20,5 @@ export function GetDesktopListenPublicActive():Promise<boolean>;
 export function SetDesktopHTTPBindPublicSetting(arg1:boolean):Promise<void>;
 
 export function SetDesktopHTTPPortSetting(arg1:number):Promise<void>;
+
+export function SelectDirectory():Promise<string>;

@@ -55,3 +55,23 @@ export function workspaceFileDownloadUrl(workspaceId: string, path: string) {
 export async function fetchWorkspaceFileBlob(workspaceId: string, path: string, mode: 'raw' | 'download' = 'raw') {
   return getDown(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/files/${mode}?path=${encodeURIComponent(path)}`) as Promise<Blob>;
 }
+
+export interface WorkspaceMutationProposal {
+  id: string
+  token: string
+  session_id?: string
+  workspace_id?: string
+  root_path?: string
+  op: string
+  from: string
+  to?: string
+  expires_at?: string
+}
+
+export async function applyWorkspaceMutation(id: string, token: string) {
+  return post(`/api/v1/workspaces/mutations/${encodeURIComponent(id)}/apply`, { token })
+}
+
+export async function rejectWorkspaceMutation(id: string, token: string) {
+  return post(`/api/v1/workspaces/mutations/${encodeURIComponent(id)}/reject`, { token })
+}

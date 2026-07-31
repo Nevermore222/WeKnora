@@ -102,6 +102,8 @@ const (
 	ResponseTypeToolApprovalRequired ResponseType = "tool_approval_required"
 	// ToolApprovalResolved: user approved/rejected (or timeout); informational for UI replay
 	ResponseTypeToolApprovalResolved ResponseType = "tool_approval_resolved"
+	// WorkspaceMutationRequired: Personal local folder destructive op — UI must confirm before apply
+	ResponseTypeWorkspaceMutationRequired ResponseType = "workspace_mutation_required"
 )
 
 // StreamResponse stream response

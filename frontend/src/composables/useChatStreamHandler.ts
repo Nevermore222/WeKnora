@@ -507,7 +507,8 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       (data.response_type === 'thinking' ||
         data.response_type === 'answer' ||
         data.response_type === 'tool_call' ||
-        data.response_type === 'tool_approval_required')
+        data.response_type === 'tool_approval_required' ||
+        data.response_type === 'workspace_mutation_required')
     ) {
       log('[Agent Chunk] Closing loading for continued stream')
       loading.value = false
@@ -575,6 +576,21 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           args_json: d.args_json,
           timeout_seconds: d.timeout_seconds,
           requested_at: d.requested_at,
+          tool_call_id: d.tool_call_id,
+          resolved: false,
+        })
+        break
+      }
+      case 'workspace_mutation_required': {
+        if (!message.agentEventStream) message.agentEventStream = []
+        const d = dataPayload || {}
+        ;(message.agentEventStream as ChatMessage[]).push({
+          type: 'workspace_mutation_required',
+          proposal_id: d.proposal_id,
+          token: d.token,
+          op: d.op,
+          from: d.from,
+          to: d.to,
           tool_call_id: d.tool_call_id,
           resolved: false,
         })
