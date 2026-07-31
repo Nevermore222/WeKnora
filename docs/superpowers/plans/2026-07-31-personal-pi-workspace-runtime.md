@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-31-personal-pi-workspace-runtime-design.md`
 
+**Progress (2026-07-31):** Tasks 1–8 implemented on `002-session-workspace-binding` (HEAD includes `c05c0969` runtime + `6096d4de` sticky Personal-mode fix). Skill script routing via Pi remains deferred; confirm mutations stay on Go apply path.
+
 ---
 
 ## File map

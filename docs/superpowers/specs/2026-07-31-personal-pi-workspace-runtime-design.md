@@ -1,9 +1,25 @@
 # Personal Pi Workspace Runtime Design
 
 **Date:** 2026-07-31  
-**Status:** Draft for review  
+**Status:** Approved — v1 implemented on branch `002-session-workspace-binding`  
 **Scope:** Personal edition only — workspace-scoped Skill / file / shell execution via Pi coding-agent SDK sidecar  
 **Non-scope:** Docker / Enterprise sidecar; replacing Go agent loop; migrating KB retrieval to Pi; replacing UI with Pi-web
+
+### Implementation progress (2026-07-31)
+
+| Item | Status |
+|---|---|
+| Spec + plan | Done |
+| Go RPC protocol / stdio client / Facade | Done (`internal/piruntime`) |
+| Node sidecar (cwd file/shell; fs-based v1) | Done (`sidecars/pi-workspace`) |
+| Personal desktop lifecycle + `build-personal.ps1` bundle | Done |
+| Agent tools `workspace_read/write/edit/list/shell` | Done (Personal only) |
+| Destructive ops confirm UI (Go mutation path) | Done (kept on Go) |
+| `execute_skill_script` via Pi | Deferred (still Go gateway; sidecar accepts `script_abs`) |
+| KB / Progressive RAG | Unchanged (by design) |
+| Docker sticky Personal UI bug (`root_path` silently dropped) | Fixed (`6096d4de`) |
+
+**Known ops note:** Docker/server must use managed workspaces. Local folder `root_path` only works on Personal desktop against a Personal edition API.
 
 ---
 
