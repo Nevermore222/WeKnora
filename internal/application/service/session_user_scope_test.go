@@ -30,6 +30,18 @@ func (s *sessionWorkspaceServiceStub) Resolve(context.Context, string) (*workspa
 	return s.resolved, s.resolveErr
 }
 
+func (s *sessionWorkspaceServiceStub) ListFiles(context.Context, string, string) ([]*workspace.FileEntry, error) {
+	return nil, nil
+}
+
+func (s *sessionWorkspaceServiceStub) PreviewFile(context.Context, string, string, int64) (*workspace.FilePreview, error) {
+	return nil, nil
+}
+
+func (s *sessionWorkspaceServiceStub) OpenFile(context.Context, string, string) (*workspace.FileOpenResult, error) {
+	return nil, nil
+}
+
 func testSessionScopeContext(tenantID uint64, userID string) context.Context {
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, tenantID)
 	if userID != "" {

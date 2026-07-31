@@ -279,11 +279,69 @@ func (s *sessionService) normalizeWorkspaceBinding(
 	}
 
 	workspaceID := strings.TrimSpace(binding.WorkspaceID)
+	rootPath := strings.TrimSpace(binding.RootPath)
+	now := time.Now()
+
+	if workspace.PersonalLocalFoldersEnabled() {
+		if rootPath == "" {
+			if workspaceID == "" {
+				return nil, nil
+			}
+			// Legacy managed binding on Personal — require rebind to a local folder.
+			return &types.SessionWorkspaceBinding{
+				WorkspaceID:       workspaceID,
+				Status:            types.SessionWorkspaceBindingStatusInvalid,
+				BindingKind:       types.SessionWorkspaceBindingKindLocalFolder,
+				ValidationMessage: "请打开本机文件夹重新绑定工作区",
+				BoundByUserID:     userID,
+				BoundAt:           cloneTimePtr(binding.BoundAt, &now),
+				LastValidatedAt:   &now,
+			}, fmt.Errorf("binding_invalid: local folder root_path required")
+		}
+		ent, err := workspace.BindLocalFolder(rootPath)
+		if ent == nil {
+			return nil, err
+		}
+		if workspaceID != "" && workspaceID != ent.ID {
+			return nil, fmt.Errorf("binding_invalid: workspace_id does not match root_path")
+		}
+		status := types.SessionWorkspaceBindingStatusBound
+		switch ent.Status {
+		case workspace.StatusMissing:
+			status = types.SessionWorkspaceBindingStatusInvalid
+		case workspace.StatusAccessDenied:
+			status = types.SessionWorkspaceBindingStatusAccessDenied
+		}
+		out := &types.SessionWorkspaceBinding{
+			WorkspaceID:       ent.ID,
+			WorkspaceName:     ent.Name,
+			RootPath:          ent.RootPath,
+			Status:            status,
+			BindingKind:       types.SessionWorkspaceBindingKindLocalFolder,
+			BoundByUserID:     userID,
+			BoundAt:           cloneTimePtr(binding.BoundAt, &now),
+			LastValidatedAt:   &now,
+		}
+		if status == types.SessionWorkspaceBindingStatusBound {
+			workspace.RememberLocalFolder(ent.ID, ent.RootPath)
+			return out, nil
+		}
+		msg := "workspace folder is not available"
+		if status == types.SessionWorkspaceBindingStatusAccessDenied {
+			msg = "workspace is not writable"
+		}
+		out.ValidationMessage = msg
+		return out, fmt.Errorf("binding_invalid: %s", ent.Status)
+	}
+
+	// Non-Personal: reject client-supplied absolute roots.
+	if rootPath != "" {
+		return nil, fmt.Errorf("binding_invalid: root_path is only supported on Personal")
+	}
 	if workspaceID == "" {
 		return nil, nil
 	}
 
-	now := time.Now()
 	if s.workspaceService == nil {
 		return nil, stderrors.New("workspace_not_configured: workspace service is unavailable")
 	}
@@ -300,6 +358,7 @@ func (s *sessionService) normalizeWorkspaceBinding(
 		return &types.SessionWorkspaceBinding{
 			WorkspaceID:       workspaceID,
 			Status:            status,
+			BindingKind:       types.SessionWorkspaceBindingKindManaged,
 			ValidationMessage: message,
 			BoundByUserID:     userID,
 			BoundAt:           cloneTimePtr(binding.BoundAt, &now),
@@ -312,6 +371,7 @@ func (s *sessionService) normalizeWorkspaceBinding(
 		WorkspaceName:     entry.Name,
 		RootPath:          entry.RootPath,
 		Status:            types.SessionWorkspaceBindingStatusBound,
+		BindingKind:       types.SessionWorkspaceBindingKindManaged,
 		ValidationMessage: "",
 		BoundByUserID:     userID,
 		BoundAt:           cloneTimePtr(binding.BoundAt, &now),

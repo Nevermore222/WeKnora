@@ -125,6 +125,7 @@ func (h *Handler) CreateSession(c *gin.Context) {
 	if request.WorkspaceBinding != nil {
 		createdSession.WorkspaceBinding = &types.SessionWorkspaceBinding{
 			WorkspaceID: request.WorkspaceBinding.WorkspaceID,
+			RootPath:    request.WorkspaceBinding.RootPath,
 		}
 	}
 
@@ -311,6 +312,7 @@ func (h *Handler) UpdateSession(c *gin.Context) {
 		if request.WorkspaceBinding != nil {
 			session.WorkspaceBinding = &types.SessionWorkspaceBinding{
 				WorkspaceID: request.WorkspaceBinding.WorkspaceID,
+				RootPath:    request.WorkspaceBinding.RootPath,
 			}
 		} else {
 			session.WorkspaceBinding = &types.SessionWorkspaceBinding{}
@@ -586,5 +588,7 @@ func isWorkspaceBindingValidationError(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "workspace binding must match the active workspace") ||
 		strings.Contains(msg, "workspace not found or no longer available") ||
-		strings.Contains(msg, "workspace is no longer active")
+		strings.Contains(msg, "workspace is no longer active") ||
+		strings.Contains(msg, "binding_invalid:") ||
+		strings.Contains(msg, "workspace_access_denied")
 }

@@ -96,6 +96,8 @@ func newWorkspaceService() interfaces.WorkspaceService {
 	if root == "" {
 		root = "/workspaces"
 	}
+	// Personal desktop builds set handler.Edition=personal via ldflags.
+	workspace.SetPersonalLocalFoldersEnabled(handler.Edition == "personal")
 	return workspace.NewLocalRegistry(root)
 }
 

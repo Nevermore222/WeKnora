@@ -179,6 +179,30 @@ func (r *LocalRegistry) List(ctx context.Context) ([]*Entry, error) {
 }
 
 func (r *LocalRegistry) Resolve(ctx context.Context, id string) (*Entry, error) {
+	id = strings.TrimSpace(id)
+	if IsLocalWorkspaceID(id) {
+		root, ok := LookupLocalFolder(id)
+		if !ok {
+			return nil, ErrNotFound
+		}
+		ent, err := BindLocalFolder(root)
+		if err != nil || ent == nil || ent.Status != StatusAvailable {
+			if err == nil {
+				err = ErrNotFound
+			}
+			return nil, err
+		}
+		if err := probeWritable(ent.RootPath); err != nil {
+			return nil, ErrAccessDenied
+		}
+		return &Entry{
+			ID:       ent.ID,
+			Name:     ent.Name,
+			RootPath: ent.RootPath,
+			Status:   StatusAvailable,
+		}, nil
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -194,7 +218,7 @@ func (r *LocalRegistry) Resolve(ctx context.Context, id string) (*Entry, error) 
 		return nil, err
 	}
 	for _, stored := range state.Workspaces {
-		if stored.ID != strings.TrimSpace(id) || stored.TenantID != tenantID || stored.UserID != userID {
+		if stored.ID != id || stored.TenantID != tenantID || stored.UserID != userID {
 			continue
 		}
 		rootPath, err := r.resolvePath(stored)

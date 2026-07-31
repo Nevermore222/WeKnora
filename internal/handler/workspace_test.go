@@ -85,6 +85,10 @@ func TestWorkspaceHandlerListDoesNotExposeRootPath(t *testing.T) {
 }
 
 func TestWorkspaceHandlerCreate(t *testing.T) {
+	prev := Edition
+	Edition = "standard"
+	t.Cleanup(func() { Edition = prev })
+
 	stub := &workspaceServiceStub{created: &workspace.Entry{
 		ID: "ws-1", Name: "Reports", RelativePath: "Reports",
 		RootPath: "/workspaces/Reports", Status: workspace.StatusAvailable,
@@ -98,6 +102,23 @@ func TestWorkspaceHandlerCreate(t *testing.T) {
 	require.Equal(t, http.StatusCreated, recorder.Code)
 	require.Equal(t, "Reports", stub.input.Name)
 	require.NotContains(t, recorder.Body.String(), "root_path")
+}
+
+func TestWorkspaceHandlerCreateDisabledOnPersonal(t *testing.T) {
+	prev := Edition
+	Edition = "personal"
+	t.Cleanup(func() { Edition = prev })
+
+	stub := &workspaceServiceStub{}
+	handler := NewWorkspaceHandler(stub)
+	c, recorder := workspaceHandlerContext(http.MethodPost, "/api/v1/workspaces", []byte(`{"name":"Reports"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler.Create(c)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "managed_workspace_disabled")
+	require.Empty(t, stub.input.Name)
 }
 
 func TestWorkspaceHandlerGetMapsNotFound(t *testing.T) {

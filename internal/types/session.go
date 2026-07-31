@@ -221,10 +221,19 @@ const (
 	SessionWorkspaceBindingStatusArchived     SessionWorkspaceBindingStatus = "archived"
 )
 
+type SessionWorkspaceBindingKind string
+
+const (
+	SessionWorkspaceBindingKindManaged     SessionWorkspaceBindingKind = "managed"
+	SessionWorkspaceBindingKindLocalFolder SessionWorkspaceBindingKind = "local_folder"
+)
+
 // SessionWorkspaceBindingInput is the client-facing payload used when a chat
 // binds or rebinds its default workspace.
 type SessionWorkspaceBindingInput struct {
 	WorkspaceID string `json:"workspace_id,omitempty"`
+	// RootPath is accepted on Personal only for local-folder binding.
+	RootPath string `json:"root_path,omitempty"`
 }
 
 // SessionWorkspaceBinding stores the durable binding state for a conversation.
@@ -233,6 +242,7 @@ type SessionWorkspaceBinding struct {
 	WorkspaceName     string                        `json:"workspace_name,omitempty"`
 	RootPath          string                        `json:"root_path,omitempty"`
 	Status            SessionWorkspaceBindingStatus `json:"status,omitempty"`
+	BindingKind       SessionWorkspaceBindingKind   `json:"binding_kind,omitempty"`
 	ValidationMessage string                        `json:"validation_message,omitempty"`
 	BoundAt           *time.Time                    `json:"bound_at,omitempty"`
 	BoundByUserID     string                        `json:"bound_by_user_id,omitempty"`

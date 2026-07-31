@@ -33,6 +33,13 @@ func (h *WorkspaceHandler) List(c *gin.Context) {
 }
 
 func (h *WorkspaceHandler) Create(c *gin.Context) {
+	if Edition == "personal" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "managed_workspace_disabled",
+			"message": "Personal uses local folders; managed workspaces are disabled",
+		})
+		return
+	}
 	var input workspace.CreateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": "invalid_request", "message": "workspace name is required"})
