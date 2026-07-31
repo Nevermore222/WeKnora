@@ -495,6 +495,10 @@ func RegisterWorkspaceRoutes(r *gin.RouterGroup, workspaceHandler *handler.Works
 	{
 		workspaces.GET("", workspaceHandler.List)
 		workspaces.POST("", workspaceHandler.Create)
+		// Static mutation routes must register before /:id to avoid shadowing.
+		workspaces.POST("/mutations/propose", workspaceHandler.ProposeMutation)
+		workspaces.POST("/mutations/:id/apply", workspaceHandler.ApplyMutation)
+		workspaces.POST("/mutations/:id/reject", workspaceHandler.RejectMutation)
 		workspaces.GET("/:id/files", workspaceHandler.ListFiles)
 		workspaces.GET("/:id/files/preview", workspaceHandler.PreviewFile)
 		workspaces.GET("/:id/files/raw", workspaceHandler.RawFile)
