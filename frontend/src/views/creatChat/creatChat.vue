@@ -217,6 +217,13 @@ async function createNewSession(value: string, modelId: string, mentionedItems: 
     try {
         const res = await createSessions(sessionData);
         if (res.data && res.data.id) {
+            if (sessionData.workspace_binding && !res.data.workspace_binding?.workspace_id && !res.data.workspace_binding?.root_path) {
+                console.warn('[createChat] workspace_binding was requested but missing on created session', {
+                    requested: sessionData.workspace_binding,
+                    sessionId: res.data.id,
+                });
+                MessagePlugin.warning(t('createChat.workspace.bindNotApplied'));
+            }
             await navigateToSession(res.data.id, value, modelId, mentionedItems, imageFiles, attachmentFiles);
         } else {
             console.error('[createChat] Failed to create session');

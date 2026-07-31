@@ -992,9 +992,14 @@ onMounted(async () => {
             isLiteEdition.value = true
             editionBadge.value = edition === 'personal' ? 'Personal' : 'Lite'
             authStore.setLiteMode(true)
-            if (edition === 'personal') {
-                authStore.setPersonalMode(true)
-            }
+            // Personal folder binding only works against a Personal edition API.
+            // Clear sticky localStorage when the connected server is not Personal,
+            // otherwise the UI sends root_path and Docker silently drops the binding.
+            authStore.setPersonalMode(edition === 'personal')
+        } else {
+            isLiteEdition.value = false
+            authStore.setLiteMode(false)
+            authStore.setPersonalMode(false)
         }
     }).catch(() => { })
 

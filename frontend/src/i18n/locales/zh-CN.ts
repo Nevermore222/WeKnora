@@ -3150,6 +3150,8 @@ export default {
       createFailed: "创建工作区失败",
       createSuccess: "工作区已创建",
       unavailable: "已隐藏 {count} 个不可用工作区",
+      bindNotApplied:
+        "会话已创建，但工作区未绑定成功。若你在用 Docker/服务器版，请改选托管工作区；本机文件夹仅 Personal 桌面客户端可用。",
     },
     messages: {
       selectKnowledgeBase: "请先选择知识库",

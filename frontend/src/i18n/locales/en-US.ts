@@ -2217,6 +2217,8 @@ export default {
       createFailed: 'Failed to create workspace',
       createSuccess: 'Workspace created',
       unavailable: '{count} unavailable workspace(s) hidden',
+      bindNotApplied:
+        'Session created, but the workspace was not bound. On Docker/server, pick a managed workspace; local folders work only with the Personal desktop client.',
     },
     messages: {
       selectKnowledgeBase: 'Please select a knowledge base first',
