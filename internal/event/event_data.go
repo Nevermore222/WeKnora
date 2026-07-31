@@ -237,3 +237,18 @@ type ToolApprovalResolvedData struct {
 	TimedOut  bool   `json:"timed_out,omitempty"`
 	Canceled  bool   `json:"canceled,omitempty"`
 }
+
+// WorkspaceMutationRequiredData asks the UI to confirm a destructive file op.
+type WorkspaceMutationRequiredData struct {
+	ProposalID         string `json:"proposal_id"`
+	Token              string `json:"token"`
+	SessionID          string `json:"session_id"`
+	WorkspaceID        string `json:"workspace_id"`
+	RootPath           string `json:"root_path"`
+	Op                 string `json:"op"`
+	From               string `json:"from"`
+	To                 string `json:"to,omitempty"`
+	ExpiresAtUnix      int64  `json:"expires_at"`
+	ToolCallID         string `json:"tool_call_id,omitempty"`
+	AssistantMessageID string `json:"assistant_message_id,omitempty"`
+}

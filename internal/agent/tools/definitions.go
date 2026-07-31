@@ -23,6 +23,8 @@ const (
 	ToolReadSkill          = "read_skill"
 	// Browser-related tools (only available when browser automation is enabled)
 	ToolBrowserNavigate = "browser_navigate"
+	// Personal local-folder destructive file ops (confirm in UI)
+	ToolWorkspaceMutate = "workspace_mutate"
 	// Wiki-related tools (only available when wiki KBs are in scope)
 	ToolWikiReadPage      = "wiki_read_page"
 	ToolWikiWritePage     = "wiki_write_page"

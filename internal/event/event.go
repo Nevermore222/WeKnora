@@ -60,6 +60,9 @@ const (
 	EventToolApprovalRequired EventType = "tool_approval_required"
 	EventToolApprovalResolved EventType = "tool_approval_resolved"
 
+	// Personal local-folder destructive mutations (delete/rename/move)
+	EventWorkspaceMutationRequired EventType = "workspace_mutation_required"
+
 	// Error events
 	EventError EventType = "error" // 错误事件
 

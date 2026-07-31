@@ -21,6 +21,7 @@ import (
 	"github.com/Tencent/Xelora/internal/types"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
 	secutils "github.com/Tencent/Xelora/internal/utils"
+	"github.com/Tencent/Xelora/internal/workspace"
 	"gorm.io/gorm"
 )
 
@@ -341,6 +342,13 @@ func (s *agentService) initializeSkillsManager(
 			WithSessionWorkspaceResolver(s.resolveSessionWorkspaceBinding)
 		toolRegistry.RegisterTool(browserTool)
 		logger.Infof(ctx, "Registered browser_navigate tool with session workspace resolver")
+	}
+
+	if workspace.PersonalLocalFoldersEnabled() {
+		mutateTool := tools.NewWorkspaceMutateTool().
+			WithSessionWorkspaceResolver(s.resolveSessionWorkspaceBinding)
+		toolRegistry.RegisterTool(mutateTool)
+		logger.Infof(ctx, "Registered workspace_mutate tool for Personal local folders")
 	}
 
 	return skillsManager, nil

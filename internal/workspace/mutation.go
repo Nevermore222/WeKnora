@@ -161,6 +161,17 @@ func (s *MutationStore) Reject(id, token string) error {
 	return nil
 }
 
+// ListPending returns copies of unfinished proposals (tests / diagnostics).
+func (s *MutationStore) ListPending() []MutationProposal {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]MutationProposal, 0, len(s.items))
+	for _, item := range s.items {
+		out = append(out, item.proposal)
+	}
+	return out
+}
+
 // Wait blocks until the proposal is applied, rejected, expired, or ctx cancels.
 func (s *MutationStore) Wait(ctx context.Context, id string) (approved bool, reason string, err error) {
 	s.mu.Lock()
