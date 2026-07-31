@@ -119,6 +119,36 @@ try {
         Copy-Item "skills" (Join-Path $OutputDir "skills") -Recurse -Force
     }
 
+    # Build and copy Pi workspace sidecar (Personal cwd file/shell runtime)
+    $sidecarDir = Join-Path $RepoRoot "sidecars\pi-workspace"
+    if (Test-Path (Join-Path $sidecarDir "package.json")) {
+        Write-Host "==> Building pi-workspace sidecar..."
+        Push-Location $sidecarDir
+        try {
+            if (-not (Test-Path "node_modules")) {
+                npm ci 2>$null
+                if ($LASTEXITCODE -ne 0) { npm install }
+            }
+            npm run build
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "pi-workspace sidecar build failed — Personal file/shell tools need Node sidecar"
+            }
+        } finally {
+            Pop-Location
+        }
+        $sidecarOut = Join-Path $OutputDir "pi-workspace"
+        if (Test-Path $sidecarOut) {
+            Remove-Item $sidecarOut -Recurse -Force
+        }
+        New-Item -ItemType Directory -Force -Path (Join-Path $sidecarOut "dist") | Out-Null
+        if (Test-Path (Join-Path $sidecarDir "dist")) {
+            Copy-Item (Join-Path $sidecarDir "dist\*") (Join-Path $sidecarOut "dist\") -Recurse -Force
+        }
+        Copy-Item (Join-Path $sidecarDir "package.json") $sidecarOut -Force
+        Write-Host "    Sidecar: $(Join-Path $sidecarOut 'dist\main.js')"
+        Write-Host "    Requires system Node >= 22 on PATH (or set XELORA_NODE)" -ForegroundColor Gray
+    }
+
     Write-Host ""
     Write-Host "==> Build complete!" -ForegroundColor Green
     Write-Host "    Output: $OutputDir"

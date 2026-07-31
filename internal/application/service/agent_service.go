@@ -17,6 +17,7 @@ import (
 	"github.com/Tencent/Xelora/internal/mcp"
 	"github.com/Tencent/Xelora/internal/models/chat"
 	"github.com/Tencent/Xelora/internal/models/rerank"
+	"github.com/Tencent/Xelora/internal/piruntime"
 	"github.com/Tencent/Xelora/internal/sandbox"
 	"github.com/Tencent/Xelora/internal/types"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
@@ -349,6 +350,19 @@ func (s *agentService) initializeSkillsManager(
 			WithSessionWorkspaceResolver(s.resolveSessionWorkspaceBinding)
 		toolRegistry.RegisterTool(mutateTool)
 		logger.Infof(ctx, "Registered workspace_mutate tool for Personal local folders")
+
+		facade := piruntime.DefaultFacade()
+		for _, wt := range []*tools.WorkspaceFSTool{
+			tools.NewWorkspaceReadTool(),
+			tools.NewWorkspaceWriteTool(),
+			tools.NewWorkspaceEditTool(),
+			tools.NewWorkspaceListTool(),
+			tools.NewWorkspaceShellTool(),
+		} {
+			wt.WithSessionWorkspaceResolver(s.resolveSessionWorkspaceBinding).WithFacade(facade)
+			toolRegistry.RegisterTool(wt)
+		}
+		logger.Infof(ctx, "Registered Personal workspace file/shell tools (Pi facade)")
 	}
 
 	return skillsManager, nil

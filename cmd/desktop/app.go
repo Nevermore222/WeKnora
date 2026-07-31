@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"log"
 	"strings"
 
+	"github.com/Tencent/Xelora/internal/piruntime"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -27,9 +29,15 @@ func NewApp() *App {
 // startup is called when the application starts.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	if err := piruntime.StartFromPersonalBundle(ctx); err != nil {
+		log.Printf("[pi-workspace] sidecar not started: %v", err)
+	}
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if err := piruntime.Stop(ctx); err != nil {
+		log.Printf("[pi-workspace] sidecar stop: %v", err)
+	}
 	a.shutdownCh <- struct{}{}
 }
 

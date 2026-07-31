@@ -25,6 +25,12 @@ const (
 	ToolBrowserNavigate = "browser_navigate"
 	// Personal local-folder destructive file ops (confirm in UI)
 	ToolWorkspaceMutate = "workspace_mutate"
+	// Personal cwd file/shell tools (Pi workspace runtime)
+	ToolWorkspaceRead  = "workspace_read"
+	ToolWorkspaceWrite = "workspace_write"
+	ToolWorkspaceEdit  = "workspace_edit"
+	ToolWorkspaceList  = "workspace_list"
+	ToolWorkspaceShell = "workspace_shell"
 	// Wiki-related tools (only available when wiki KBs are in scope)
 	ToolWikiReadPage      = "wiki_read_page"
 	ToolWikiWritePage     = "wiki_write_page"
