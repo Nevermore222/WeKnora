@@ -13,6 +13,7 @@ from openpyxl.chart.label import DataLabelList
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.pagebreak import Break
 from PIL import Image as PILImage
 
 
@@ -302,6 +303,25 @@ def style_table(ws, header_row: int, start_col: int, headers: list[str], rows: l
     return header_row + len(rows)
 
 
+def style_grouped_table(ws, header_row: int, groups: list[tuple[int, int]], headers: list[str],
+                        rows: list[list[str]], *, row_height: int = 40,
+                        header_color: str = THEME["navy"]) -> int:
+    border = cell_border()
+    for (start_col, end_col), header in zip(groups, headers):
+        merge_value(ws, header_row, start_col, header_row, end_col, header, size=9, bold=True,
+                    color=THEME["white"], background=header_color, horizontal="center",
+                    vertical="center", border=border)
+    ws.row_dimensions[header_row].height = 28
+    for row_offset, values in enumerate(rows, 1):
+        row_no = header_row + row_offset
+        background = THEME["white"] if row_offset % 2 else THEME["panel"]
+        for (start_col, end_col), value in zip(groups, values):
+            merge_value(ws, row_no, start_col, row_no, end_col, value, size=9,
+                        color=THEME["ink"], background=background, vertical="center", border=border)
+        ws.row_dimensions[row_no].height = row_height
+    return header_row + len(rows)
+
+
 def add_image(ws, path: Path, anchor: str, *, max_width: int, max_height: int) -> tuple[int, int]:
     with PILImage.open(path) as source:
         width, height = source.size
@@ -377,6 +397,7 @@ def build_summary(wb: Workbook) -> None:
     add_legend(ws, 40)
     add_source_note(ws, 42, f"{source_ref('README_CN', 'RAG', 'README_CN 核心能力章节')}；{rel(IMAGE_FILES['qa'])}；{rel(IMAGE_FILES['current_architecture'])}")
     ws.print_area = "A1:L42"
+    ws.page_setup.fitToHeight = 1
     ws.freeze_panes = "A5"
 
 
@@ -398,13 +419,12 @@ def build_value_loop(wb: Workbook) -> None:
         ("03 推理", "Agent 组织多步检索、工具调用和回答", THEME["purple"]),
         ("04 沉淀", "Wiki、图谱、工作区文件与追踪记录", THEME["amber"]),
     ]
-    col = 1
-    for index, (title, body, color) in enumerate(steps):
-        add_card(ws, end_row + 6, col, col + 2, title, body, color)
-        if index < len(steps) - 1:
-            merge_value(ws, end_row + 7, col + 3, end_row + 7, col + 3, "→", size=20, bold=True,
+    step_layout = [(1, 2, 3), (4, 5, 6), (7, 8, 9), (10, 11, None)]
+    for (title, body, color), (start_col, end_col, arrow_col) in zip(steps, step_layout):
+        add_card(ws, end_row + 6, start_col, end_col, title, body, color)
+        if arrow_col is not None:
+            merge_value(ws, end_row + 7, arrow_col, end_row + 7, arrow_col, "→", size=20, bold=True,
                         color=THEME["muted"], horizontal="center", vertical="center")
-        col += 3
     merge_value(ws, end_row + 11, 1, end_row + 12, 12,
                 "技术说明：README 同时列出 BM25、Dense、GraphRAG、Parent-Child、Rerank、pgvector HNSW 等检索与索引能力；本报告将其作为能力选项，不解释为已完成的统一效果排名。",
                 size=9, color=THEME["muted"], background=THEME["panel"], vertical="center")
@@ -435,6 +455,7 @@ def build_architecture(wb: Workbook) -> None:
     add_legend(ws, end_row + 6)
     add_source_note(ws, end_row + 8, f"{rel(IMAGE_FILES['current_architecture'])}；{rel(SOURCE_FILES['PI_DESIGN'])}；{rel(SOURCE_FILES['EXECUTION_SPEC'])}")
     ws.print_area = f"A1:L{end_row + 8}"
+    ws.page_setup.fitToHeight = 1
     ws.freeze_panes = "A5"
 
 
@@ -450,6 +471,8 @@ def build_screenshots(wb: Workbook) -> None:
     add_legend(ws, 56)
     add_source_note(ws, 58, f"{rel(SOURCE_FILES['README_CN'])}；{', '.join(rel(path) for path in IMAGE_FILES.values() if path != IMAGE_FILES['current_architecture'])}")
     ws.print_area = "A1:L58"
+    ws.row_breaks.append(Break(id=38))
+    ws.page_setup.fitToHeight = 2
     ws.freeze_panes = "A5"
 
 
@@ -509,14 +532,18 @@ def build_scenarios(wb: Workbook) -> None:
     add_legend(ws, 29)
     add_source_note(ws, 31, f"{rel(SOURCE_FILES['README_CN'])}；{rel(SOURCE_FILES['WORKSPACE_SPEC'])}；{rel(SOURCE_FILES['EXECUTION_SPEC'])}")
     ws.print_area = "A1:L31"
+    ws.row_breaks.append(Break(id=13))
+    ws.page_setup.fitToHeight = 2
     ws.freeze_panes = "A6"
 
 
 def build_status(wb: Workbook) -> None:
     ws = wb["07_当前进展与后续规划"]
     add_header(ws, "当前进展与后续规划", "以任务板和当前工作区为依据，区分已验证、进行中和待规划")
+    for column, width in {"A": 16, "B": 42, "C": 20, "D": 30, "E": 22}.items():
+        ws.column_dimensions[column].width = width
     merge_value(ws, 5, 1, 5, 12, "状态总览", size=12, bold=True, color=THEME["navy"], vertical="center")
-    status_rows = [("已完成/已验证", STATUS_DONE, THEME["green"]), ("进行中/当前工作区", STATUS_CURRENT, THEME["amber"]), ("待规划", STATUS_PLANNED, THEME["purple"])]
+    status_rows = [("已完成", STATUS_DONE, THEME["green"]), ("进行中", STATUS_CURRENT, THEME["amber"]), ("待规划", STATUS_PLANNED, THEME["purple"])]
     for row, (label, formula_status, color) in enumerate(status_rows, 7):
         set_value(ws, row, 1, label, size=10, bold=True, color=THEME["white"], background=color,
                   horizontal="center", vertical="center", border=cell_border(color))
@@ -528,8 +555,8 @@ def build_status(wb: Workbook) -> None:
     chart.type = "bar"
     chart.style = 10
     chart.title = "事项状态分布"
-    chart.y_axis.title = "状态"
-    chart.x_axis.title = "事项数"
+    chart.y_axis.title = None
+    chart.x_axis.title = None
     chart.height = 5.6
     chart.width = 10.0
     data = Reference(ws, min_col=2, min_row=7, max_row=9)
@@ -538,14 +565,22 @@ def build_status(wb: Workbook) -> None:
     chart.set_categories(categories)
     chart.dataLabels = DataLabelList()
     chart.dataLabels.showVal = True
+    chart.dataLabels.showSerName = False
+    chart.dataLabels.showCatName = True
+    chart.dataLabels.showLegendKey = False
     chart.legend = None
     ws.add_chart(chart, "G6")
     tasks = parse_task_board(SOURCE_FILES["TASKS"]) + current_worktree_rows()
     headers = ["编号", "事项", "状态", "证据来源", "备注"]
     rows: list[list[str]] = []
     for task in tasks:
-        note = "任务板已勾选" if task.status == STATUS_DONE else "任务板未勾选或当前工作区证据"
-        rows.append([task.task_id, task.title, task.status, task.source, note])
+        title = re.sub(rf"^{re.escape(task.task_id)}\s*", "", task.title).replace(" - ", " / ")
+        if len(title) > 52:
+            title = title[:49] + "..."
+        source = "TASKS.md" if task.source.endswith("docs/customizations/TASKS.md") else task.source
+        source = source.replace("docs/superpowers/specs/", "specs/")
+        note = "任务板已勾选" if task.status == STATUS_DONE else "未勾选/工作区证据"
+        rows.append([task.task_id, title, task.status, source, note])
     end_row = style_table(ws, 14, 1, headers, rows, row_height=34)
     if end_row < 15:
         raise ValueError("Task board did not produce any status rows")
@@ -555,6 +590,8 @@ def build_status(wb: Workbook) -> None:
     add_legend(ws, end_row + 6)
     add_source_note(ws, end_row + 8, f"{rel(SOURCE_FILES['TASKS'])}；当前工作区 git status；{rel(SOURCE_FILES['PI_DESIGN'])}")
     ws.print_area = f"A1:L{end_row + 8}"
+    ws.print_title_rows = "$1:$14"
+    ws.page_setup.fitToHeight = 2
     ws.freeze_panes = "A15"
 
 
@@ -574,20 +611,24 @@ def build_sources(wb: Workbook) -> None:
         ["S-09", "git commit d0ae7ec7", "本报告设计稿", "08", "设计已单独提交"],
         ["S-10", "当前工作区 git status", "Agent 完成语义和 Pi workspace 当前变更", "07", "未提交工作区证据，不能等同发布能力"],
     ]
-    end_row = style_table(ws, 5, 1, headers, rows, row_height=48)
+    source_groups = [(1, 2), (3, 5), (6, 8), (9, 10), (11, 12)]
+    end_row = style_grouped_table(ws, 5, source_groups, headers, rows, row_height=42)
     add_section_title(ws, end_row + 3, "口径图例", "报告中的事实标签用于帮助非研发读者区分证据强度")
     legend_rows = [
-        ["已验证事实", "README、规格、任务、源代码或测试证据支持的陈述", "绿色"],
-        ["当前工作区", "当前 dirty workspace 或正在实施的设计，不能当作发布声明", "琥珀色"],
-        ["设计决策", "当前架构/规格明确的 ownership 和边界", "紫色"],
-        ["路线图", "任务板或 ROADMAP 中尚未完成的方向", "灰紫色"],
+        ["已验证事实", "README/规格/任务/源代码/测试支持的陈述", "绿色"],
+        ["当前工作区", "dirty workspace 或 active design，不是发布声明", "琥珀色"],
+        ["设计决策", "架构/规格明确的 ownership 与边界", "紫色"],
+        ["路线图", "任务板/ROADMAP 中尚未完成的方向", "灰紫色"],
     ]
-    style_table(ws, end_row + 5, 1, ["标签", "含义", "视觉标识"], legend_rows, row_height=32, header_color=THEME["navy_2"])
+    legend_groups = [(1, 2), (3, 9), (10, 12)]
+    style_grouped_table(ws, end_row + 5, legend_groups, ["标签", "含义", "视觉标识"], legend_rows,
+                        row_height=30, header_color=THEME["navy_2"])
     merge_value(ws, end_row + 11, 1, end_row + 12, 12,
                 "本报告不替代项目验收，不将演示截图解释为性能基准；任何 ROI、准确率、延迟、采用率和生产规模结论都需要额外的独立测量证据。",
                 size=10, bold=True, color=THEME["amber"], background="FFF7E8", vertical="center", border=cell_border(THEME["amber"]))
     add_source_note(ws, end_row + 15, "报告生成器读取以上来源并将图片嵌入 XLSX；最终工作簿可脱离源仓库打开。")
     ws.print_area = f"A1:L{end_row + 15}"
+    ws.page_setup.fitToHeight = 1
     ws.freeze_panes = "A5"
 
 
@@ -598,6 +639,17 @@ def finalize_sheet(ws) -> None:
                 cell.font = Font(name=FONT_NAME, size=cell.font.sz or 10, bold=cell.font.bold,
                                  italic=cell.font.italic, color=cell.font.color or THEME["ink"])
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+
+
+def assert_no_overlapping_merges(wb: Workbook) -> None:
+    for ws in wb.worksheets:
+        ranges = list(ws.merged_cells.ranges)
+        for index, first in enumerate(ranges):
+            for second in ranges[index + 1:]:
+                rows_overlap = first.min_row <= second.max_row and second.min_row <= first.max_row
+                cols_overlap = first.min_col <= second.max_col and second.min_col <= first.max_col
+                if rows_overlap and cols_overlap:
+                    raise ValueError(f"Overlapping merged ranges in {ws.title}: {first} and {second}")
 
 
 def build_workbook(output: Path) -> None:
@@ -622,6 +674,7 @@ def build_workbook(output: Path) -> None:
     build_scenarios(wb)
     build_status(wb)
     build_sources(wb)
+    assert_no_overlapping_merges(wb)
     for ws in wb.worksheets:
         finalize_sheet(ws)
     wb.save(output)
