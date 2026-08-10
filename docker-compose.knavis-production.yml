@@ -1,0 +1,35 @@
+services:
+  frontend:
+    image: "${XELORA_FRONTEND_IMAGE:?set XELORA_FRONTEND_IMAGE in .env}"
+
+  app:
+    image: "${XELORA_APP_IMAGE:?set XELORA_APP_IMAGE in .env}"
+    environment:
+      XELORA_BRAND_PROFILE: internal
+      XELORA_PROCESS_ROLE: active
+      AUTO_MIGRATE: "false"
+      AUTO_RECOVER_DIRTY: "false"
+      STORAGE_TYPE: minio
+      MINIO_ENDPOINT: minio:9000
+      MINIO_USE_SSL: "false"
+      MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:?set MINIO_BUCKET_NAME in .env}"
+
+  docreader:
+    image: "${XELORA_DOCREADER_IMAGE:-wechatopenai/xelora-docreader:${XELORA_RUNTIME_VERSION:-latest}}"
+
+  sandbox:
+    image: "${XELORA_SANDBOX_DOCKER_IMAGE:-wechatopenai/xelora-sandbox:${XELORA_RUNTIME_VERSION:-latest}}"
+
+  postgres:
+    ports:
+      - "${KNAVIS_MAINTENANCE_BIND_IP:?set KNAVIS_MAINTENANCE_BIND_IP in .env}:5432:5432"
+
+  redis:
+    ports:
+      - "${KNAVIS_MAINTENANCE_BIND_IP:?set KNAVIS_MAINTENANCE_BIND_IP in .env}:6379:6379"
+
+  minio:
+    profiles: [minio]
+    ports: !override
+      - "${KNAVIS_MAINTENANCE_BIND_IP:?set KNAVIS_MAINTENANCE_BIND_IP in .env}:9000:9000"
+      - "${KNAVIS_MAINTENANCE_BIND_IP:?set KNAVIS_MAINTENANCE_BIND_IP in .env}:9001:9001"
