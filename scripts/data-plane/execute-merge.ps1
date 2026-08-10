@@ -163,7 +163,7 @@ WHERE contype = 'f' AND convalidated = false
     $dumpInContainer = '/tmp/merged-local-wins.dump'
     Invoke-Checked -FilePath 'docker' -Arguments @(
         'exec', $containerName, 'pg_dump', '--username=postgres', '--dbname=merged_preview',
-        '--format=custom', '--no-owner', '--no-privileges', "--file=$dumpInContainer"
+        '--format=custom', '--schema=public', '--no-owner', '--no-privileges', "--file=$dumpInContainer"
     )
     $mergedDumpPath = Join-Path $artifactRoot 'merged-local-wins.dump'
     Invoke-Checked -FilePath 'docker' -Arguments @('cp', "$containerName`:$dumpInContainer", $mergedDumpPath)
