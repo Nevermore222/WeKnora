@@ -1,16 +1,21 @@
 [CmdletBinding()]
 param(
-    [string]$EnvFile = ".env.knavis-passive"
+    [string]$EnvFile = ".env.knavis-passive",
+    [string]$DeploymentRoot = (Split-Path -Parent $PSScriptRoot)
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$base = Join-Path $repoRoot "docker-compose.yml"
-$passive = Join-Path $repoRoot "docker-compose.knavis-passive.yml"
+$passiveRoot = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path -LiteralPath $DeploymentRoot -PathType Container)) {
+    throw "Deployment root is missing: $DeploymentRoot"
+}
+$deploymentRoot = (Resolve-Path -LiteralPath $DeploymentRoot).Path
+$base = Join-Path $deploymentRoot "docker-compose.yml"
+$passive = Join-Path $passiveRoot "docker-compose.knavis-passive.yml"
 $envPath = if ([System.IO.Path]::IsPathRooted($EnvFile)) {
     $EnvFile
 } else {
-    Join-Path $repoRoot $EnvFile
+    Join-Path $deploymentRoot $EnvFile
 }
 
 foreach ($path in @($base, $passive, $envPath)) {
