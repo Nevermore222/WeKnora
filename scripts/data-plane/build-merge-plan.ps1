@@ -455,9 +455,10 @@ try {
     $serverMount = "type=bind,source=$($server.Root),target=/snapshots/server,readonly"
     $localMount = "type=bind,source=$($local.Root),target=/snapshots/local,readonly"
     $containerId = [string]((Invoke-CheckedOutput -FilePath 'docker' -Arguments @(
-            'run', '-d', '--name', $containerName,
-            '-e', 'POSTGRES_HOST_AUTH_METHOD=trust',
-            '--mount', $serverMount,
+        'run', '-d', '--name', $containerName,
+        '-e', 'POSTGRES_HOST_AUTH_METHOD=trust',
+        '--tmpfs', '/var/lib/postgresql/data:rw',
+        '--mount', $serverMount,
             '--mount', $localMount,
             $PostgresImage
         ))[-1])
