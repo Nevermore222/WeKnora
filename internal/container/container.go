@@ -112,6 +112,11 @@ func newWorkspaceService() interfaces.WorkspaceService {
 func BuildContainer(container *dig.Container) *dig.Container {
 	ctx := context.Background()
 	logger.Debugf(ctx, "[Container] Starting container initialization...")
+	role, err := processRoleFromEnv()
+	must(err)
+	activeProcess := backgroundServicesEnabled(role)
+	logger.Infof(ctx, "[Container] process role=%s", role)
+	must(container.Provide(func() processRole { return role }))
 
 	// Register resource cleaner for proper cleanup of resources
 	must(container.Provide(NewResourceCleaner, dig.As(new(interfaces.ResourceCleaner))))
@@ -295,13 +300,17 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(initConnectorRegistry))
 	must(container.Provide(datasource.NewScheduler))
 	must(container.Provide(service.NewDataSourceService))
-	must(container.Invoke(startDataSourceScheduler))
-	logger.Debugf(ctx, "[Container] Data source sync framework registered")
-	must(container.Invoke(startAuditLogRetention))
-	logger.Debugf(ctx, "[Container] Audit log retention runner registered")
 	must(container.Provide(service.NewHousekeepingService))
-	must(container.Invoke(startHousekeepingService))
-	logger.Debugf(ctx, "[Container] Knowledge housekeeping runner registered")
+	if activeProcess {
+		must(container.Invoke(startDataSourceScheduler))
+		logger.Debugf(ctx, "[Container] Data source sync framework registered")
+		must(container.Invoke(startAuditLogRetention))
+		logger.Debugf(ctx, "[Container] Audit log retention runner registered")
+		must(container.Invoke(startHousekeepingService))
+		logger.Debugf(ctx, "[Container] Knowledge housekeeping runner registered")
+	} else {
+		logger.Infof(ctx, "[Container] background schedulers disabled for passive process")
+	}
 	must(container.Provide(chatpipeline.NewEventManager))
 	must(container.Invoke(chatpipeline.NewPluginSearch))
 	must(container.Invoke(chatpipeline.NewPluginRerank))
@@ -384,10 +393,14 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	// Router configuration
 	logger.Debugf(ctx, "[Container] Registering router and starting task server...")
 	must(container.Provide(router.NewRouter))
-	if redisAvailable {
-		must(container.Invoke(router.RunAsynqServer))
+	if activeProcess {
+		if redisAvailable {
+			must(container.Invoke(router.RunAsynqServer))
+		} else {
+			must(container.Invoke(router.RegisterSyncHandlers))
+		}
 	} else {
-		must(container.Invoke(router.RegisterSyncHandlers))
+		logger.Infof(ctx, "[Container] task consumers disabled for passive process")
 	}
 
 	logger.Infof(ctx, "[Container] Container initialization completed successfully")
@@ -1385,10 +1398,10 @@ func registerWebSearchProviders(registry *infra_web_search.Registry) {
 	registry.Register("searxng", infra_web_search.NewSearxngProvider)
 }
 
-// registerIMAdapterFactories registers adapter factories for each IM platform
-// and loads enabled channels from the database. Each platform's factory lives
+// registerIMAdapterFactories registers adapter factories for each IM platform.
+// Channel consumers only run in active processes. Each platform's factory lives
 // in its own subpackage to keep this file focused on wiring.
-func registerIMAdapterFactories(imService *imPkg.Service) {
+func registerIMAdapterFactories(imService *imPkg.Service, role processRole) {
 	imService.RegisterAdapterFactory("wecom", wecom.NewFactory())
 	imService.RegisterAdapterFactory("feishu", feishu.NewFactory())
 	imService.RegisterAdapterFactory("slack", slack.NewFactory())
@@ -1396,6 +1409,11 @@ func registerIMAdapterFactories(imService *imPkg.Service) {
 	imService.RegisterAdapterFactory("dingtalk", dingtalk.NewFactory())
 	imService.RegisterAdapterFactory("mattermost", mattermost.NewFactory())
 	imService.RegisterAdapterFactory("wechat", wechat.NewFactory())
+
+	if !backgroundServicesEnabled(role) {
+		logger.Infof(context.Background(), "[IM] channel consumers disabled for passive process")
+		return
+	}
 
 	// Load and start all enabled channels from database
 	if err := imService.LoadAndStartChannels(); err != nil {
