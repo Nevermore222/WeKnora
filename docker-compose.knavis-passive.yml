@@ -1,0 +1,38 @@
+services:
+  frontend:
+    image: "${XELORA_FRONTEND_IMAGE:?set XELORA_FRONTEND_IMAGE in .env.knavis-passive}"
+    container_name: Knavis-passive-frontend
+    ports: !override
+      - "127.0.0.1:${KNAVIS_PASSIVE_FRONTEND_PORT:-18081}:80"
+
+  app:
+    image: "${XELORA_APP_IMAGE:?set XELORA_APP_IMAGE in .env.knavis-passive}"
+    container_name: Knavis-passive-app
+    env_file: !override
+      - "${KNAVIS_PASSIVE_SERVICE_ENV_FILE:?set KNAVIS_PASSIVE_SERVICE_ENV_FILE}"
+    ports: !override
+      - "127.0.0.1:${KNAVIS_PASSIVE_APP_PORT:-18080}:8080"
+    environment:
+      XELORA_BRAND_PROFILE: internal
+      XELORA_PROCESS_ROLE: passive
+      AUTO_MIGRATE: "false"
+      AUTO_RECOVER_DIRTY: "false"
+      DB_HOST: "${DB_HOST:?set DB_HOST in .env.knavis-passive}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_USER: "${DB_USER:?set DB_USER in .env.knavis-passive}"
+      DB_PASSWORD: "${DB_PASSWORD:?set DB_PASSWORD in .env.knavis-passive}"
+      DB_NAME: "${DB_NAME:?set DB_NAME in .env.knavis-passive}"
+      REDIS_ADDR: "${REDIS_ADDR:?set REDIS_ADDR in .env.knavis-passive}"
+      STORAGE_TYPE: minio
+      MINIO_ENDPOINT: "${MINIO_ENDPOINT:?set MINIO_ENDPOINT in .env.knavis-passive}"
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY_ID: "${MINIO_ACCESS_KEY_ID:?set MINIO_ACCESS_KEY_ID in .env.knavis-passive}"
+      MINIO_SECRET_ACCESS_KEY: "${MINIO_SECRET_ACCESS_KEY:?set MINIO_SECRET_ACCESS_KEY in .env.knavis-passive}"
+      MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:?set MINIO_BUCKET_NAME in .env.knavis-passive}"
+      XELORA_SANDBOX_DOCKER_VOLUMES_FROM: Knavis-passive-app
+
+  docreader:
+    image: "${XELORA_DOCREADER_IMAGE:-wechatopenai/xelora-docreader:${XELORA_RUNTIME_VERSION:-latest}}"
+
+  sandbox:
+    image: "${XELORA_SANDBOX_DOCKER_IMAGE:-wechatopenai/xelora-sandbox:${XELORA_RUNTIME_VERSION:-latest}}"
