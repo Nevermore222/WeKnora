@@ -86,11 +86,12 @@ ORDER BY table_name
 '@ -Headers @('table_name'))
 $columns = @(Invoke-PostgresCsv -PostgresContainer $PostgresContainer -DatabaseName $DatabaseName -DatabaseUser $DatabaseUser -Sql @'
 SELECT table_name, column_name, ordinal_position, data_type, udt_name,
-       is_nullable, COALESCE(column_default, '') AS column_default
+       is_nullable, COALESCE(column_default, '') AS column_default,
+       is_identity, identity_generation, is_generated
 FROM information_schema.columns
 WHERE table_schema = 'public'
 ORDER BY table_name, ordinal_position
-'@ -Headers @('table_name', 'column_name', 'ordinal_position', 'data_type', 'udt_name', 'is_nullable', 'column_default'))
+'@ -Headers @('table_name', 'column_name', 'ordinal_position', 'data_type', 'udt_name', 'is_nullable', 'column_default', 'is_identity', 'identity_generation', 'is_generated'))
 $primaryKeys = @(Invoke-PostgresCsv -PostgresContainer $PostgresContainer -DatabaseName $DatabaseName -DatabaseUser $DatabaseUser -Sql @'
 SELECT tc.table_name, kcu.column_name, kcu.ordinal_position
 FROM information_schema.table_constraints tc

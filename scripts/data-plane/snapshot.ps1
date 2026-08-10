@@ -46,6 +46,20 @@ $resolvedWorkspaceRoot = Assert-ExistingDirectory -Path $WorkspaceRoot -Label 'W
 Assert-ContainersStopped -Names $ApplicationContainers
 $artifactRoot = New-ArtifactDirectory -OutputRoot $OutputRoot -Prefix "snapshot-$SourceName"
 
+if ($PreflightDir) {
+    foreach ($reportName in @(
+            'preflight.json', 'database-schema.json', 'file-references.json',
+            'data-files-manifest.json', 'workspace-manifest.json', 'SHA256SUMS.txt'
+        )) {
+        $reportPath = Join-Path $PreflightDir $reportName
+        if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
+            throw "Preflight report is missing: $reportPath"
+        }
+        $destinationName = if ($reportName -eq 'SHA256SUMS.txt') { 'preflight-SHA256SUMS.txt' } else { $reportName }
+        Copy-Item -LiteralPath $reportPath -Destination (Join-Path $artifactRoot $destinationName)
+    }
+}
+
 $dumpName = "$SourceName-$([Guid]::NewGuid().ToString('N')).dump"
 $dumpInContainer = "/tmp/$dumpName"
 $dumpPath = Join-Path $artifactRoot "$SourceName.dump"
