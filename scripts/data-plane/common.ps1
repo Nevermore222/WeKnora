@@ -321,6 +321,9 @@ function Assert-RelativeStorageKey {
     if ([string]::IsNullOrWhiteSpace($Key) -or $Key.StartsWith('/') -or $Key -match '^[A-Za-z]:') {
         throw "Storage key is not relative: $Key"
     }
+    if ($Key -match '[\r\n\t\x00]') {
+        throw "Storage key contains a control character: $Key"
+    }
     $normalized = $Key.Replace('\', '/')
     if ($normalized.Split('/') -contains '..') {
         throw "Storage key escapes its root: $Key"
