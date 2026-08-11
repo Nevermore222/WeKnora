@@ -1,10 +1,11 @@
 #!/usr/bin/env node
+import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
 const repoRoot = process.cwd();
 const agentScriptPath = path.join(repoRoot, "scripts", "n8n", "upsert-xelora-cobol-tech-point-verification-agent.mjs");
-const workflowPath = path.resolve(repoRoot, "..", "n8n", "二维表", "Xelora版COBOL技术点检证用例工作流（基于tech_point）_1.0.0.json");
+const workflowPath = path.resolve(repoRoot, "..", "n8n", "二维表", "Xelora版COBOL技术点检证用例工作流（基于tech_point）_1.1.0.json");
 
 const agentScript = fs.readFileSync(agentScriptPath, "utf8");
 const workflow = JSON.parse(fs.readFileSync(workflowPath, "utf8"));
@@ -12,6 +13,28 @@ const workflowCode = workflow.nodes
   .filter((node) => node.type === "n8n-nodes-base.code")
   .map((node) => node.parameters?.jsCode || "")
   .join("\n");
+const serializedWorkflow = JSON.stringify(workflow);
+
+function requireNode(name) {
+  const node = workflow.nodes.find((entry) => entry.name === name);
+  assert.ok(node, `Missing workflow node: ${name}`);
+  return node;
+}
+
+const queryNode = requireNode("按项目查询tech_point行");
+const query = queryNode.parameters?.query || "";
+assert.match(query, /t\.project_id\s*=\s*\{\{\s*\$json\.project_id\s*\}\}/);
+assert.match(query, /variable_declaration/);
+assert.doesNotMatch(query, /DISTINCT\s+ON\s*\(sub_category\)/i);
+assert.ok(!workflow.nodes.some((node) => node.name === "按小分類查询tech_point代表行"));
+for (const marker of ["【技術点NO】", "【小分類】", "【変数宣言】", "【SOURCE_CONTENT】"]) {
+  assert.ok(serializedWorkflow.includes(marker), `Missing per-tech-point marker: ${marker}`);
+}
+assert.ok(serializedWorkflow.includes("ON CONFLICT (command_id, project_id, case_number)"));
+assert.ok(!serializedWorkflow.includes("ON CONFLICT (command_id, case_number)"));
+for (const nodeName of ["校验project_id", "查询并确认项目", "确认项目存在"]) {
+  requireNode(nodeName);
+}
 
 for (const node of workflow.nodes.filter((entry) => entry.type === "n8n-nodes-base.code")) {
   const code = node.parameters?.jsCode || "";
