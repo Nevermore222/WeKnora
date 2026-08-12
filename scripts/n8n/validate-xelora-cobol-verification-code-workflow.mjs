@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -14,7 +15,7 @@ const workflowPath = path.resolve(
   "..",
   "n8n",
   "检证用例代码",
-  "Xelora版COBOL检证用例代码生成工作流_1.0.0.json",
+  "Xelora版COBOL检证用例代码生成工作流_1.1.0.json",
 );
 
 const agentScript = fs.readFileSync(agentScriptPath, "utf8");
@@ -26,6 +27,27 @@ function requireNode(name) {
   if (!node) throw new Error(`Generated workflow is missing node: ${name}`);
   return node;
 }
+
+assert.ok(!workflow.nodes.some((node) => node.name === "查询cl_verification_cases_master表"));
+assert.ok(!workflow.nodes.some((node) => node.name === "判断project_id是否为空"));
+const projectQueryNode = requireNode("查询项目COBOL检证用例");
+const projectQuery = projectQueryNode.parameters?.query || "";
+for (const marker of [
+  "v.project_id = {{ $json.project_id }}",
+  "t.project_id = v.project_id",
+  "t.command_id = v.command_id",
+  "t.tech_point_no = v.tech_point_no",
+  "t.id AS source_tech_point_id",
+  "t.source_content",
+  "t.variable_declaration",
+]) {
+  assert.ok(projectQuery.includes(marker), `Missing project query marker: ${marker}`);
+}
+for (const nodeName of ["校验project_id", "查询并确认项目", "确认项目存在"]) {
+  requireNode(nodeName);
+}
+assert.ok(workflowText.includes("TECH_POINT_CONTEXT"));
+assert.ok(workflowText.includes("projectId === 3 ? 'F'"));
 
 for (const node of workflow.nodes.filter((entry) => entry.type === "n8n-nodes-base.code")) {
   const code = node.parameters?.jsCode || "";
