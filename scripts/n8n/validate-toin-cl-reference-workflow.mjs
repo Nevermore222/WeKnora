@@ -27,6 +27,8 @@ for (const forbidden of ["/v1/chat-messages", "dify_request_body", "Authorizatio
   if (serialized.includes(forbidden)) throw new Error(`workflow still contains Dify artifact: ${forbidden}`);
 }
 if (!serialized.includes("/sessions") || !serialized.includes("/agent-chat/")) throw new Error("workflow must call Xelora session and agent-chat endpoints");
-if (!serialized.includes("XELORA_CL_TECH_POINT_AGENT_ID")) throw new Error("workflow must use the dedicated CL tech-point agent env var");
+if (serialized.includes("$env.") || serialized.includes("XELORA_CL_TECH_POINT_AGENT_ID") || serialized.includes("N8N_XELORA_API_KEY")) throw new Error("workflow must not depend on n8n environment variables");
+if (!serialized.includes("ea572e95-405b-43da-b8e7-70a4a22e9cce")) throw new Error("workflow must use the dedicated CL tech-point agent ID");
+if (!serialized.includes("sk-5NB4aUSnLqpsYKoit_FuqbjECutYS-szIJfvxEWgBkKZb5x5")) throw new Error("workflow must embed the Xelora API key");
 if (serialized.includes("7286db41-b3e9-4289-ac4d-e6382d6be6e2")) throw new Error("workflow must not use the COBOL tech-point agent");
 console.log(JSON.stringify({ valid: true, nodes: workflow.nodes.length, connections: Object.keys(workflow.connections || {}).length }));
