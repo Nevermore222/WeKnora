@@ -49,8 +49,8 @@ return output;`;
 const requestNode = node("汇总并准备用例生成请求");
 requestNode.parameters.jsCode = `// 将每个技术点的最多五条引用构造成智能体请求
 const XELORA_API_BASE_URL = "http://192.168.2.61:18080/api/v1";
-const XELORA_API_KEY = "sk-5NB4aUSnLqpsYKoit_FuqbjECutYS-szIJfvxEWgBkKZb5x5";
-const XELORA_AGENT_ID = "7286db41-b3e9-4289-ac4d-e6382d6be6e2";
+const XELORA_API_KEY = $env.N8N_XELORA_API_KEY;
+const XELORA_AGENT_ID = $env.XELORA_CL_TECH_POINT_AGENT_ID;
 const XELORA_KB_ID = "51c574e9-0445-4c41-b0c7-6eecda9c4638";
 const XELORA_KNOWLEDGE_IDS = ["1fb94dcb-7dfb-4aad-aaa8-d9117dbc1244", "0029c569-941c-497b-9063-58d5b221ba4f"];
 const results = [];
