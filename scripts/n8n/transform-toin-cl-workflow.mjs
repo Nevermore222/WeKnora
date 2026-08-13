@@ -97,7 +97,7 @@ responseCopy.parameters.jsCode = responseCopy.parameters.jsCode.replace(
 );
 responseCopy.position = [responseCopy.position[0] + 900, responseCopy.position[1]];
 workflow.nodes.push(responseCopy);
-workflow.connections["小分類逐批处理"] = { main: [[{ node: "创建Xelora会话", type: "main", index: 0 }], [{ node: "最后尾收", type: "main", index: 0 }]] };
+workflow.connections["小分類逐批处理"] = { main: [[{ node: "最后尾收", type: "main", index: 0 }], [{ node: "创建Xelora会话", type: "main", index: 0 }]] };
 workflow.connections["创建Xelora会话"] = { main: [[{ node: "提取Xelora会话ID", type: "main", index: 0 }]] };
 workflow.connections["提取Xelora会话ID"] = { main: [[{ node: "调用Xelora用例生成智能体", type: "main", index: 0 }]] };
 workflow.connections["调用Xelora用例生成智能体"] = { main: [[{ node: "处理本批智能体响应", type: "main", index: 0 }]] };

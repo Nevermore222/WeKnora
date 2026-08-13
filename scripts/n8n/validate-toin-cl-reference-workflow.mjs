@@ -10,6 +10,13 @@ for (const required of ["按小分類查询tech_point代表行", "按批次分�
 for (const required of ["创建Xelora会话", "提取Xelora会话ID", "调用Xelora用例生成智能体", "处理本批智能体响应"]) {
   if (!names.has(required)) throw new Error(`missing Xelora node: ${required}`);
 }
+const subCategoryBatchOutputs = workflow.connections["小分類逐批处理"]?.main;
+if (subCategoryBatchOutputs?.[0]?.[0]?.node !== "最后尾收") {
+  throw new Error("小分類逐批处理 output 0 (Done) must connect to 最后尾收");
+}
+if (subCategoryBatchOutputs?.[1]?.[0]?.node !== "创建Xelora会话") {
+  throw new Error("小分類逐批处理 output 1 (Loop) must connect to 创建Xelora会话");
+}
 const query = workflow.nodes.find((node) => node.name === "按小分類查询tech_point代表行").parameters.query;
 const selector = workflow.nodes.find((node) => node.name === "按批次分组小分類").parameters.jsCode;
 const request = workflow.nodes.find((node) => node.name === "汇总并准备用例生成请求").parameters.jsCode;
