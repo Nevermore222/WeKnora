@@ -1,5 +1,15 @@
 import { get, post, put } from '@/utils/request'
 
+export interface ClientFeaturesResponse {
+  features: {
+    workspace_binding?: boolean
+  }
+}
+
+export async function getClientFeatures(): Promise<ClientFeaturesResponse> {
+  return (await get('/api/v1/system/client-features')) as unknown as ClientFeaturesResponse
+}
+
 export interface ClientCapabilityFlags {
   can_create_knowledge_base: boolean
   can_create_agent: boolean
