@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Xelora 登录页参考选型</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Microsoft YaHei", sans-serif; background: #0f172a; color: #e2e8f0; padding: 32px; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    .intro { color: #94a3b8; margin-bottom: 28px; line-height: 1.6; max-width: 960px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 24px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; overflow: hidden; }
+    .card h2 { font-size: 16px; padding: 14px 16px 6px; color: #f8fafc; }
+    .meta { padding: 0 16px 10px; font-size: 13px; color: #94a3b8; line-height: 1.5; }
+    .tag { display: inline-block; background: #2563eb33; color: #93c5fd; font-size: 11px; padding: 2px 8px; border-radius: 999px; margin-right: 6px; margin-top: 4px; }
+    img { width: 100%; display: block; background: #fff; border-top: 1px solid #334155; cursor: zoom-in; }
+    a { color: #60a5fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .note { margin-top: 28px; padding: 16px; background: #172554; border-radius: 10px; border: 1px solid #1d4ed8; max-width: 960px; line-height: 1.6; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>登录页视觉参考 · 请选择风格编号</h1>
+  <p class="intro">
+    以下参考均保留<strong>默认服务器 + 邮箱密码登录</strong>逻辑，不涉及手填服务器地址。
+    截图已保存在 <code>docs/login-references/</code>，可直接打开本页浏览对比。
+  </p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>参考 1 · Aceternity 渐变宣传分栏</h2>
+      <div class="meta">
+        <span class="tag">强烈推荐</span><span class="tag">左侧表单 + 右侧宣传</span><span class="tag">SVG 渐变动效</span><br/>
+        左侧登录，右侧产品 Slogan + 客户证言，B2B/AI 平台感强。<br/>
+        <a href="https://ui.aceternity.com/blocks/login-and-signup-sections/login-form-with-gradient" target="_blank">来源 → Aceternity UI</a>
+      </div>
+      <a href="01-aceternity-gradient.png" target="_blank"><img src="01-aceternity-gradient.png" alt="Aceternity gradient login" /></a>
+    </div>
+
+    <div class="card">
+      <h2>参考 2 · 21st Login Card 粒子背景</h2>
+      <div class="meta">
+        <span class="tag">强烈推荐</span><span class="tag">居中卡片</span><span class="tag">粒子/渐变背景</span><br/>
+        全屏动态背景 + 居中磨砂卡片，SaaS/App 登录最常见范式。<br/>
+        <a href="https://21st.dev/@ruixen.ui/components/login-card" target="_blank">来源 → 21st.dev (Ruixen UI)</a>
+      </div>
+      <a href="02-21st-login-card.png" target="_blank"><img src="02-21st-login-card.png" alt="21st login card" /></a>
+    </div>
+
+    <div class="card">
+      <h2>参考 3 · Linear 极简 App 登录</h2>
+      <div class="meta">
+        <span class="tag">桌面 App 风</span><span class="tag">极简</span><span class="tag">大按钮栈</span><br/>
+        居中 Logo + 大圆角按钮，Desktop 客户端气质；可加 subtle 背景动效。<br/>
+        <a href="https://linear.app/login" target="_blank">来源 → Linear</a>
+      </div>
+      <a href="05-linear-login.png" target="_blank"><img src="05-linear-login.png" alt="Linear login" /></a>
+    </div>
+
+    <div class="card">
+      <h2>参考 4 · Notion 居中卡片 + 社交登录</h2>
+      <div class="meta">
+        <span class="tag">卡片式</span><span class="tag">产品 Slogan</span><br/>
+        顶部 Slogan「AI 工作空间」+ 居中表单，适合加产品宣传语。<br/>
+        <a href="https://www.notion.so/login" target="_blank">来源 → Notion</a>
+      </div>
+      <a href="05-notion-login.png" target="_blank"><img src="05-notion-login.png" alt="Notion login" /></a>
+    </div>
+
+    <div class="card">
+      <h2>参考 5 · Vercel 极简开发者风</h2>
+      <div class="meta">
+        <span class="tag">极简</span><span class="tag">黑白</span><br/>
+        干净、克制；动效需额外叠加（如网格/粒子背景）。<br/>
+        <a href="https://vercel.com/login" target="_blank">来源 → Vercel</a>
+      </div>
+      <a href="04-vercel-login.png" target="_blank"><img src="04-vercel-login.png" alt="Vercel login" /></a>
+    </div>
+
+    <div class="card">
+      <h2>参考 6 · Raycast 暗色高端动效（背景参考）</h2>
+      <div class="meta">
+        <span class="tag">背景灵感</span><span class="tag">暗色</span><span class="tag">光带/噪点</span><br/>
+        非登录页，但光带渐变 + 噪点非常适合做「高大上」动态背景。<br/>
+        <a href="https://www.raycast.com/" target="_blank">来源 → Raycast</a>
+      </div>
+      <a href="06-raycast.png" target="_blank"><img src="06-raycast.png" alt="Raycast homepage" /></a>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>推荐组合（供选择）：</strong><br/>
+    · <strong>A 方案</strong>：参考 2 的布局（居中卡片 + 粒子背景）+ Xelora 宣传文案轮播<br/>
+    · <strong>B 方案</strong>：参考 1 的分栏（左登录右宣传）+ 右侧放产品能力/行业场景<br/>
+    · <strong>C 方案</strong>：参考 3 Linear 极简 + 参考 6 Raycast 暗色光带动效背景<br/><br/>
+    可用组件库：<a href="https://ui.aceternity.com/">Aceternity UI</a> ·
+    <a href="https://magicui.design/docs/components/particles">Magic UI Particles</a> ·
+    <a href="https://21st.dev/">21st.dev</a> ·
+    设计 Skill：<code>frontend-design</code>
+  </div>
+</body>
+</html>

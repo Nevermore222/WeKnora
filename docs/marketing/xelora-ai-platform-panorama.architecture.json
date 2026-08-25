@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Xelora 企业级知识与智能体 AI 基盘",
+    "subtitle": "让企业知识可理解、业务可协同、流程可执行、决策有依据",
+    "output": "docs/marketing/xelora-ai-platform-panorama.html",
+    "animation": "none",
+    "visual_preset": "classic",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "business-value",
+        "label": "从企业价值到智能应用",
+        "focus": ["enterprise_value", "application_matrix"],
+        "note": "从降本增效、决策提质和风险合规进入六大业务域。"
+      },
+      {
+        "id": "intelligence-stack",
+        "label": "智能体与 AI 能力",
+        "focus": ["application_matrix", "agent_orchestration", "ai_capabilities"],
+        "note": "查看应用如何复用 RAG、Agent、模型、检索和工具能力。"
+      },
+      {
+        "id": "enterprise-foundation",
+        "label": "Runtime、数据与治理",
+        "focus": ["runtime_platform", "data_foundation", "enterprise_governance", "omnichannel_access"],
+        "note": "查看私有化运行、数据底座、安全治理和多入口交付。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "enterprise_value",
+      "type": "cloud",
+      "label": "企业价值跃迁",
+      "sublabel": "知识激活 · 效率提升 · 决策增强",
+      "tag": "提质 / 增效 / 控险",
+      "pos": [590, 80],
+      "size": [260, 78]
+    },
+    {
+      "id": "application_matrix",
+      "type": "frontend",
+      "label": "企业智能应用矩阵",
+      "sublabel": "六大业务域 · 36 类场景模板",
+      "tag": "快速构建",
+      "pos": [560, 215],
+      "size": [320, 92]
+    },
+    {
+      "id": "agent_orchestration",
+      "type": "backend",
+      "label": "智能体编排平台",
+      "sublabel": "规划 / RAG / 工具 / MCP / 审批",
+      "tag": "单智能体与多智能体",
+      "pos": [585, 370],
+      "size": [270, 82]
+    },
+    {
+      "id": "ai_capabilities",
+      "type": "backend",
+      "label": "AI 能力中心",
+      "sublabel": "模型 / 多模态 / 检索 / 图谱 / 分析",
+      "tag": "统一接入",
+      "pos": [585, 515],
+      "size": [270, 82]
+    },
+    {
+      "id": "runtime_platform",
+      "type": "messagebus",
+      "label": "Agent Runtime",
+      "sublabel": "Executor / Workspace / Artifact",
+      "tag": "可替换 Provider",
+      "pos": [585, 660],
+      "size": [270, 82]
+    },
+    {
+      "id": "data_foundation",
+      "type": "database",
+      "label": "企业数据底座",
+      "sublabel": "关系 / 向量 / 对象 / 实时数据",
+      "tag": "企业 AI 燃料",
+      "pos": [585, 805],
+      "size": [270, 82]
+    },
+    {
+      "id": "enterprise_governance",
+      "type": "security",
+      "label": "企业级安全治理",
+      "sublabel": "租户 / RBAC / 加密 / 审计 / 观测",
+      "tag": "安全可信",
+      "pos": [950, 515],
+      "size": [270, 82]
+    },
+    {
+      "id": "omnichannel_access",
+      "type": "external",
+      "label": "全场景交付入口",
+      "sublabel": "Web / Personal / API / CLI / MCP",
+      "tag": "私有化与离线部署",
+      "pos": [220, 515],
+      "size": [270, 82]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Xelora 企业级 AI 基盘核心",
+      "wraps": ["application_matrix", "agent_orchestration", "ai_capabilities", "runtime_platform", "data_foundation"],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "企业治理控制面",
+      "wraps": ["enterprise_governance"],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "data-runtime",
+      "from": "data_foundation",
+      "to": "runtime_platform",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "runtime-ai",
+      "from": "runtime_platform",
+      "to": "ai_capabilities",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "ai-agent",
+      "from": "ai_capabilities",
+      "to": "agent_orchestration",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "agent-apps",
+      "from": "agent_orchestration",
+      "to": "application_matrix",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "apps-value",
+      "from": "application_matrix",
+      "to": "enterprise_value",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "access-apps",
+      "from": "omnichannel_access",
+      "to": "application_matrix",
+      "label": "统一体验",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [[520, 556], [520, 261]]
+    },
+    {
+      "id": "governance-runtime",
+      "from": "enterprise_governance",
+      "to": "runtime_platform",
+      "label": "全程治理",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "right",
+      "via": [[900, 556], [900, 701]]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "企业价值",
+      "items": ["知识资产激活", "运营效率提升", "决策质量增强", "创新周期缩短", "客户体验优化", "风险合规强化"]
+    },
+    {
+      "dot": "cyan",
+      "title": "知识与智慧办公",
+      "items": ["企业智能搜索", "制度与知识问答", "文档智能撰写", "分析报告生成", "会议纪要整理", "摘要、翻译与改写"]
+    },
+    {
+      "dot": "violet",
+      "title": "营销、销售与客户服务",
+      "items": ["客户洞察", "营销内容生成", "销售陪练", "商机辅助", "解决方案生成", "智能客服"]
+    },
+    {
+      "dot": "amber",
+      "title": "运营、采购与供应链",
+      "items": ["经营分析", "流程助手", "采购评估", "供应商审查", "需求预测", "库存与物流问答"]
+    },
+    {
+      "dot": "rose",
+      "title": "财务、法务与风险合规",
+      "items": ["财务分析", "费用审核辅助", "合同审阅辅助", "政策法规查询", "合规检查", "风险预警"]
+    },
+    {
+      "dot": "emerald",
+      "title": "研发、生产与质量管理",
+      "items": ["研发知识助手", "技术文档生成", "代码辅助", "故障诊断", "质量分析", "测试用例生成"]
+    },
+    {
+      "dot": "orange",
+      "title": "人力资源与培训赋能",
+      "items": ["简历初筛", "入职助手", "员工政策问答", "培训陪练", "人才画像", "绩效辅导"]
+    },
+    {
+      "dot": "slate",
+      "title": "核心技术实现",
+      "items": ["混合检索与 ReAct", "MCP 与工具调用", "Office 工作区产物", "SSE 流式交互", "PostgreSQL / SQLite / Redis", "DocReader 文档解析"]
+    },
+    {
+      "dot": "rose",
+      "title": "能力状态",
+      "items": ["核心能力｜知识、Agent、共享、文件产物", "可选扩展｜多向量库、图谱、外部模型", "演进方向｜Browser Automation", "实验能力｜OpenSandbox Provider", "高风险决策｜保留人工审批与复核", "场景模板｜需结合企业系统集成"]
+    }
+  ]
+}

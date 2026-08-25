@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Xelora 行业智能化应用生态",
+    "subtitle": "一套企业级知识与智能体 AI 基盘，持续赋能多行业、多角色、多业务场景",
+    "output": "docs/marketing/xelora-industry-ecosystem.html",
+    "animation": "none",
+    "visual_preset": "classic",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "industrial-economy",
+        "label": "工业与实体经济",
+        "focus": ["xelora_platform", "industrial_cluster"],
+        "note": "以企业知识、设备数据和业务流程支撑制造、汽车、能源与建筑场景。"
+      },
+      {
+        "id": "financial-services",
+        "label": "金融与现代服务",
+        "focus": ["xelora_platform", "finance_cluster"],
+        "note": "为金融、保险、零售和物流提供知识、分析、服务与合规辅助。"
+      },
+      {
+        "id": "public-professional",
+        "label": "公共与专业服务",
+        "focus": ["xelora_platform", "public_cluster"],
+        "note": "以人工复核为前提，为政务、法律、医疗与教育提供专业辅助。"
+      },
+      {
+        "id": "technology-content",
+        "label": "科技与内容产业",
+        "focus": ["xelora_platform", "technology_cluster"],
+        "note": "连接研发知识、技术服务、内容生产和用户体验创新。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "xelora_platform",
+      "type": "backend",
+      "label": "Xelora 企业级 AI 基盘",
+      "sublabel": "知识 + 智能体 + Runtime",
+      "tag": "跨行业复用",
+      "pos": [610, 350],
+      "size": [280, 96]
+    },
+    {
+      "id": "industrial_cluster",
+      "type": "cloud",
+      "label": "工业与实体经济",
+      "sublabel": "制造 / 汽车 / 能源 / 建筑",
+      "tag": "知识驱动生产",
+      "pos": [230, 145],
+      "size": [260, 82]
+    },
+    {
+      "id": "finance_cluster",
+      "type": "cloud",
+      "label": "金融与现代服务",
+      "sublabel": "银行 / 保险 / 零售 / 物流",
+      "tag": "服务与合规并重",
+      "pos": [1010, 145],
+      "size": [260, 82]
+    },
+    {
+      "id": "public_cluster",
+      "type": "cloud",
+      "label": "公共与专业服务",
+      "sublabel": "政务 / 法律 / 医疗 / 教育",
+      "tag": "专业知识辅助",
+      "pos": [230, 575],
+      "size": [260, 82]
+    },
+    {
+      "id": "technology_cluster",
+      "type": "cloud",
+      "label": "科技与内容产业",
+      "sublabel": "医药 / 通信 / 软件 / 文旅",
+      "tag": "创新加速",
+      "pos": [1010, 575],
+      "size": [260, 82]
+    },
+    {
+      "id": "knowledge_value",
+      "type": "frontend",
+      "label": "激活知识",
+      "sublabel": "搜索 · 问答 · 共享",
+      "pos": [610, 120],
+      "size": [130, 64]
+    },
+    {
+      "id": "decision_value",
+      "type": "frontend",
+      "label": "辅助决策",
+      "sublabel": "洞察 · 分析 · 预警",
+      "pos": [760, 120],
+      "size": [130, 64]
+    },
+    {
+      "id": "execution_value",
+      "type": "messagebus",
+      "label": "自动执行",
+      "sublabel": "流程 · 工具 · 产物",
+      "pos": [610, 690],
+      "size": [130, 64]
+    },
+    {
+      "id": "governance_value",
+      "type": "security",
+      "label": "安全可信",
+      "sublabel": "权限 · 审批 · 审计",
+      "pos": [760, 690],
+      "size": [130, 64]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "跨行业智能化应用生态",
+      "wraps": ["industrial_cluster", "finance_cluster", "public_cluster", "technology_cluster", "xelora_platform"],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    {
+      "id": "platform-industrial",
+      "from": "xelora_platform",
+      "to": "industrial_cluster",
+      "label": "知识赋能",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right",
+      "route": "orthogonal-h",
+      "labelAt": [550, 270]
+    },
+    {
+      "id": "platform-finance",
+      "from": "xelora_platform",
+      "to": "finance_cluster",
+      "label": "业务增效",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "orthogonal-h",
+      "labelAt": [950, 270]
+    },
+    {
+      "id": "platform-public",
+      "from": "xelora_platform",
+      "to": "public_cluster",
+      "label": "专业辅助",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right",
+      "route": "orthogonal-h",
+      "labelAt": [550, 530]
+    },
+    {
+      "id": "platform-technology",
+      "from": "xelora_platform",
+      "to": "technology_cluster",
+      "label": "创新加速",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "orthogonal-h",
+      "labelAt": [950, 530]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "工业与实体经济",
+      "items": [
+        "智能制造｜工艺知识 · 设备故障诊断 · 质量异常分析",
+        "汽车交通｜研发知识 · 售后维修助手 · 供应链协同",
+        "能源电力｜运维规程问答 · 巡检分析 · 安全风险预警",
+        "建筑地产｜项目知识库 · 招投标文件 · 工程规范审查"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "金融与现代服务",
+      "items": [
+        "银行证券｜投研助手 · 信贷材料审查辅助 · 合规政策问答",
+        "保险｜智能核保辅助 · 理赔材料分析 · 代理人培训",
+        "零售电商｜商品知识 · 智能客服 · 营销与经营分析",
+        "物流供应链｜运单问答 · 异常处置 · 供应商与库存分析"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "公共与专业服务",
+      "items": [
+        "政务公共服务｜政策问答 · 材料预审辅助 · 公文与报告辅助",
+        "法律服务｜法规检索 · 合同审阅辅助 · 案件材料归纳",
+        "医疗健康｜医学知识助手 · 病历摘要辅助 · 患者服务",
+        "教育培训｜课程知识库 · 智能助教 · 个性化学习支持"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "科技与内容产业",
+      "items": [
+        "医药生命科学｜研发文献 · 药品知识 · 合规资料辅助",
+        "通信运营｜网络运维知识 · 客服坐席 · 故障分析",
+        "软件与互联网｜研发助手 · API 文档 · 测试与故障排查",
+        "文旅传媒｜内容生产 · 游客服务 · 舆情与传播分析"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "跨行业通用价值",
+      "items": ["激活企业知识资产", "增强业务决策依据", "自动执行可控流程", "规模化生产专业内容", "强化风险与合规管理", "持续优化客户体验"]
+    },
+    {
+      "dot": "slate",
+      "title": "可信落地边界",
+      "items": ["场景模板需结合企业数据和系统集成", "金融、医疗、法律结论保留人工复核", "高风险工具调用支持人工审批", "私有化与离线部署保障数据主权"]
+    }
+  ]
+}
