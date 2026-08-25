@@ -580,7 +580,7 @@ func (h *AgentStreamHandler) handleComplete(ctx context.Context, evt event.Event
 	// Update assistant message with final data
 	if data.MessageID == h.assistantMessageID {
 		// h.assistantMessage.Content = data.FinalAnswer
-		h.assistantMessage.IsCompleted = true
+		h.assistantMessage.IsCompleted = data.Succeeded
 		h.assistantMessage.AgentDurationMs = data.TotalDurationMs
 
 		// Update knowledge references if provided
@@ -602,6 +602,13 @@ func (h *AgentStreamHandler) handleComplete(ctx context.Context, evt event.Event
 				h.assistantMessage.AgentSteps = agenttools.SanitizeAgentStepsForStorage(steps)
 			}
 		}
+	}
+
+	// Error and cancellation paths also emit AgentComplete so partial steps can
+	// be persisted. They must not be exposed as successful terminal SSE events;
+	// the following error/stop event is the authoritative terminal signal.
+	if !data.Succeeded {
+		return nil
 	}
 
 	// Fallback: if no answer events were streamed but we have a final answer,
