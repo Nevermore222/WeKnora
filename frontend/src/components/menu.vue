@@ -293,8 +293,7 @@ import RuntimeContextSelector from '@/components/RuntimeContextSelector.vue';
 import { useI18n } from 'vue-i18n';
 import { getSystemInfo } from '@/api/system';
 import { useTheme } from '@/composables/useTheme';
-import xeloraLogo from '@/assets/img/xelora.png';
-import xeloraDarkLogo from '@/assets/img/xelora-dark.png';
+import { brandProfile } from '@/config/brandProfile';
 
 const chatResources = useChatResourcesStore();
 // Platform logos reused from IMChannelsOverviewPanel — keeps the session list
@@ -331,7 +330,7 @@ const systemDark = ref(
 );
 const logoSrc = computed(() => {
     const effectiveDark = currentTheme.value === 'dark' || (currentTheme.value === 'system' && systemDark.value);
-    return effectiveDark ? xeloraDarkLogo : xeloraLogo;
+    return effectiveDark ? brandProfile.darkLogo : brandProfile.lightLogo;
 });
 
 // Platform-aware label for the ⌘K hint. navigator.platform is deprecated but
