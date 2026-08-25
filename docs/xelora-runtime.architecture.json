@@ -1,0 +1,302 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Xelora Runtime Architecture",
+    "subtitle": "Primary agent request path, replaceable providers, and explicit trust boundaries",
+    "output": "docs/xelora-runtime-architecture.html",
+    "animation": "none",
+    "visual_preset": "classic",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "agent-request",
+        "label": "Primary agent request",
+        "focus": [
+          "channels",
+          "client_runtime",
+          "api_router",
+          "auth_rbac",
+          "session_services",
+          "rag_agent",
+          "executor_gateway",
+          "workspace_artifacts"
+        ],
+        "note": "Follow an authenticated agent request from the client to a workspace-bound artifact."
+      },
+      {
+        "id": "trust-and-state",
+        "label": "Trust and durable state",
+        "focus": [
+          "client_runtime",
+          "api_router",
+          "auth_rbac",
+          "session_services",
+          "workspace_artifacts",
+          "core_stores"
+        ],
+        "note": "Inspect the client, application, and persistent-data trust boundaries."
+      },
+      {
+        "id": "replaceable-providers",
+        "label": "Replaceable providers",
+        "focus": [
+          "rag_agent",
+          "executor_gateway",
+          "ai_dependencies",
+          "runtime_providers"
+        ],
+        "note": "Xelora owns the product contracts while AI, tool, and sandbox providers remain replaceable."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "channels",
+      "type": "external",
+      "label": "Users & Channels",
+      "sublabel": "Web / CLI / MCP / IM",
+      "pos": [40, 300],
+      "size": [140, 66]
+    },
+    {
+      "id": "client_runtime",
+      "type": "frontend",
+      "label": "Web / Personal",
+      "sublabel": "Vue 3 + Wails runtime",
+      "tag": "WebView or browser",
+      "pos": [245, 300],
+      "size": [150, 66]
+    },
+    {
+      "id": "api_router",
+      "type": "backend",
+      "label": "Gin API Router",
+      "sublabel": "/api/v1 + SSE",
+      "pos": [470, 300],
+      "size": [145, 66]
+    },
+    {
+      "id": "auth_rbac",
+      "type": "security",
+      "label": "Auth & RBAC",
+      "sublabel": "JWT / API key / tenant",
+      "tag": "organization sharing",
+      "pos": [685, 300],
+      "size": [150, 66]
+    },
+    {
+      "id": "session_services",
+      "type": "backend",
+      "label": "Session Services",
+      "sublabel": "messages + runtime context",
+      "pos": [905, 300],
+      "size": [155, 66]
+    },
+    {
+      "id": "rag_agent",
+      "type": "backend",
+      "label": "RAG + ReAct Engine",
+      "sublabel": "retrieve / reason / stream",
+      "tag": "tool registry",
+      "pos": [1130, 290],
+      "size": [175, 86]
+    },
+    {
+      "id": "executor_gateway",
+      "type": "messagebus",
+      "label": "Executor Gateway",
+      "sublabel": "policy + job + logs",
+      "tag": "provider seam",
+      "pos": [1385, 290],
+      "size": [175, 86]
+    },
+    {
+      "id": "workspace_artifacts",
+      "type": "backend",
+      "label": "Workspace & Artifacts",
+      "sublabel": "binding / boundary / preview",
+      "tag": "Xelora-owned",
+      "pos": [1640, 290],
+      "size": [180, 86]
+    },
+    {
+      "id": "core_stores",
+      "type": "database",
+      "label": "Core Data Stores",
+      "sublabel": "Postgres/SQLite + Redis",
+      "tag": "vector + object storage",
+      "pos": [895, 515],
+      "size": [175, 76]
+    },
+    {
+      "id": "ai_dependencies",
+      "type": "external",
+      "label": "AI & Tool Services",
+      "sublabel": "LLM / DocReader / MCP",
+      "tag": "web search + data sources",
+      "pos": [1130, 515],
+      "size": [175, 76]
+    },
+    {
+      "id": "runtime_providers",
+      "type": "external",
+      "label": "Runtime Providers",
+      "sublabel": "Controlled Docker",
+      "tag": "Local / OpenSandbox",
+      "pos": [1385, 515],
+      "size": [175, 76]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Client trust boundary",
+      "wraps": ["client_runtime"],
+      "pad": 18
+    },
+    {
+      "kind": "security-group",
+      "label": "Xelora application trust boundary",
+      "wraps": [
+        "api_router",
+        "auth_rbac",
+        "session_services",
+        "rag_agent",
+        "executor_gateway",
+        "workspace_artifacts"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "security-group",
+      "label": "Persistent data trust boundary",
+      "wraps": ["core_stores"],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "channels-to-client",
+      "from": "channels",
+      "to": "client_runtime",
+      "label": "HTTPS",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "client-to-api",
+      "from": "client_runtime",
+      "to": "api_router",
+      "label": "HTTP / SSE",
+      "variant": "security",
+      "route": "straight"
+    },
+    {
+      "id": "api-to-auth",
+      "from": "api_router",
+      "to": "auth_rbac",
+      "route": "straight"
+    },
+    {
+      "id": "auth-to-session",
+      "from": "auth_rbac",
+      "to": "session_services",
+      "route": "straight"
+    },
+    {
+      "id": "session-to-agent",
+      "from": "session_services",
+      "to": "rag_agent",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "agent-to-executor",
+      "from": "rag_agent",
+      "to": "executor_gateway",
+      "label": "tool job",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "executor-to-artifacts",
+      "from": "executor_gateway",
+      "to": "workspace_artifacts",
+      "label": "result",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "session-to-stores",
+      "from": "session_services",
+      "to": "core_stores",
+      "label": "state + retrieval",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [938, 390]
+    },
+    {
+      "id": "agent-to-ai",
+      "from": "rag_agent",
+      "to": "ai_dependencies",
+      "label": "model / tool API",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [1272, 400]
+    },
+    {
+      "id": "executor-to-provider",
+      "from": "executor_gateway",
+      "to": "runtime_providers",
+      "label": "execute",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [1513, 400]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Runtime Forms",
+      "items": [
+        "Standard runs Vue/Nginx and Gin as Docker services",
+        "Personal runs the same Vue UI in Wails with a loopback Gin runtime",
+        "desktopremote profiles proxy Personal sessions to a selected server"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Primary Path",
+      "items": [
+        "Auth middleware resolves user, tenant, role, and shared-resource scope",
+        "Session services select quick RAG or the ReAct agent pipeline",
+        "SSE returns reasoning and answer events through the originating API path"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Runtime Ownership",
+      "items": [
+        "Xelora owns session, workspace, job, policy, artifact, and history contracts",
+        "Controlled Docker is the validated provider; OpenSandbox remains experimental",
+        "Workspace boundary checks reject invalid or escaping artifact paths"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Repository Evidence",
+      "items": [
+        "DI: internal/container/container.go",
+        "HTTP and trust gates: internal/router/router.go",
+        "Provider seam: internal/executor/provider.go",
+        "Pipelines: session_knowledge_qa.go and session_agent_qa.go"
+      ]
+    }
+  ]
+}
