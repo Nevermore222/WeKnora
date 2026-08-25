@@ -94,7 +94,7 @@
                   </div>
 
                   <!-- Xelora Cloud -->
-                  <div v-if="currentSection === 'xeloracloud'" class="section">
+                  <div v-if="showXeloraCloudSettings && currentSection === 'xeloracloud'" class="section">
                     <XeloraCloudSettings />
                   </div>
 
@@ -189,6 +189,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
+import { brandProfile } from '@/config/brandProfile'
 import SystemInfo from './SystemInfo.vue'
 import TenantInfo from './TenantInfo.vue'
 import ApiInfo from './ApiInfo.vue'
@@ -213,10 +214,16 @@ const router = useRouter()
 const uiStore = useUIStore()
 const authStore = useAuthStore()
 const { t } = useI18n()
+const showXeloraCloudSettings = brandProfile.showXeloraCloudSettings
 
 const currentSection = ref<string>('general')
 const currentSubSection = ref<string>('')
 const expandedMenus = ref<string[]>([])
+
+const normalizeSection = (section: string): string => {
+  if (!showXeloraCloudSettings && section === 'xeloracloud') return 'general'
+  return section
+}
 
 type NavItem = {
   key: string
@@ -249,7 +256,7 @@ type RoleKey = 'viewer' | 'contributor' | 'admin' | 'owner'
 const SECTION_MIN_ROLE: Record<string, RoleKey> = {
   general: 'viewer',
   ollama: 'admin',
-  xeloracloud: 'admin',
+  ...(showXeloraCloudSettings ? { xeloracloud: 'admin' as RoleKey } : {}),
   models: 'viewer',
   websearch: 'admin',
   chathistory: 'admin',
@@ -285,7 +292,9 @@ const navItems = computed(() => {
   const all: NavItem[] = [
     { key: 'general', icon: 'setting', label: t('general.title') },
     { key: 'ollama', icon: 'server', label: 'Ollama' },
-    { key: 'xeloracloud', icon: '', label: 'Xelora Cloud' },
+    ...(showXeloraCloudSettings
+      ? [{ key: 'xeloracloud', icon: '', label: 'Xelora Cloud' }]
+      : []),
     { key: 'models', icon: 'control-platform', label: t('settings.modelManagement') },
     { key: 'websearch', icon: 'search', label: t('settings.webSearchConfig') },
     { key: 'chathistory', icon: 'chat', label: t('chatHistorySettings.title') },
@@ -334,7 +343,11 @@ const navGroups = computed<NavGroup[]>(() => {
     {
       key: 'models_runtime',
       label: t('settings.navGroups.modelsRuntime'),
-      items: pickItems(['models', 'ollama', 'xeloracloud']),
+      items: pickItems([
+        'models',
+        'ollama',
+        ...(showXeloraCloudSettings ? ['xeloracloud'] : []),
+      ]),
     },
     {
       key: 'data_extensions',
@@ -404,11 +417,12 @@ const handleClose = () => {
 // 监听初始导航设置
 watch(() => uiStore.settingsInitialSection, (section) => {
   if (section && visible.value) {
-    currentSection.value = section
-    const navItem = (navItems.value as any[]).find((item) => item.key === section)
+    const normalizedSection = normalizeSection(section)
+    currentSection.value = normalizedSection
+    const navItem = (navItems.value as any[]).find((item) => item.key === normalizedSection)
     if (navItem && navItem.children && navItem.children.length > 0) {
-      if (!expandedMenus.value.includes(section)) {
-        expandedMenus.value.push(section)
+      if (!expandedMenus.value.includes(normalizedSection)) {
+        expandedMenus.value.push(normalizedSection)
       }
       currentSubSection.value = uiStore.settingsInitialSubSection || navItem.children[0].key
       if (uiStore.settingsInitialSubSection) {
@@ -429,7 +443,7 @@ watch(
   () => [visible.value, route.query.section],
   ([isVisible, section]) => {
     if (!isVisible || typeof section !== 'string') return
-    currentSection.value = section
+    currentSection.value = normalizeSection(section)
     currentSubSection.value = ''
   },
   { immediate: true },
@@ -455,12 +469,13 @@ const handleEscape = (e: KeyboardEvent) => {
 const handleSettingsNav = (e: CustomEvent) => {
   const { section, subsection } = e.detail
   if (section) {
-    currentSection.value = section
+    const normalizedSection = normalizeSection(section)
+    currentSection.value = normalizedSection
     // 如果有子菜单，自动展开
-    const navItem = (navItems.value as any[]).find((item: any) => item.key === section)
+    const navItem = (navItems.value as any[]).find((item: any) => item.key === normalizedSection)
     if (navItem && navItem.children && navItem.children.length > 0) {
-      if (!expandedMenus.value.includes(section)) {
-        expandedMenus.value.push(section)
+      if (!expandedMenus.value.includes(normalizedSection)) {
+        expandedMenus.value.push(normalizedSection)
       }
       // 如果有 subsection，选中对应的子菜单项
       currentSubSection.value = subsection || navItem.children[0].key
