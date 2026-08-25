@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -88,5 +89,30 @@ func TestDefaultEnterpriseServerURLFallsBackToLocalhost(t *testing.T) {
 
 	if got := defaultEnterpriseServerURL(); got != "http://localhost:8080" {
 		t.Fatalf("expected localhost fallback URL, got %q", got)
+	}
+}
+
+func TestDefaultEnterpriseServerURLPrefersPackagedOrigin(t *testing.T) {
+	originalPackaged := packagedEnterpriseServerURL
+	packagedEnterpriseServerURL = "http://xelora-server.internal:8080"
+	t.Cleanup(func() { packagedEnterpriseServerURL = originalPackaged })
+	t.Setenv("XELORA_PERSONAL_SERVER_URL", "http://localhost:8080")
+
+	if got := defaultEnterpriseServerURL(); got != "http://xelora-server.internal:8080" {
+		t.Fatalf("expected packaged server URL to win, got %q", got)
+	}
+}
+
+func TestLocalEnterpriseServerFallbackUsesLoopbackOnlyForLocalIP(t *testing.T) {
+	localIPs := []net.IP{net.ParseIP("192.168.2.61")}
+
+	if got := localEnterpriseServerFallbackURL("http://192.168.2.61:8080", localIPs); got != "http://127.0.0.1:8080" {
+		t.Fatalf("expected local server fallback to loopback, got %q", got)
+	}
+	if got := localEnterpriseServerFallbackURL("http://192.168.2.62:8080", localIPs); got != "" {
+		t.Fatalf("expected no fallback for a remote IP, got %q", got)
+	}
+	if got := localEnterpriseServerFallbackURL("http://xelora-server.internal:8080", localIPs); got != "" {
+		t.Fatalf("expected no fallback for a hostname, got %q", got)
 	}
 }
