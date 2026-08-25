@@ -61,3 +61,9 @@ test('embed locale normalization covers Japanese and Vietnamese prefixes', () =>
   assert.match(source, /'ja-JP': deepMerge/)
   assert.match(source, /'vi-VN': deepMerge/)
 })
+
+test('embed channel API locale type accepts Japanese and Vietnamese', () => {
+  const source = readFileSync(new URL('./src/api/embed/index.ts', import.meta.url), 'utf8')
+  assert.match(source, /EmbedLocaleTag[^\n]*'ja-JP'/)
+  assert.match(source, /EmbedLocaleTag[^\n]*'vi-VN'/)
+})

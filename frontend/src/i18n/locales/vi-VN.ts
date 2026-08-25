@@ -3873,6 +3873,8 @@ export default {
     "enUS": "Tiếng Anh",
     "ruRU": "Русский",
     "koKR": "한국어",
+    "jaJP": "日本語",
+    "viVN": "Tiếng Việt",
     "selectLanguage": "Chọn ngôn ngữ",
     "language": "Ngôn ngữ",
     "languageDescription": "Chọn ngôn ngữ hiển thị giao diện",

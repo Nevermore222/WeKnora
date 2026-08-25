@@ -1,4 +1,6 @@
 import { createI18n } from 'vue-i18n'
+import jaJP from './locales/ja-JP.ts'
+import viVN from './locales/vi-VN.ts'
 
 const messages = {
   "zh-CN": {
@@ -1024,7 +1026,29 @@ const ruEmbedPublish = {
   },
 } as const
 
-const SUPPORTED_LOCALES = ['zh-CN', 'en-US', 'ko-KR', 'ru-RU'] as const
+const jaEmbedMessages = {
+  embedPublish: jaJP.embedPublish,
+  chat: jaJP.chat,
+  common: jaJP.common,
+  error: jaJP.error,
+  agent: jaJP.agent,
+  agentStream: jaJP.agentStream,
+  input: jaJP.input,
+  knowledgeEditor: { wikiBrowser: jaJP.knowledgeEditor.wikiBrowser },
+} as const
+
+const viEmbedMessages = {
+  embedPublish: viVN.embedPublish,
+  chat: viVN.chat,
+  common: viVN.common,
+  error: viVN.error,
+  agent: viVN.agent,
+  agentStream: viVN.agentStream,
+  input: viVN.input,
+  knowledgeEditor: { wikiBrowser: viVN.knowledgeEditor.wikiBrowser },
+} as const
+
+const SUPPORTED_LOCALES = ['zh-CN', 'en-US', 'ko-KR', 'ru-RU', 'ja-JP', 'vi-VN'] as const
 export type EmbedLocale = (typeof SUPPORTED_LOCALES)[number]
 
 /** Isolated from the main app `locale` key so embed preview never hijacks admin UI language. */
@@ -1036,6 +1060,8 @@ export function normalizeEmbedLocale(raw: string): EmbedLocale {
   if (s.startsWith('en')) return 'en-US'
   if (s.startsWith('ko')) return 'ko-KR'
   if (s.startsWith('ru')) return 'ru-RU'
+  if (s.startsWith('ja')) return 'ja-JP'
+  if (s.startsWith('vi')) return 'vi-VN'
   if (s.startsWith('zh')) return 'zh-CN'
   const exact = SUPPORTED_LOCALES.find((l) => l.toLowerCase() === s)
   return exact || 'zh-CN'
@@ -1080,6 +1106,8 @@ const i18n = createI18n({
     'en-US': messages['en-US'],
     'ko-KR': deepMerge(messages['en-US'], koEmbedPublish),
     'ru-RU': deepMerge(messages['en-US'], ruEmbedPublish),
+    'ja-JP': deepMerge(messages['en-US'], jaEmbedMessages),
+    'vi-VN': deepMerge(messages['en-US'], viEmbedMessages),
   },
 })
 

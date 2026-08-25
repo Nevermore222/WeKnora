@@ -1915,7 +1915,7 @@ export default {
     backToLogin: 'Back to Login',
     registerNow: 'Register Now',
     loginHint: 'Sign in to continue, or create an account below if this is your first time.',
-    firstTime: 'New to Xelora?',
+    firstTime: 'New to {brand}?',
     registerSuccess: 'Registration successful! The system has created an exclusive tenant for you, please login',
     registerFailed: 'Registration failed',
     subtitle: 'RAG Q&A, ReAct Agent and Wiki — an LLM-powered enterprise knowledge framework',
@@ -3457,6 +3457,9 @@ export default {
         loadFailed: 'Failed to load',
       },
       keyLabels: {
+        client: {
+          workspace_binding_enabled: 'Client workspace binding',
+        },
         auth: {
           registration_mode: 'Self-service registration mode',
         },
@@ -3472,6 +3475,10 @@ export default {
         },
       },
       keyDescriptions: {
+        client: {
+          workspace_binding_enabled:
+            'Controls whether enterprise clients show server workspace binding controls. It does not replace server-side workspace authorization.',
+        },
         auth: {
           registration_mode:
             'Self-service registration mode. self_serve = anyone can register an account; invite_only = public registration is disabled and only Owners/Admins can invite. Takes effect immediately after saving, but use self_serve with care (the public internet will send spam sign-ups).',
@@ -3924,6 +3931,8 @@ export default {
     enUS: 'English',
     ruRU: 'Русский',
     koKR: '한국어',
+    jaJP: '日本語',
+    viVN: 'Tiếng Việt',
     selectLanguage: 'Select Language',
     language: 'Language',
     languageDescription: 'Select interface display language',
@@ -5945,6 +5954,21 @@ export default {
     addFailed: 'Failed to add server',
     connectSuccess: 'Connected to enterprise server',
     connectFailed: 'Connection failed. Check whether the enterprise server URL is reachable.',
+    retryConnection: 'Retry connection',
+    connectionStatus: {
+      connecting: 'Connecting to enterprise server',
+      ready: 'Enterprise server connected',
+      error: 'Enterprise server is unavailable',
+    },
+    connectionErrors: {
+      unreachable: 'Cannot reach enterprise server {url}. {message}',
+      unauthorized: 'Enterprise server rejected the request: {url}. {message}',
+      incompatible: 'Enterprise server and client versions are incompatible: {url}. {message}',
+      invalid: 'Enterprise server address is invalid: {url}. {message}',
+      unknown: 'Enterprise server connection failed: {url}. {message}',
+      unknownURL: 'the configured address',
+      unknownDetail: 'Check that the server is running and the address is correct.',
+    },
     testReachable: 'Server is reachable',
     testUnreachable: 'Server is unreachable',
     testFailed: 'Test failed',

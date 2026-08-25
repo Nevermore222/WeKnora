@@ -3873,6 +3873,8 @@ export default {
     "enUS": "英語",
     "ruRU": "Русский",
     "koKR": "한국어",
+    "jaJP": "日本語",
+    "viVN": "Tiếng Việt",
     "selectLanguage": "言語の選択",
     "language": "言語",
     "languageDescription": "インターフェース表示言語の選択",

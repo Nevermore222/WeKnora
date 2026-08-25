@@ -1777,7 +1777,7 @@ export default {
     backToLogin: "返回登录",
     registerNow: "立即注册",
     loginHint: "登录以继续使用；首次使用请在下方创建账户。",
-    firstTime: "首次使用 Xelora？",
+    firstTime: "首次使用 {brand}？",
     registerSuccess: "注册成功！系统已为您创建专属空间，请登录",
     registerFailed: "注册失败",
     subtitle: "RAG 问答、ReAct 智能体与 Wiki 知识库，大模型驱动的企业级知识框架",
@@ -2456,6 +2456,9 @@ export default {
         loadFailed: "加载失败",
       },
       keyLabels: {
+        client: {
+          workspace_binding_enabled: "客户端工作区绑定",
+        },
         auth: {
           registration_mode: "自助注册模式",
         },
@@ -2471,6 +2474,10 @@ export default {
         },
       },
       keyDescriptions: {
+        client: {
+          workspace_binding_enabled:
+            "控制企业客户端是否显示服务器工作区绑定界面。该开关不替代服务器端的工作区访问授权。",
+        },
         auth: {
           registration_mode:
             "自助注册模式。self_serve = 任何人可注册账号；invite_only = 关闭公网注册，" +
@@ -2929,6 +2936,8 @@ export default {
     enUS: "English",
     ruRU: "Русский",
     koKR: "한국어",
+    jaJP: "日本語",
+    viVN: "Tiếng Việt",
     selectLanguage: "选择语言",
     language: "语言",
     languageDescription: "选择界面显示语言",
@@ -5955,6 +5964,21 @@ export default {
     addFailed: "添加失败",
     connectSuccess: "已连接到企业服务器",
     connectFailed: "连接失败，请检查企业服务器地址是否可达",
+    retryConnection: "重试连接",
+    connectionStatus: {
+      connecting: "正在连接企业服务器",
+      ready: "企业服务器已连接",
+      error: "企业服务器暂不可达",
+    },
+    connectionErrors: {
+      unreachable: "无法连接企业服务器 {url}。{message}",
+      unauthorized: "企业服务器拒绝了连接请求：{url}。{message}",
+      incompatible: "企业服务器与客户端版本不兼容：{url}。{message}",
+      invalid: "企业服务器地址无效：{url}。{message}",
+      unknown: "连接企业服务器失败：{url}。{message}",
+      unknownURL: "配置的服务器地址",
+      unknownDetail: "请确认服务器已启动且地址正确。",
+    },
     testReachable: "服务器可达",
     testUnreachable: "服务器不可达",
     testFailed: "测试失败",
