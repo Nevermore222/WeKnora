@@ -17,9 +17,8 @@ import i18n from "./i18n";
 import { initTheme } from "@/composables/useTheme";
 import { initFont } from "@/composables/useFont";
 import { installTDesignIconOfflineGuard } from "@/utils/tdesign-icon-offline";
-import { setDesktopBootstrap, setRuntimeContext } from "@/utils/api-context";
-import { ensureDefaultDesktopProfile } from "@/api/desktop-remote";
-import { initializeDefaultEnterpriseProfile } from "@/utils/default-enterprise-bootstrap";
+import { setDesktopBootstrap } from "@/utils/api-context";
+import { ensureDefaultEnterpriseRuntime } from "@/utils/default-enterprise-runtime";
 
 // 必须在 Vue 组件挂载之前执行，避免 tdesign-icons 运行时请求 tdesign.gtimg.com
 installTDesignIconOfflineGuard();
@@ -48,18 +47,15 @@ async function initDesktopBootstrap() {
   try {
     const bootstrap = await Promise.resolve(fn());
     setDesktopBootstrap(bootstrap);
-    await initDefaultEnterpriseProfile(bootstrap);
+    void initDefaultEnterpriseProfile();
   } catch {
     setDesktopBootstrap(null);
   }
 }
 
-async function initDefaultEnterpriseProfile(bootstrap: any) {
+async function initDefaultEnterpriseProfile() {
   try {
-    await initializeDefaultEnterpriseProfile(bootstrap, {
-      ensureProfile: ensureDefaultDesktopProfile,
-      setContext: setRuntimeContext,
-    });
+    await ensureDefaultEnterpriseRuntime();
   } catch (error) {
     console.error('failed to initialize default enterprise profile:', error);
   }

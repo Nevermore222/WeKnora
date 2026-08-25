@@ -8,6 +8,7 @@ import UploadConfirmHost from '@/components/UploadConfirmHost.vue'
 import FilePreviewDrawer from '@/components/file-preview/FilePreviewDrawer.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
+import { useClientFeaturesStore } from '@/stores/clientFeatures'
 import { getCurrentUser, userInfoFromApi } from '@/api/auth'
 import { consumePendingTenantSwitchToast } from '@/utils/tenantSwitch'
 import { useRoleLabel } from '@/composables/useRoleLabel'
@@ -25,6 +26,7 @@ const { formatRole, roleIcon } = useRoleLabel()
 const router = useRouter()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+const clientFeaturesStore = useClientFeaturesStore()
 
 const tdLocaleMap: Record<string, object> = {
   'en-US': enUSConfig,
@@ -185,8 +187,13 @@ const stopInvitationPolling = () => {
 watch(
   () => authStore.isLoggedIn,
   (logged) => {
-    if (logged) startInvitationPolling()
-    else stopInvitationPolling()
+    if (logged) {
+      startInvitationPolling()
+      void clientFeaturesStore.refresh()
+    } else {
+      stopInvitationPolling()
+      clientFeaturesStore.reset()
+    }
   },
   { immediate: true },
 )
