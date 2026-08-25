@@ -135,6 +135,7 @@ type AgentQueryData struct {
 // AgentCompleteData represents agent completion event data
 type AgentCompleteData struct {
 	SessionID       string                 `json:"session_id"`
+	Succeeded       bool                   `json:"succeeded"`
 	TotalSteps      int                    `json:"total_steps"`
 	FinalAnswer     string                 `json:"final_answer"`
 	KnowledgeRefs   []interface{}          `json:"knowledge_refs,omitempty"` // []*types.SearchResult

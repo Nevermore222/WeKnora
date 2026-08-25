@@ -1,5 +1,3 @@
-BEGIN;
-
 DO $$
 DECLARE
   duplicate_count bigint;
@@ -25,6 +23,11 @@ DO $$
 DECLARE
   constraint_name text;
 BEGIN
+  -- Older deployments used this fixed global key name. Remove it explicitly
+  -- before the generic catalog-based cleanup below.
+  ALTER TABLE analyzes.cl_verification_cases_master_proj
+    DROP CONSTRAINT IF EXISTS idx_verification_cases_master_command_case_number_1;
+
   FOR constraint_name IN
     SELECT c.conname
     FROM pg_constraint c
@@ -47,6 +50,8 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+DROP INDEX IF EXISTS analyzes.idx_verification_cases_master_command_case_number_1;
 
 DO $$
 DECLARE
@@ -86,5 +91,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS
   uq_cl_verification_cases_master_proj_project_case
 ON analyzes.cl_verification_cases_master_proj
   (command_id, project_id, case_number);
-
-COMMIT;

@@ -43,7 +43,7 @@
                     </div>
                 </transition>
             </div>
-            <WorkspaceSelector v-model="selectedWorkspaceId" />
+            <WorkspaceSelector v-if="showWorkspaceBinding" v-model="selectedWorkspaceId" />
             <InputField ref="inputFieldRef" @send-msg="sendMsg"></InputField>
         </div>
     </div>
@@ -66,22 +66,32 @@ import type { SuggestedQuestion } from "@/api/agent/index";
 import { useMenuStore } from '@/stores/menu';
 import { useSettingsStore } from '@/stores/settings';
 import { useUIStore } from '@/stores/ui';
-import { useAuthStore } from '@/stores/auth';
 import { useRoute, useRouter } from 'vue-router';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useI18n } from 'vue-i18n';
 import KnowledgeBaseEditorModal from '@/views/knowledge/KnowledgeBaseEditorModal.vue';
 import { useKnowledgeBaseCreationNavigation } from '@/hooks/useKnowledgeBaseCreationNavigation';
+import { useRuntimeContextStore } from '@/stores/runtimeContext';
+import { useClientFeaturesStore } from '@/stores/clientFeatures';
+import {
+    buildWorkspaceBindingPayload,
+    shouldShowWorkspaceBinding,
+} from '@/utils/clientWorkspaceFeature';
 
 const router = useRouter();
 const route = useRoute();
 const usemenuStore = useMenuStore();
 const settingsStore = useSettingsStore();
 const uiStore = useUIStore();
-const authStore = useAuthStore();
+const runtimeContextStore = useRuntimeContextStore();
+const clientFeaturesStore = useClientFeaturesStore();
 const { t } = useI18n();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 const selectedWorkspaceId = ref('');
+const showWorkspaceBinding = computed(() => shouldShowWorkspaceBinding(
+    runtimeContextStore.kind,
+    clientFeaturesStore.workspaceBindingEnabled,
+));
 
 const showChatContextualGuide = computed(() => {
     return route.name === 'globalCreatChat' || route.name === 'kbCreatChat';
@@ -208,11 +218,14 @@ async function createNewSession(value: string, modelId: string, mentionedItems: 
         allowed_tools: settingsStore.agentConfig.allowedTools
     };
 
-    if (selectedWorkspaceId.value) {
-        sessionData.workspace_binding = authStore.isPersonalMode
-            ? { root_path: selectedWorkspaceId.value }
-            : { workspace_id: selectedWorkspaceId.value };
-    }
+    Object.assign(
+        sessionData,
+        buildWorkspaceBindingPayload(
+            runtimeContextStore.kind,
+            clientFeaturesStore.workspaceBindingEnabled,
+            selectedWorkspaceId.value,
+        ),
+    );
 
     try {
         const res = await createSessions(sessionData);

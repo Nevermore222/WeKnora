@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
 
 const pkg = require('./package.json') as { version?: string }
-const FRONTEND_VERSION = pkg.version ?? 'unknown'
+const FRONTEND_VERSION = process.env.VITE_FRONTEND_VERSION || pkg.version || 'unknown'
 
 function resolveFrontendCommit(): string {
   const fromEnv = process.env.VITE_FRONTEND_COMMIT || process.env.GITHUB_SHA
@@ -28,6 +28,18 @@ function resolveFrontendCommit(): string {
 }
 
 const FRONTEND_COMMIT = resolveFrontendCommit()
+
+function brandHtml(): Plugin {
+  const brand = process.env.VITE_BRAND_PROFILE === 'internal' ? 'Knavis' : 'Xelora'
+  return {
+    name: 'brand-html',
+    transformIndexHtml(html) {
+      return html
+        .replace('<title>Xelora</title>', `<title>${brand}</title>`)
+        .replace('<title>Xelora Embed</title>', `<title>${brand} Embed</title>`)
+    },
+  }
+}
 
 /** Dev parity with nginx: serve embed.html for /embed/:channelId (not the main SPA). */
 function embedHtmlDevFallback(): Plugin {
@@ -119,6 +131,7 @@ export default defineConfig({
   plugins: [
     vue(),
     vueJsx(),
+    brandHtml(),
     embedHtmlDevFallback(),
   ],
   resolve: {

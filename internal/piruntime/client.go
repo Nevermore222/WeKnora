@@ -41,6 +41,7 @@ func Start(ctx context.Context, opts StartOptions) (*Client, error) {
 		return nil, fmt.Errorf("%s: empty command", ErrRuntimeUnavailable)
 	}
 	cmd := exec.CommandContext(ctx, opts.Command, opts.Args...)
+	prepareSidecarCommand(cmd)
 	if opts.Dir != "" {
 		cmd.Dir = opts.Dir
 	}

@@ -9,12 +9,11 @@ const migrationPath = path.join(
 const sql = fs.readFileSync(migrationPath, "utf8");
 
 for (const marker of [
-  "BEGIN;",
   "command_id, project_id, case_number",
   "RAISE EXCEPTION",
   "cl_verification_cases_master_proj",
   "uq_cl_verification_cases_master_proj_project_case",
-  "COMMIT;",
+  "idx_verification_cases_master_command_case_number_1",
 ]) {
   if (!sql.includes(marker)) throw new Error(`Migration is missing: ${marker}`);
 }
@@ -27,6 +26,12 @@ if (!/WHERE\s+project_id\s+IS\s+NOT\s+NULL/i.test(sql)) {
 }
 if (!/CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS/i.test(sql)) {
   throw new Error("Migration must create an idempotent unique index.");
+}
+if (/^\s*(BEGIN|COMMIT)\s*;/im.test(sql)) {
+  throw new Error("Migration must be compatible with auto-commit SQL clients; do not wrap it in BEGIN/COMMIT.");
+}
+if (!/DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+idx_verification_cases_master_command_case_number_1/i.test(sql)) {
+  throw new Error("Migration must remove the legacy global command/case constraint.");
 }
 
 console.log("COBOL project-scope migration validation passed.");

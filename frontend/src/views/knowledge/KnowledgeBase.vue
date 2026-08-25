@@ -57,6 +57,11 @@ import { listMoveTargets, moveKnowledge, getKnowledgeMoveProgress } from '@/api/
 import { useI18n } from 'vue-i18n';
 import { formatStringDate } from '@/utils';
 import { formatFileSize } from '@/utils/files';
+import {
+  formatKnowledgeUploadError,
+  getUploadFileDiagnostics,
+  isKnowledgeFileUploadComplete,
+} from '@/utils/knowledgeUpload';
 import { useMarqueeSelect } from '@/hooks/useMarqueeSelect';
 import type { ParserEngineInfo } from '@/api/system';
 const route = useRoute();
@@ -1455,6 +1460,15 @@ const executeUploadBatch = async (
 
   for (const file of files) {
     try {
+      console.info('[knowledge-upload] file-before-upload', getUploadFileDiagnostics(file));
+      if (!file || file.size <= 0) {
+        failCount++;
+        if (totalCount === 1) {
+          MessagePlugin.error(t('knowledgeBase.uploadFailed'));
+        }
+        continue;
+      }
+
       const uploadData: {
         file: File
         tag_id?: string
@@ -1469,18 +1483,13 @@ const executeUploadBatch = async (
       }
 
       const responseData: any = await uploadKnowledgeFile(targetKbId, uploadData);
-      const isSuccess = responseData?.success || responseData?.code === 200 || responseData?.status === 'success' || (!responseData?.error && responseData);
+      const isSuccess = isKnowledgeFileUploadComplete(responseData);
       if (isSuccess) {
         successCount++;
       } else {
         failCount++;
         if (totalCount === 1) {
-          let errorMessage = t('knowledgeBase.uploadFailed');
-          if (responseData?.error?.message) {
-            errorMessage = responseData.error.message;
-          } else if (responseData?.message) {
-            errorMessage = responseData.message;
-          }
+          let errorMessage = formatKnowledgeUploadError(responseData, t('knowledgeBase.uploadFailed'));
           if (responseData?.code === 'duplicate_file' || responseData?.error?.code === 'duplicate_file') {
             errorMessage = t('knowledgeBase.fileExists');
           }
@@ -1490,7 +1499,7 @@ const executeUploadBatch = async (
     } catch (error: any) {
       failCount++;
       if (totalCount === 1) {
-        let errorMessage = error?.error?.message || error?.message || t('knowledgeBase.uploadFailed');
+        let errorMessage = formatKnowledgeUploadError(error, t('knowledgeBase.uploadFailed'));
         if (error?.code === 'duplicate_file') {
           errorMessage = t('knowledgeBase.fileExists');
         }

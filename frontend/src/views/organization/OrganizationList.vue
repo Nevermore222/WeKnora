@@ -552,7 +552,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { useOrganizationStore } from '@/stores/organization'
 import { useAuthStore } from '@/stores/auth'
 import type { Organization, OrganizationPreview, SearchableOrganizationItem } from '@/api/organization'
-import { previewOrganization, joinOrganization, submitJoinRequest, searchSearchableOrganizations, joinOrganizationById } from '@/api/organization'
+import { previewOrganization, submitJoinRequest, searchSearchableOrganizations, joinOrganizationById } from '@/api/organization'
 import { useI18n } from 'vue-i18n'
 import OrganizationSettingsModal from './OrganizationSettingsModal.vue'
 import SpaceAvatar from '@/components/SpaceAvatar.vue'
@@ -999,18 +999,16 @@ async function confirmJoinOrganization() {
       }
     } else {
       // 直接加入
-      const result = await joinOrganization({ invite_code: inviteCode.value })
-      if (result.success) {
+      const result = await orgStore.join(inviteCode.value)
+      if (result) {
         MessagePlugin.success(t('organization.invite.joinSuccess'))
         showInvitePreview.value = false
         inviteCode.value = ''
         invitePreviewData.value = null
         // 清除 URL 中的 invite_code 参数
         router.replace({ path: route.path, query: {} })
-        // 刷新组织列表
-        orgStore.fetchOrganizations()
       } else {
-        MessagePlugin.error(result.message || t('organization.invite.joinFailed'))
+        MessagePlugin.error(orgStore.error || t('organization.invite.joinFailed'))
       }
     }
   } catch (e: any) {
@@ -1210,8 +1208,8 @@ async function joinBySearchOrg() {
       if (invitePreviewData.value.require_approval) {
         MessagePlugin.success(t('organization.invite.requestSubmitted'))
       } else {
+        await orgStore.refreshAfterJoin()
         MessagePlugin.success(t('organization.invite.joinSuccess'))
-        orgStore.fetchOrganizations()
       }
       showInvitePreview.value = false
       invitePreviewData.value = null

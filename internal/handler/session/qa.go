@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -735,7 +736,10 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 				streamCtx.eventBus.Emit(streamCtx.asyncCtx, event.Event{
 					Type:      event.EventAgentComplete,
 					SessionID: sessionID,
-					Data:      event.AgentCompleteData{FinalAnswer: streamCtx.assistantMessage.Content},
+					Data: event.AgentCompleteData{
+						Succeeded:   true,
+						FinalAnswer: streamCtx.assistantMessage.Content,
+					},
 				})
 			}
 			return nil
@@ -767,7 +771,7 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 					context.WithoutCancel(streamCtx.asyncCtx),
 					types.TenantIDContextKey, reqCtx.session.TenantID,
 				)
-				h.completeAssistantMessage(updateCtx, streamCtx.assistantMessage, reqCtx.query)
+				h.persistAgentMessage(updateCtx, streamCtx.assistantMessage, reqCtx.query)
 				logger.Infof(streamCtx.asyncCtx, "Agent QA service completed for session: %s", sessionID)
 			}
 		}()
@@ -942,6 +946,20 @@ func (h *Handler) completeAssistantMessage(ctx context.Context, assistantMessage
 
 	// Asynchronously index the Q&A pair into the chat history knowledge base for vector search.
 	// Use WithoutCancel so the goroutine survives after the HTTP request context is done.
+	bgCtx := context.WithoutCancel(ctx)
+	go h.messageService.IndexMessageToKB(bgCtx, userQuery, assistantMessage.Content, assistantMessage.ID, assistantMessage.SessionID)
+}
+
+// persistAgentMessage stores the final agent state without converting a failed
+// execution into a completed response. Successful responses are indexed;
+// failed responses retain their partial steps for diagnosis and retry.
+func (h *Handler) persistAgentMessage(ctx context.Context, assistantMessage *types.Message, userQuery string) {
+	assistantMessage.UpdatedAt = time.Now()
+	_ = h.messageService.UpdateMessage(ctx, assistantMessage)
+
+	if !assistantMessage.IsCompleted || strings.TrimSpace(assistantMessage.Content) == "" {
+		return
+	}
 	bgCtx := context.WithoutCancel(ctx)
 	go h.messageService.IndexMessageToKB(bgCtx, userQuery, assistantMessage.Content, assistantMessage.ID, assistantMessage.SessionID)
 }

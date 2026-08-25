@@ -39,7 +39,18 @@ func TestDesktopRemoteRoutesRequireSessionAndProxyServerAPI(t *testing.T) {
 			if r.Header.Get("Authorization") != "" {
 				t.Fatalf("register leaked authorization=%q", r.Header.Get("Authorization"))
 			}
+			if r.Header.Get("X-Xelora-Client") != "personal" {
+				t.Fatalf("register client marker=%q", r.Header.Get("X-Xelora-Client"))
+			}
 			_, _ = w.Write([]byte(`{"success":true,"data":{"user":{"id":"u2","email":"u2@example.com"},"tenant":{"id":"43","name":"New"}}}`))
+		case "/api/v1/auth/register-by-invite":
+			if r.Header.Get("Authorization") != "" {
+				t.Fatalf("invite register leaked authorization=%q", r.Header.Get("Authorization"))
+			}
+			if r.Header.Get("X-Xelora-Client") != "personal" {
+				t.Fatalf("invite register client marker=%q", r.Header.Get("X-Xelora-Client"))
+			}
+			_, _ = w.Write([]byte(`{"success":true,"token":"access-token","refresh_token":"refresh-token","user":{"id":"u3","email":"u3@example.com"}}`))
 		case "/api/v1/agents":
 			if r.Header.Get("Authorization") != "Bearer access-token" {
 				t.Fatalf("authorization=%q", r.Header.Get("Authorization"))
@@ -90,6 +101,12 @@ func TestDesktopRemoteRoutesRequireSessionAndProxyServerAPI(t *testing.T) {
 	router.ServeHTTP(register, desktopRequest(http.MethodPost, "/desktop/remote/profiles/"+profile.ID+"/register", []byte(`{"email":"u2@example.com","password":"secret123","username":"u2"}`)))
 	if register.Code != http.StatusOK || !bytes.Contains(register.Body.Bytes(), []byte(`"success":true`)) {
 		t.Fatalf("register status=%d body=%s", register.Code, register.Body.String())
+	}
+
+	inviteRegister := httptest.NewRecorder()
+	router.ServeHTTP(inviteRegister, desktopRequest(http.MethodPost, "/desktop/remote/profiles/"+profile.ID+"/register-by-invite", []byte(`{"token":"invite-token","email":"u3@example.com","password":"secret123","username":"u3"}`)))
+	if inviteRegister.Code != http.StatusOK || !bytes.Contains(inviteRegister.Body.Bytes(), []byte(`"success":true`)) {
+		t.Fatalf("invite register status=%d body=%s", inviteRegister.Code, inviteRegister.Body.String())
 	}
 
 	login := httptest.NewRecorder()

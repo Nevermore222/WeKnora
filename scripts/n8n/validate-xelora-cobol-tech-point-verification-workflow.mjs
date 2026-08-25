@@ -32,6 +32,16 @@ for (const marker of ["【技術点NO】", "【小分類】", "【変数宣言�
 }
 assert.ok(serializedWorkflow.includes("ON CONFLICT (command_id, project_id, case_number)"));
 assert.ok(!serializedWorkflow.includes("ON CONFLICT (command_id, case_number)"));
+const projectCaseKeyGuard = workflow.nodes.find((node) => node.id === "check-project-case-key-v110");
+assert.ok(projectCaseKeyGuard, "Missing project-scoped verification-case unique-key guard");
+assert.equal(projectCaseKeyGuard.type, "n8n-nodes-base.postgres");
+assert.match(projectCaseKeyGuard.parameters?.query || "", /pg_indexes|pg_constraint/i);
+assert.match(workflowCode, /2026-08-11-project-scope-verification-case-key/);
+assert.match(workflowCode, /has_legacy_global_case_key/);
+assert.match(workflowCode, /仍存在旧的全局/);
+const deleteNode = workflow.nodes.find((node) => (node.parameters?.jsCode || "").includes("DELETE FROM analyzes.cl_verification_cases_master_proj"));
+assert.ok(deleteNode, "Missing project-scoped delete preparation node");
+assert.ok((projectCaseKeyGuard.position?.[0] ?? Number.POSITIVE_INFINITY) < (deleteNode.position?.[0] ?? Number.NEGATIVE_INFINITY), "Unique-key guard must run before any delete preparation");
 for (const nodeName of ["校验project_id", "查询并确认项目", "确认项目存在"]) {
   requireNode(nodeName);
 }

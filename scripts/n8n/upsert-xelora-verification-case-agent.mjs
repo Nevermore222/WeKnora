@@ -7,7 +7,7 @@ const repoRoot = process.cwd();
 const outputDir = path.resolve(repoRoot, "..", "n8n", "\u4e8c\u7ef4\u8868");
 const envOutputPath = path.join(outputDir, "Xelora-CL-Verification-Case-Agent.env");
 
-const knowledgeBaseName = "ASP_ALL_KNOWLEDGE";
+const knowledgeBaseName = "Manual_ASP";
 const agentName = "CL\u547d\u4ee4\u68c0\u8bc1\u7528\u4f8b\u751f\u6210\u667a\u80fd\u4f53";
 const agentDescription =
   "\u57fa\u4e8e ASP_ALL_KNOWLEDGE \u548c\u53c2\u6570\u89e3\u6790\u4e8c\u7ef4\u8868\u751f\u6210 CL \u68c0\u8bc1\u7528\u4f8b\u4e8c\u7ef4\u8868\uff0c\u9002\u7528\u4e8e command_master.detail_info \u4ee5\u5916\u7684\u6d4b\u8bd5\u7528\u4f8b\u6d41\u7a0b\u3002";

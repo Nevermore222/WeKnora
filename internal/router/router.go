@@ -788,6 +788,7 @@ func RegisterSystemRoutes(r *gin.RouterGroup, handler *handler.SystemHandler, g 
 	systemRoutes := r.Group("/system")
 	{
 		systemRoutes.GET("/info", g.Viewer(), handler.GetSystemInfo)
+		systemRoutes.GET("/client-features", g.Viewer(), handler.GetClientFeatures)
 		systemRoutes.GET("/parser-engines", g.Viewer(), handler.ListParserEngines)
 		systemRoutes.POST("/parser-engines/check", g.Admin(), handler.CheckParserEngines)
 		systemRoutes.POST("/docreader/reconnect", g.Admin(), handler.ReconnectDocReader)

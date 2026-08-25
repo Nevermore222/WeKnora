@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Tencent/Xelora/internal/types"
@@ -53,7 +54,7 @@ func (r *organizationRepository) GetByID(ctx context.Context, id string) (*types
 // GetByInviteCode gets an organization by invite code (returns ErrInviteCodeExpired if code has expired)
 func (r *organizationRepository) GetByInviteCode(ctx context.Context, inviteCode string) (*types.Organization, error) {
 	var org types.Organization
-	if err := r.db.WithContext(ctx).Where("invite_code = ?", inviteCode).First(&org).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("invite_code = ?", strings.TrimSpace(inviteCode)).First(&org).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrInviteCodeNotFound
 		}

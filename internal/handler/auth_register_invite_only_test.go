@@ -53,6 +53,24 @@ func (s *stubAutoSetupTenantService) GetTenantByID(ctx context.Context, id uint6
 	return s.getTenantByID(ctx, id)
 }
 
+type stubTenantInvitationService struct {
+	interfaces.TenantInvitationService
+	lookup func(ctx context.Context, token string) (*types.TenantInvitation, error)
+	accept func(ctx context.Context, token string, userID string) (*types.TenantMember, error)
+}
+
+func (s *stubTenantInvitationService) LookupByToken(
+	ctx context.Context, token string,
+) (*types.TenantInvitation, error) {
+	return s.lookup(ctx, token)
+}
+
+func (s *stubTenantInvitationService) AcceptByToken(
+	ctx context.Context, token string, userID string,
+) (*types.TenantMember, error) {
+	return s.accept(ctx, token, userID)
+}
+
 // errorCapture mirrors gin's default ErrorHandler behaviour for tests:
 // when a handler calls c.Error(), we surface it as an HTTP response so the
 // recorder reflects the real client-visible status. The production
@@ -155,6 +173,63 @@ func TestRegister_SelfServeAllowsRegistration(t *testing.T) {
 	}
 	if !called {
 		t.Fatalf("UserService.Register should have been invoked")
+	}
+}
+
+func TestRegisterByInvite_PersonalClientMarksProvisionedUser(t *testing.T) {
+	var gotReq *types.RegisterRequest
+	us := &stubRegisterUserService{
+		getUserByEmail: func(context.Context, string) (*types.User, error) {
+			return nil, nil
+		},
+		register: func(_ context.Context, req *types.RegisterRequest) (*types.User, error) {
+			gotReq = req
+			return &types.User{ID: "client-user-1", Email: req.Email}, nil
+		},
+		generateTokens: func(_ context.Context, _ *types.User) (string, string, error) {
+			return "access-token", "refresh-token", nil
+		},
+	}
+	invites := &stubTenantInvitationService{
+		lookup: func(_ context.Context, token string) (*types.TenantInvitation, error) {
+			if token != "invite-token" {
+				t.Fatalf("unexpected invite token: %s", token)
+			}
+			return &types.TenantInvitation{TenantID: 42, Role: types.TenantRoleContributor}, nil
+		},
+		accept: func(_ context.Context, token string, userID string) (*types.TenantMember, error) {
+			if token != "invite-token" || userID != "client-user-1" {
+				t.Fatalf("unexpected accept args: token=%s userID=%s", token, userID)
+			}
+			return &types.TenantMember{}, nil
+		},
+	}
+	ts := &stubAutoSetupTenantService{
+		getTenantByID: func(_ context.Context, id uint64) (*types.Tenant, error) {
+			return &types.Tenant{ID: id, Name: "Admin Workspace"}, nil
+		},
+	}
+	h := NewAuthHandler(&config.Config{}, us, ts, nil, invites)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(errorCapture())
+	r.POST("/auth/register-by-invite", h.RegisterByInvite)
+	body, _ := json.Marshal(map[string]string{
+		"token": "invite-token", "username": "client-user",
+		"email": "client-user@example.com", "password": "supersecret",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/auth/register-by-invite", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Xelora-Client", "personal")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("invite registration must succeed, got %d body=%s", w.Code, w.Body.String())
+	}
+	if gotReq == nil || !gotReq.ClientProvisioned {
+		t.Fatalf("invite registration must mark the request as client-provisioned: %+v", gotReq)
 	}
 }
 

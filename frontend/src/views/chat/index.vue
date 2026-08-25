@@ -99,7 +99,7 @@
         </transition>
         <div class="input-container" :class="{ 'is-embedded': embeddedMode }">
            <!-- Workspace binding context bar -->
-           <div v-if="!embeddedMode && workspaceBinding" class="workspace-binding-bar"
+           <div v-if="!embeddedMode && showWorkspaceBinding && workspaceBinding" class="workspace-binding-bar"
                :class="{ 'is-bound': isWorkspaceBound, 'is-warning': !!workspaceBindingWarning }">
                <t-icon :name="isWorkspaceBound ? 'folder' : 'folder-open'" size="14px" />
                <span v-if="isWorkspaceBound" class="workspace-binding-text">
@@ -111,7 +111,7 @@
                <span v-else class="workspace-binding-text">{{ t('chat.workspaceUnbound') }}</span>
            </div>
             <!-- Workspace binding recovery banner for invalid/access_denied/archived -->
-           <div v-if="!embeddedMode && workspaceBindingError" class="workspace-binding-recovery">
+           <div v-if="!embeddedMode && showWorkspaceBinding && workspaceBindingError" class="workspace-binding-recovery">
                 <t-icon name="error-circle" size="14px" />
                 <span class="recovery-text">{{ workspaceBindingError }}</span>
             </div>
@@ -121,7 +121,7 @@
                 :assistantMessageId="currentAssistantMessageId" :embeddedMode="embeddedMode"></InputField>
         </div>
         <button
-            v-if="!embeddedMode && isWorkspaceBound"
+            v-if="!embeddedMode && showWorkspaceBinding && isWorkspaceBound"
             type="button"
             class="workspace-file-toggle"
             :class="{ 'is-active': filePreviewStore.browserVisible }"
@@ -133,7 +133,7 @@
             <span class="workspace-file-toggle__label">文件</span>
         </button>
         <WorkspaceFileBrowser
-            v-if="!embeddedMode && isWorkspaceBound && filePreviewStore.browserVisible"
+            v-if="!embeddedMode && showWorkspaceBinding && isWorkspaceBound && filePreviewStore.browserVisible"
             :workspace-id="workspaceBinding?.workspace_id"
             :title="workspaceBinding?.workspace_name || '工作区文件'"
         />
@@ -166,6 +166,9 @@ import { useStickyBottomOnResize } from '@/composables/useStickyBottomOnResize';
 import { clearCitationChunkCache } from '@/utils/citationChunkCache';
 import { sanitizeSkillDirectiveDisplay } from '@/utils/skillDirectiveDisplay';
 import { resolveContinuableAssistantMessageId } from '@/utils/chat-runtime';
+import { useRuntimeContextStore } from '@/stores/runtimeContext';
+import { useClientFeaturesStore } from '@/stores/clientFeatures';
+import { shouldShowWorkspaceBinding } from '@/utils/clientWorkspaceFeature';
 
 const props = defineProps({
     session_id: { type: String, default: '' },
@@ -176,6 +179,8 @@ const props = defineProps({
 
 const usemenuStore = useMenuStore();
 const useSettingsStoreInstance = useSettingsStore();
+const runtimeContextStore = useRuntimeContextStore();
+const clientFeaturesStore = useClientFeaturesStore();
 
 // Whether the active chat session is using the Agent pipeline (not quick-answer).
 const isAgentStreamSession = () => {
@@ -193,6 +198,10 @@ const { t } = useI18n();
 // Workspace binding context for the current conversation.
 const workspaceBinding = computed(() => useSettingsStoreInstance.activeSessionWorkspaceBinding);
 const isWorkspaceBound = computed(() => useSettingsStoreInstance.isSessionWorkspaceBound);
+const showWorkspaceBinding = computed(() => shouldShowWorkspaceBinding(
+    runtimeContextStore.kind,
+    clientFeaturesStore.workspaceBindingEnabled,
+));
 const workspaceBindingWarning = computed(() => {
     const b = workspaceBinding.value;
     if (!b || !b.workspace_id) return null;

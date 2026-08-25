@@ -319,6 +319,12 @@ func (s *userService) ProvisionClientUser(
 		}
 		user.PasswordHash = string(hashed)
 		user.IsActive = true
+		// Re-provisioning is also a client onboarding boundary. Apply the
+		// current defaults unless an administrator explicitly overrode this
+		// user's capabilities; the override must survive password resets.
+		if user.CapabilitiesOverriddenAt == nil {
+			s.applyClientCapabilityDefaults(ctx, user)
+		}
 		// Preserve the user's existing home tenant: do NOT re-home into the
 		// admin tenant. Re-homing would orphan any organization invites the
 		// admin already created for the user and is the bug the previous

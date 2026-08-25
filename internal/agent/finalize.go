@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	agenttools "github.com/Tencent/Xelora/internal/agent/tools"
@@ -184,6 +185,7 @@ func (e *AgentEngine) emitCompletionEvent(
 		Type:      event.EventAgentComplete,
 		SessionID: sessionID,
 		Data: event.AgentCompleteData{
+			Succeeded:       state.IsComplete && strings.TrimSpace(state.FinalAnswer) != "",
 			FinalAnswer:     state.FinalAnswer,
 			KnowledgeRefs:   knowledgeRefsInterface,
 			AgentSteps:      state.RoundSteps, // Include detailed execution steps for message storage

@@ -221,6 +221,7 @@ export const useOrganizationStore = defineStore('organization', () => {
         if (!exists) {
           organizations.value.unshift(response.data)
         }
+        await refreshAfterJoin()
         return response.data
       } else {
         error.value = response.message || 'Failed to join organization'
@@ -432,6 +433,24 @@ export const useOrganizationStore = defineStore('organization', () => {
     return fetchSharedAgentsPromise
   }
 
+  // A successful join changes all three membership-derived views. Do not let
+  // their short-lived caches hide the newly available space or its resources.
+  async function refreshAfterJoin() {
+    // A request started before the membership change can still resolve with
+    // the old data. Let it settle before issuing the forced post-join read.
+    await Promise.all([
+      fetchOrganizationsPromise,
+      fetchSharedKbPromise,
+      fetchSharedAgentsPromise,
+    ])
+
+    await Promise.all([
+      fetchOrganizations({ force: true }),
+      fetchSharedKnowledgeBases({ force: true }),
+      fetchSharedAgents({ force: true }),
+    ])
+  }
+
   /**
    * Set current organization for detail view
    */
@@ -513,6 +532,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     remove,
     preview,
     join,
+    refreshAfterJoin,
     leave,
     refreshInviteCode,
     fetchMembers,

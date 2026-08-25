@@ -218,7 +218,64 @@ return [{ json: { project_id: Number(row.project_id), project_name: row.project_
 );
 delete assertProjectNode.onError;
 
-workflow.nodes.push(validateProjectNode, lookupProjectNode, assertProjectNode);
+const projectCaseKeyGuardNode = {
+  id: "check-project-case-key-v110",
+  name: "检查项目级用例唯一键",
+  type: "n8n-nodes-base.postgres",
+  typeVersion: 2.1,
+  position: [1080, 280],
+  credentials: sourceQueryNode.credentials,
+  parameters: {
+    operation: "executeQuery",
+    query: `WITH key_check AS (
+  SELECT EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'analyzes'
+      AND tablename = 'cl_verification_cases_master_proj'
+      AND indexdef ILIKE 'CREATE UNIQUE%'
+      AND replace(replace(indexdef, ' ', ''), '"', '') ILIKE '%(command_id,project_id,case_number)%'
+  ) AS has_project_case_key,
+  EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'analyzes'
+      AND tablename = 'cl_verification_cases_master_proj'
+      AND indexdef ILIKE 'CREATE UNIQUE%'
+      AND replace(replace(indexdef, ' ', ''), '"', '') ILIKE '%(command_id,case_number)%'
+      AND replace(replace(indexdef, ' ', ''), '"', '') NOT ILIKE '%(command_id,project_id,case_number)%'
+  ) AS has_legacy_global_case_key
+)
+SELECT {{ $json.project_id }}::int AS project_id, has_project_case_key
+FROM key_check;`,
+    options: {},
+  },
+  notes: "在删除旧用例之前确认目标库已执行项目级唯一键迁移。",
+};
+
+const assertProjectCaseKeyNode = makeCodeNode(
+  "assert-project-case-key-v110",
+  "确认项目级用例唯一键",
+  [1260, 280],
+  `const row = $input.first()?.json || {};
+if (row.has_project_case_key !== true && row.has_project_case_key !== 't') {
+  throw new Error('目标数据库缺少项目级唯一键，请先执行 2026-08-11-project-scope-verification-case-key.sql');
+}
+if (row.has_legacy_global_case_key === true || row.has_legacy_global_case_key === 't') {
+  throw new Error('目标数据库仍存在旧的全局(command_id, case_number)唯一键，请重新执行 2026-08-11-project-scope-verification-case-key.sql');
+}
+return [{ json: { project_id: Number(row.project_id), has_project_case_key: true, has_legacy_global_case_key: false } }];`,
+  "唯一键不存在时立即停止，避免删除旧数据后在 ON CONFLICT 处失败。",
+);
+delete assertProjectCaseKeyNode.onError;
+
+workflow.nodes.push(
+  validateProjectNode,
+  lookupProjectNode,
+  assertProjectNode,
+  projectCaseKeyGuardNode,
+  assertProjectCaseKeyNode,
+);
 workflow.connections["解析Webhook参数"] = {
   main: [[{ node: "校验project_id", type: "main", index: 0 }]],
 };
@@ -229,6 +286,12 @@ workflow.connections["查询并确认项目"] = {
   main: [[{ node: "确认项目存在", type: "main", index: 0 }]],
 };
 workflow.connections["确认项目存在"] = {
+  main: [[{ node: "检查项目级用例唯一键", type: "main", index: 0 }]],
+};
+workflow.connections["检查项目级用例唯一键"] = {
+  main: [[{ node: "确认项目级用例唯一键", type: "main", index: 0 }]],
+};
+workflow.connections["确认项目级用例唯一键"] = {
   main: [[{ node: "按项目查询tech_point行", type: "main", index: 0 }]],
 };
 

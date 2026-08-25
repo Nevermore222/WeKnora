@@ -151,6 +151,13 @@ var registry = map[string]settingSpec{
 		Description: "为 true 时，对未显式覆盖能力的客户端用户套用当前默认值（通常全关）。" +
 			"需通过系统管理「收紧存量」操作触发，不会在读设置时自动改写用户。",
 	},
+	"client.workspace_binding_enabled": {
+		Type:     "bool",
+		EnvName:  "XELORA_CLIENT_WORKSPACE_BINDING_ENABLED",
+		Default:  false,
+		Category: "client",
+		Description: "是否向企业客户端显示服务器工作区绑定控件。该开关只控制客户端界面，不替代服务器端授权。",
+	},
 	// tenant.max_owned_per_user caps how many tenants a single non-superuser
 	// can create (and Own) via self-service POST /tenants. Read on every
 	// request — UI edits take effect immediately, no restart required. The

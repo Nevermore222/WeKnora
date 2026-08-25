@@ -9,6 +9,7 @@ import {
   type DesktopServerProfile,
 } from '@/api/desktop-remote'
 import { useAuthStore } from '@/stores/auth'
+import { useClientFeaturesStore } from '@/stores/clientFeatures'
 import { useRuntimeContextStore } from '@/stores/runtimeContext'
 
 export interface EnterpriseServer extends DesktopServerProfile {
@@ -97,6 +98,7 @@ export const useEnterpriseStore = defineStore('enterprise', () => {
         tenantId: snapshot.tenant_id ?? null,
       })
       useAuthStore().applyDesktopIdentitySnapshot(snapshot)
+      await useClientFeaturesStore().refresh()
       await fetchServers()
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Connection failed'

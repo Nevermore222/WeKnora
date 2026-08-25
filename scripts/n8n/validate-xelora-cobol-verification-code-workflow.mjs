@@ -48,6 +48,19 @@ for (const nodeName of ["校验project_id", "查询并确认项目", "确认项�
 }
 assert.ok(workflowText.includes("TECH_POINT_CONTEXT"));
 assert.ok(workflowText.includes("projectId === 3 ? 'F'"));
+assert.ok(workflowText.includes("projectId === 3 ? 'Fukutsu'"));
+for (const nodeId of [
+  "887941f5-0f80-4d91-a41e-4bd2cbfd8655",
+  "5a8e9a02-947f-4c4d-8a5e-2793ef78195e",
+  "74a15787-6c9f-4766-a119-1278ed11fde8",
+  "09cfd223-a679-46eb-8ae8-a072184f5195",
+  "e68f43a8-167c-4b32-8547-281e1d5bfe92",
+]) {
+  const pathNode = workflow.nodes.find((node) => node.id === nodeId);
+  assert.ok(pathNode, `Missing path node: ${nodeId}`);
+  const code = pathNode.parameters?.jsCode || "";
+  assert.doesNotMatch(code, /\$\{[^}]+\}\/TOINSRC|\/TOINSRC`|\/TOINSRC['"]/, `Path node still creates TOINSRC: ${nodeId}`);
+}
 
 for (const node of workflow.nodes.filter((entry) => entry.type === "n8n-nodes-base.code")) {
   const code = node.parameters?.jsCode || "";

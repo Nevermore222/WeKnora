@@ -147,7 +147,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	req.Username = secutils.SanitizeForLog(req.Username)
 	req.Email = secutils.SanitizeForLog(req.Email)
 	// Personal edition servers and desktop remote proxy mark client onboarding.
-	if Edition == "personal" || strings.EqualFold(c.GetHeader("X-Xelora-Client"), "personal") {
+	if isPersonalClientRequest(c) {
 		req.ClientProvisioned = true
 	}
 	// Call service to register user
@@ -218,7 +218,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	if Edition == "personal" && response.User != nil {
+	if isPersonalClientRequest(c) && response.User != nil {
 		if repaired, err := h.userService.EnsurePersonalClientCapabilities(ctx, response.User); err != nil {
 			logger.Warnf(ctx, "Login: ensure personal client capabilities: %v", err)
 		} else if repaired != nil {
@@ -502,7 +502,7 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	if Edition == "personal" {
+	if isPersonalClientRequest(c) {
 		if repaired, err := h.userService.EnsurePersonalClientCapabilities(ctx, user); err != nil {
 			logger.Warnf(ctx, "GetCurrentUser: ensure personal client capabilities: %v", err)
 		} else if repaired != nil {
@@ -544,6 +544,10 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 			"memberships": memberships,
 		},
 	})
+}
+
+func isPersonalClientRequest(c *gin.Context) bool {
+	return Edition == "personal" || strings.EqualFold(c.GetHeader("X-Xelora-Client"), "personal")
 }
 
 // updateMyPreferencesRequest is the body for PUT /auth/me/preferences.

@@ -74,6 +74,7 @@ func (h *DesktopRemoteHandler) RegisterRoutes(r gin.IRouter) {
 	r.POST("/profiles/:id/login", h.Login)
 	r.GET("/profiles/:id/auth/config", h.AuthConfig)
 	r.POST("/profiles/:id/register", h.Register)
+	r.POST("/profiles/:id/register-by-invite", h.RegisterByInvite)
 	r.POST("/profiles/:id/logout", h.Logout)
 	r.GET("/profiles/:id/session", h.Session)
 	r.DELETE("/profiles/:id", h.DeleteProfile)
@@ -141,6 +142,11 @@ func (h *DesktopRemoteHandler) AuthConfig(c *gin.Context) {
 
 func (h *DesktopRemoteHandler) Register(c *gin.Context) {
 	h.forwardAnonymousAuth(c, http.MethodPost, "/api/v1/auth/register",
+		map[string]string{"X-Xelora-Client": "personal"})
+}
+
+func (h *DesktopRemoteHandler) RegisterByInvite(c *gin.Context) {
+	h.forwardAnonymousAuth(c, http.MethodPost, "/api/v1/auth/register-by-invite",
 		map[string]string{"X-Xelora-Client": "personal"})
 }
 

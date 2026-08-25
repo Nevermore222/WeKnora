@@ -1,5 +1,6 @@
 import { get, post, put, del, postUpload, getDown } from "../../utils/request";
 import type { KnowledgeProcessOverrides } from '@/types/knowledgeProcess';
+import { getUploadFileDiagnostics } from '@/utils/knowledgeUpload';
 
 // 知识库管理 API（列表、创建、获取、更新、删除、复制）
 export function listKnowledgeBases(params?: {
@@ -182,6 +183,7 @@ export function uploadKnowledgeFile(
       formData.append(key, value);
     }
   });
+  console.info('[knowledge-upload] form-data-file', getUploadFileDiagnostics(formData.get('file') as File | null));
   return postUpload(`/api/v1/knowledge-bases/${kbId}/knowledge/file`, formData, onProgress);
 }
 

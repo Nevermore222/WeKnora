@@ -4,7 +4,7 @@
 
     <!-- Logo - Top Left -->
     <div class="header-logo" aria-hidden="true">
-      <img :src="headerLogoSrc" alt="Xelora" class="logo-image" />
+      <img :src="headerLogoSrc" :alt="brandProfile.displayName" class="logo-image" />
     </div>
 
     <!-- Header Links - Top Right -->
@@ -36,12 +36,35 @@
         <div class="login-panel__glow" aria-hidden="true" />
         <div class="login-panel__grain" aria-hidden="true" />
 
+        <div
+          v-if="isDefaultEnterpriseRequired() && defaultEnterpriseConnectionState !== 'ready'"
+          class="enterprise-connection-status"
+          :class="`enterprise-connection-status--${defaultEnterpriseConnectionState}`"
+          aria-live="polite"
+        >
+          <t-icon :name="defaultEnterpriseConnectionIcon" class="enterprise-connection-status__icon" />
+          <div class="enterprise-connection-status__body">
+            <strong>{{ defaultEnterpriseConnectionStatusText }}</strong>
+            <span v-if="defaultEnterpriseConnectionMessage">{{ defaultEnterpriseConnectionMessage }}</span>
+            <span v-else-if="defaultEnterpriseServerURL">{{ defaultEnterpriseServerURL }}</span>
+          </div>
+          <t-button
+            v-if="defaultEnterpriseConnectionState === 'error'"
+            theme="default"
+            variant="text"
+            size="small"
+            @click="retryEnterpriseConnection"
+          >
+            {{ $t('enterprise.retryConnection') }}
+          </t-button>
+        </div>
+
         <!-- Login Card -->
         <div class="form-card" v-if="!isRegisterMode">
           <div class="form-header">
             <div class="form-brand">
-              <span class="form-brand__mark">X</span>
-              <span class="form-brand__name">Xelora</span>
+              <span class="form-brand__mark">{{ brandProfile.displayName.charAt(0) }}</span>
+              <span class="form-brand__name">{{ brandProfile.displayName }}</span>
             </div>
             <h2 class="form-title">{{ $t('auth.login') }}</h2>
             <p class="form-welcome">{{ $t('auth.subtitle') }}</p>
@@ -72,13 +95,21 @@
                 </t-input>
               </t-form-item>
 
-              <t-button type="submit" theme="primary" size="large" block :loading="loading" class="submit-button">
+              <t-button
+                type="submit"
+                theme="primary"
+                size="large"
+                block
+                :loading="loading"
+                :disabled="loading || (isDefaultEnterpriseRequired() && !defaultEnterpriseConnectionReady)"
+                class="submit-button"
+              >
                 {{ loading ? $t('auth.loggingIn') : $t('auth.login') }}
               </t-button>
 
               <div class="register-cta" v-if="registrationEnabled">
                 <p class="register-cta__text">
-                  {{ $t('auth.firstTime') }}
+                  {{ $t('auth.firstTime', { brand: brandProfile.displayName }) }}
                   <button type="button" class="register-cta__link" :disabled="loading" @click="toggleMode">
                     {{ $t('auth.createAccount') }}
                   </button>
@@ -89,8 +120,16 @@
                 <span>{{ $t('auth.orContinueWith') }}</span>
               </div>
 
-              <t-button v-if="oidcEnabled" theme="default" size="large" block :loading="oidcLoading" :disabled="loading"
-                class="oidc-button" @click="handleOIDCLogin">
+              <t-button
+                v-if="oidcEnabled"
+                theme="default"
+                size="large"
+                block
+                :loading="oidcLoading"
+                :disabled="loading || (isDefaultEnterpriseRequired() && !defaultEnterpriseConnectionReady)"
+                class="oidc-button"
+                @click="handleOIDCLogin"
+              >
                 {{ oidcLoading ? $t('auth.redirectingToOIDC') : oidcLoginText }}
               </t-button>
             </t-form>
@@ -116,8 +155,8 @@
 
           <div class="form-header">
             <div class="form-brand">
-              <span class="form-brand__mark">X</span>
-              <span class="form-brand__name">Xelora</span>
+              <span class="form-brand__mark">{{ brandProfile.displayName.charAt(0) }}</span>
+              <span class="form-brand__name">{{ brandProfile.displayName }}</span>
             </div>
             <h2 class="form-title">{{ $t('auth.createAccount') }}</h2>
             <p class="form-subtitle">{{ $t('auth.registerSubtitle') }}</p>
@@ -166,7 +205,15 @@
                 </t-input>
               </t-form-item>
 
-              <t-button type="submit" theme="primary" size="large" block :loading="loading" class="submit-button">
+              <t-button
+                type="submit"
+                theme="primary"
+                size="large"
+                block
+                :loading="loading"
+                :disabled="loading || (isDefaultEnterpriseRequired() && !defaultEnterpriseConnectionReady)"
+                class="submit-button"
+              >
                 {{ loading ? $t('auth.registering') : $t('auth.register') }}
               </t-button>
             </t-form>
@@ -203,19 +250,30 @@ import {
   registerByInvite,
   type InviteLookup,
 } from '@/api/auth'
-import { getDesktopAuthConfig, loginDesktopProfile, registerDesktopProfile } from '@/api/desktop-remote'
+import {
+  getDesktopAuthConfig,
+  loginDesktopProfile,
+  registerDesktopProfile,
+  registerDesktopProfileByInvite,
+} from '@/api/desktop-remote'
 import { useAuthStore } from '@/stores/auth'
-import { getRuntimeContext, isDefaultEnterpriseRequired } from '@/utils/api-context'
+import { getDesktopBootstrap, getRuntimeContext, isDefaultEnterpriseRequired } from '@/utils/api-context'
+import {
+  classifyDefaultEnterpriseConnectionError,
+  getDefaultEnterpriseErrorMessage,
+  type DefaultEnterpriseConnectionFailureKind,
+} from '@/utils/default-enterprise-bootstrap'
+import { ensureDefaultEnterpriseRuntime } from '@/utils/default-enterprise-runtime'
 import { useI18n } from 'vue-i18n'
 
-import xeloraDarkLogo from '@/assets/img/xelora-dark.png'
+import { brandProfile } from '@/config/brandProfile'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const { t, tm, locale } = useI18n()
 const { formatRole, roleIcon } = useRoleLabel()
-const headerLogoSrc = computed(() => xeloraDarkLogo)
+const headerLogoSrc = computed(() => brandProfile.darkLogo)
 
 // Form references
 const formRef = ref()
@@ -232,6 +290,23 @@ const oidcProviderName = ref('')
 // link is visible; the actual mode is fetched from /auth/config in onMounted.
 // In invite_only mode the link/card are hidden.
 const registrationEnabled = ref(true)
+type DefaultEnterpriseConnectionState = 'connecting' | 'ready' | 'error'
+const defaultEnterpriseConnectionState = ref<DefaultEnterpriseConnectionState>(
+  isDefaultEnterpriseRequired() ? 'connecting' : 'ready',
+)
+const defaultEnterpriseConnectionMessage = ref('')
+const defaultEnterpriseServerURL = computed(() => getDesktopBootstrap()?.default_enterprise_server_url || '')
+const defaultEnterpriseConnectionReady = computed(() =>
+  !isDefaultEnterpriseRequired() || defaultEnterpriseConnectionState.value === 'ready',
+)
+const defaultEnterpriseConnectionIcon = computed(() => {
+  if (defaultEnterpriseConnectionState.value === 'ready') return 'check-circle'
+  if (defaultEnterpriseConnectionState.value === 'error') return 'error-circle'
+  return 'loading'
+})
+const defaultEnterpriseConnectionStatusText = computed(() =>
+  t(`enterprise.connectionStatus.${defaultEnterpriseConnectionState.value}`),
+)
 
 // invite-link state. When the URL carries ?token=xxx we resolve it to
 // the originating tenant + role and switch the form into a "register
@@ -249,7 +324,9 @@ const languageOptions = [
   { value: 'zh-CN', label: '简体中文', shortLabel: '中文', flag: '🇨🇳' },
   { value: 'en-US', label: 'English', shortLabel: 'EN', flag: '🇺🇸' },
   { value: 'ru-RU', label: 'Русский', shortLabel: 'RU', flag: '🇷🇺' },
-  { value: 'ko-KR', label: '한국어', shortLabel: '한국어', flag: '🇰🇷' }
+  { value: 'ko-KR', label: '한국어', shortLabel: '한국어', flag: '🇰🇷' },
+  { value: 'ja-JP', label: '日本語', shortLabel: '日本語', flag: '🇯🇵' },
+  { value: 'vi-VN', label: 'Tiếng Việt', shortLabel: 'VI', flag: '🇻🇳' }
 ]
 
 const currentLanguage = computed(() => locale.value)
@@ -439,8 +516,65 @@ const loadAuthConfig = async () => {
   }
 }
 
+const formatDefaultEnterpriseConnectionError = (error: unknown) => {
+  const kind: DefaultEnterpriseConnectionFailureKind = classifyDefaultEnterpriseConnectionError(error)
+  const detail = getDefaultEnterpriseErrorMessage(error).trim() || t('enterprise.connectionErrors.unknownDetail')
+  const url = defaultEnterpriseServerURL.value || t('enterprise.connectionErrors.unknownURL')
+  return t(`enterprise.connectionErrors.${kind}`, { url, message: detail })
+}
+
+const markDefaultEnterpriseConnectionReady = () => {
+  const shouldNotify = defaultEnterpriseConnectionState.value !== 'ready'
+  defaultEnterpriseConnectionState.value = 'ready'
+  defaultEnterpriseConnectionMessage.value = ''
+  if (shouldNotify) {
+    MessagePlugin.success({
+      content: t('enterprise.connectionStatus.ready'),
+      duration: 3000,
+      placement: 'top',
+    })
+  }
+}
+
+const ensureEnterpriseConnection = async (showToast = false): Promise<boolean> => {
+  if (!isDefaultEnterpriseRequired()) {
+    defaultEnterpriseConnectionState.value = 'ready'
+    defaultEnterpriseConnectionMessage.value = ''
+    return true
+  }
+
+  if (getRuntimeContext().kind === 'enterprise') {
+    markDefaultEnterpriseConnectionReady()
+    return true
+  }
+
+  defaultEnterpriseConnectionState.value = 'connecting'
+  defaultEnterpriseConnectionMessage.value = ''
+
+  try {
+    const context = await ensureDefaultEnterpriseRuntime({ switchContext: true })
+    if (!context || context.kind !== 'enterprise') {
+      throw new Error('default enterprise server is not configured')
+    }
+    markDefaultEnterpriseConnectionReady()
+    return true
+  } catch (error) {
+    defaultEnterpriseConnectionState.value = 'error'
+    defaultEnterpriseConnectionMessage.value = formatDefaultEnterpriseConnectionError(error)
+    if (showToast) MessagePlugin.error(defaultEnterpriseConnectionMessage.value)
+    return false
+  }
+}
+
+const retryEnterpriseConnection = async () => {
+  if (await ensureEnterpriseConnection(true)) {
+    await Promise.all([loadOIDCConfig(), loadAuthConfig()])
+  }
+}
+
 const handleOIDCLogin = async () => {
   try {
+    if (!(await ensureEnterpriseConnection(true))) return
     oidcLoading.value = true
     const response = await getOIDCAuthorizationURL(getBackendOIDCRedirectURI())
     const authorizationURL = response.authorization_url
@@ -467,10 +601,10 @@ const handleLogin = async () => {
 
     loading.value = true
 
-    const runtimeContext = getRuntimeContext()
+    let runtimeContext = getRuntimeContext()
     if (isDefaultEnterpriseRequired() && runtimeContext.kind !== 'enterprise') {
-      MessagePlugin.error(t('enterprise.connectFailed'))
-      return
+      if (!(await ensureEnterpriseConnection(true))) return
+      runtimeContext = getRuntimeContext()
     }
     if (runtimeContext.kind === 'enterprise') {
       const snapshot = await loginDesktopProfile(runtimeContext.profileId, {
@@ -513,13 +647,22 @@ const handleRegister = async () => {
 
     loading.value = true
 
+    let runtimeContext = getRuntimeContext()
+    if (isDefaultEnterpriseRequired() && runtimeContext.kind !== 'enterprise') {
+      if (!(await ensureEnterpriseConnection(true))) return
+      runtimeContext = getRuntimeContext()
+    }
+
     if (inviteToken.value) {
-      const response = await registerByInvite({
+      const invitePayload = {
         token: inviteToken.value,
         username: registerData.username,
         email: registerData.email,
         password: registerData.password,
-      })
+      }
+      const response = runtimeContext.kind === 'enterprise'
+        ? await registerDesktopProfileByInvite(runtimeContext.profileId, invitePayload)
+        : await registerByInvite(invitePayload)
       if (!response.success) {
         MessagePlugin.error(response.message || t('auth.registerFailed'))
         return
@@ -532,11 +675,6 @@ const handleRegister = async () => {
       return
     }
 
-    const runtimeContext = getRuntimeContext()
-    if (isDefaultEnterpriseRequired() && runtimeContext.kind !== 'enterprise') {
-      MessagePlugin.error(t('enterprise.connectFailed'))
-      return
-    }
     const response = runtimeContext.kind === 'enterprise'
       ? await registerDesktopProfile(runtimeContext.profileId, {
           username: registerData.username,
@@ -614,6 +752,7 @@ onMounted(async () => {
   }
 
   if (isDefaultEnterpriseRequired() || getRuntimeContext().kind === 'enterprise') {
+    if (isDefaultEnterpriseRequired() && !(await ensureEnterpriseConnection())) return
     loadOIDCConfig()
     loadAuthConfig()
     return
@@ -888,6 +1027,64 @@ onMounted(async () => {
   box-sizing: border-box;
   border: none;
   width: 100%;
+}
+
+.enterprise-connection-status {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 14px 18px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 90, 55, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 250, 243, 0.78);
+  color: var(--login-card-muted);
+  font-size: 12px;
+  line-height: 1.45;
+
+  &--connecting {
+    color: #7b6b5b;
+  }
+
+  &--ready {
+    color: #287447;
+    border-color: rgba(40, 116, 71, 0.2);
+    background: rgba(235, 250, 240, 0.82);
+  }
+
+  &--error {
+    color: #9d2b2b;
+    border-color: rgba(185, 28, 28, 0.2);
+    background: rgba(255, 240, 240, 0.9);
+  }
+}
+
+.enterprise-connection-status__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 16px;
+}
+
+.enterprise-connection-status__body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+
+  strong {
+    font-weight: 700;
+  }
+}
+
+.enterprise-connection-status :deep(.t-button) {
+  flex-shrink: 0;
+  min-height: 24px;
+  padding: 0 4px;
+  font-size: 12px;
 }
 
 .invite-banner {

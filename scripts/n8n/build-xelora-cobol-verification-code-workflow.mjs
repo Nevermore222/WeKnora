@@ -305,6 +305,31 @@ summarizeNormalizeNode.parameters.jsCode = summarizeNormalizeNode.parameters.jsC
   "固定映射 /home/n8n/.n8n/verification_cases_code -> /data/n8n/data/verification_cases_code",
 );
 
+// 统一落盘目录：项目名必须使用稳定的 ASCII 目录名，文件直接放在批次时间目录下。
+for (const nodeId of [
+  "5a8e9a02-947f-4c4d-8a5e-2793ef78195e",
+  "74a15787-6c9f-4766-a119-1278ed11fde8",
+  "09cfd223-a679-46eb-8ae8-a072184f5195",
+  "887941f5-0f80-4d91-a41e-4bd2cbfd8655",
+  "e68f43a8-167c-4b32-8547-281e1d5bfe92",
+]) {
+  const node = workflow.nodes.find((entry) => entry.id === nodeId);
+  if (!node?.parameters?.jsCode) continue;
+  node.parameters.jsCode = node.parameters.jsCode
+    .replaceAll("if (projectId && projectName) {", "if (projectId) {")
+    .replaceAll(
+      "const safeProjectName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');",
+      "const safeProjectName = projectId === 3 ? 'Fukutsu' : projectId === 1 ? 'TOIN' : projectName.replace(/[^a-zA-Z0-9_-]/g, '_');",
+    )
+    .replaceAll(
+      "const safeProjectName = String(projectName).replace(/[^a-zA-Z0-9_-]/g, '_');",
+      "const safeProjectName = projectId === 3 ? 'Fukutsu' : projectId === 1 ? 'TOIN' : String(projectName).replace(/[^a-zA-Z0-9_-]/g, '_');",
+    )
+    .replaceAll("`${batchRoot}/TOINSRC`", "batchRoot")
+    .replaceAll("`${baseDir}/${subFolderName}/${timeFolderName}/TOINSRC`", "`${baseDir}/${subFolderName}/${timeFolderName}`")
+    .replaceAll("baseDir + '/' + subFolder + '/' + timeFolder + '/TOINSRC'", "baseDir + '/' + subFolder + '/' + timeFolder");
+}
+
 const organizeNode = requireNode(workflow, "组织检证用例二维表");
 organizeNode.parameters.jsCode = `// 将数据库二维表按批组织为 Xelora SR6 代码生成请求。
 const items = $input.all();
@@ -340,12 +365,14 @@ const timestamp = now.getFullYear().toString() +
 const subFolderName = commandMasterId + '_' + command;
 const timeFolderName = command + '_' + timestamp;
 let baseDir = '/home/n8n/.n8n/verification_cases_code';
-if (projectId && projectName) {
-  const safeProjectName = String(projectName).replace(/[^a-zA-Z0-9_-]/g, '_');
-  baseDir += '/' + safeProjectName + '/ASP/COBOL';
-} else {
-  baseDir += '/ASP/COBOL';
-}
+const safeProjectName = projectId === 3
+  ? 'Fukutsu'
+  : projectId === 1
+    ? 'TOIN'
+    : projectName
+      ? String(projectName).replace(/[^a-zA-Z0-9_-]/g, '_')
+      : 'Project_' + projectId;
+baseDir += '/' + safeProjectName + '/ASP/COBOL';
 
 const rows = items.map((item) => item.json);
 for (const row of rows) {

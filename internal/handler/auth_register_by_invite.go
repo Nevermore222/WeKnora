@@ -169,9 +169,10 @@ func (h *AuthHandler) RegisterByInvite(c *gin.Context) {
 	}
 
 	user, err := h.userService.Register(ctx, &types.RegisterRequest{
-		Username: req.Username,
-		Email:    req.Email,
-		Password: req.Password,
+		Username:          req.Username,
+		Email:             req.Email,
+		Password:          req.Password,
+		ClientProvisioned: isPersonalClientRequest(c),
 	})
 	if err != nil {
 		logger.Errorf(ctx, "register-by-invite: user create failed for %s: %v",

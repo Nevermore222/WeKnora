@@ -65,6 +65,7 @@ import { ref, computed, h, withDefaults } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MessagePlugin, Icon as TIcon } from 'tdesign-vue-next'
 import { filterUploadFiles } from '../utils/uploadSources'
+import { snapshotUploadFiles } from '@/utils/knowledgeUpload'
 
 const props = withDefaults(defineProps<{
   acceptFileTypes?: string
@@ -129,13 +130,22 @@ const dropdownOptions = computed(() => {
   return options
 })
 
+const openFilePicker = (input: HTMLInputElement | null) => {
+  if (!input) return
+
+  // WebView2 releases the selected file's bytes if the input is reset before
+  // FormData consumes it. Reset only before the next selection.
+  input.value = ''
+  input.click()
+}
+
 const handleActionSelect = (data: { value: string }) => {
   switch (data.value) {
     case 'upload':
-      fileInputRef.value?.click()
+      openFilePicker(fileInputRef.value)
       break
     case 'uploadFolder':
-      folderInputRef.value?.click()
+      openFilePicker(folderInputRef.value)
       break
     case 'importURL':
       urlInputValue.value = ''
@@ -166,15 +176,24 @@ const notifyFilterResult = (result: ReturnType<typeof filterUploadFiles>, emptyA
   return true
 }
 
-const handleFilesChange = (event: Event, fromFolder: boolean) => {
+const handleFilesChange = async (event: Event, fromFolder: boolean) => {
   const input = event.target as HTMLInputElement
   const files = input.files
   if (!files || files.length === 0) return
 
-  const result = filterUploadFiles(files, {
+  let snapshots: File[]
+  try {
+    snapshots = await snapshotUploadFiles(Array.from(files))
+  } catch {
+    input.value = ''
+    MessagePlugin.error(t('knowledgeBase.uploadFailed'))
+    return
+  }
+
+  const result = filterUploadFiles(snapshots, {
     supportedFileTypes: props.supportedFileTypes,
     fromFolder,
-    multiFile: files.length > 1,
+    multiFile: snapshots.length > 1,
   })
 
   if (!notifyFilterResult(result, 'knowledgeBase.allFilesSkippedNoEngine')) {
@@ -183,7 +202,6 @@ const handleFilesChange = (event: Event, fromFolder: boolean) => {
   }
 
   emit('files', result.validFiles)
-  input.value = ''
 }
 
 const handleUrlDialogConfirm = () => {

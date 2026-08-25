@@ -33,6 +33,16 @@ type OrganizationHandler struct {
 	chunkRepo     interfaces.ChunkRepository
 }
 
+func inviteCodeAppError(err error) *apperrors.AppError {
+	if errors.Is(err, service.ErrInviteCodeExpired) {
+		return apperrors.NewBadRequestError("Invite code has expired; ask the organization administrator to refresh it.")
+	}
+	if errors.Is(err, service.ErrOrgPermissionDenied) {
+		return apperrors.NewForbiddenError("This organization requires approval; submit a join request instead.")
+	}
+	return apperrors.NewNotFoundError("Invalid invite code")
+}
+
 // NewOrganizationHandler creates a new organization handler
 func NewOrganizationHandler(
 	orgService interfaces.OrganizationService,
@@ -565,7 +575,7 @@ func (h *OrganizationHandler) PreviewByInviteCode(c *gin.Context) {
 	// Get organization by invite code
 	org, err := h.orgService.GetOrganizationByInviteCode(ctx, inviteCode)
 	if err != nil {
-		c.Error(apperrors.NewNotFoundError("Invalid invite code"))
+		c.Error(inviteCodeAppError(err))
 		return
 	}
 
@@ -631,7 +641,7 @@ func (h *OrganizationHandler) JoinByInviteCode(c *gin.Context) {
 			c.Error(apperrors.NewValidationError("该空间成员已满，无法加入"))
 			return
 		}
-		c.Error(apperrors.NewNotFoundError("Invalid invite code"))
+		c.Error(inviteCodeAppError(err))
 		return
 	}
 
@@ -668,7 +678,7 @@ func (h *OrganizationHandler) SubmitJoinRequest(c *gin.Context) {
 	// Get organization by invite code
 	org, err := h.orgService.GetOrganizationByInviteCode(ctx, req.InviteCode)
 	if err != nil {
-		c.Error(apperrors.NewNotFoundError("Invalid invite code"))
+		c.Error(inviteCodeAppError(err))
 		return
 	}
 

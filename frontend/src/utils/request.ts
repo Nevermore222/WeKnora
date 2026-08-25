@@ -1,6 +1,7 @@
 // src/utils/request.js
 import axios from "axios";
 import { generateRandomString, MAX_FILE_SIZE_MB } from "./index";
+import { clearFormDataContentType } from './knowledgeUpload';
 import i18n from '@/i18n'
 import { getApiBaseUrl } from './api-base';
 import { desktopSessionHeader, getRuntimeContext, resolveApiUrl } from './api-context';
@@ -85,6 +86,14 @@ instance.interceptors.request.use(
     }
     
     config.headers["X-Request-ID"] = `${generateRandomString(12)}`;
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      clearFormDataContentType(config.headers);
+      console.info('[knowledge-upload] request', {
+        url: config.url,
+        contentType: config.headers['Content-Type'] || config.headers['content-type'] || '',
+        hasFileField: !!config.data.get('file'),
+      });
+    }
     return config;
   },
   (error) => {
@@ -294,7 +303,6 @@ export async function getDown(url: string) {
 export function postUpload(url: string, data = {}, onUploadProgress?: (progressEvent: any) => void) {
   return instance.post(url, data, {
     headers: {
-      "Content-Type": "multipart/form-data",
       "X-Request-ID": `${generateRandomString(12)}`,
     },
     onUploadProgress,

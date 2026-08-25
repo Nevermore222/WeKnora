@@ -39,7 +39,15 @@ test('enterprise snapshot authenticates without a token', () => {
 
   const state = applyDesktopIdentitySnapshot({
     authenticated: true,
-    user: { id: 'u1', username: 'alice', email: 'a@example.com' },
+    user: {
+      id: 'u1',
+      username: 'alice',
+      email: 'a@example.com',
+      is_client_provisioned: true,
+      can_create_knowledge_base: false,
+      can_create_agent: false,
+      can_bind_model: false,
+    },
     tenant: { id: 42, name: 'Team' },
     memberships: [{ tenant_id: 42, tenant_name: 'Team', role: 'owner' }],
   })
@@ -49,6 +57,10 @@ test('enterprise snapshot authenticates without a token', () => {
   assert.equal(localStorage.getItem('xelora_token'), null)
   assert.equal(localStorage.getItem('xelora_refresh_token'), null)
   assert.equal(state.user?.id, 'u1')
+  assert.equal(state.user?.is_client_provisioned, true)
+  assert.equal(state.user?.can_create_knowledge_base, false)
+  assert.equal(state.user?.can_create_agent, false)
+  assert.equal(state.user?.can_bind_model, false)
   assert.equal(state.tenant?.id, '42')
   assert.equal(state.memberships[0]?.role, 'owner')
 })

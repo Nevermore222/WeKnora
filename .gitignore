@@ -2,6 +2,7 @@
 .*
 # 但不忽略特定隐藏文件和目录
 !.env.example
+!.dockerignore
 !.gitignore
 !.github/
 !.specify/
@@ -70,3 +71,21 @@ fix-docker.sh
 
 # WeChat Mini Program local/private configuration
 miniprogram/project.private.config.json
+
+# Local n8n / CL / COBOL workstreams are kept out of GitHub
+/n8n/
+/scripts/n8n/
+**/*n8n*
+**/*N8N*
+**/*cl-verification*
+**/*CL-verification*
+**/*-cl-*
+**/*-CL-*
+**/*cobol*
+**/*COBOL*
+
+# Local build and smoke-test artifacts
+/cmd/desktop/build/windows/
+/cmd/desktop/bindings-test.exe
+/server.exe
+tmp-*.sse

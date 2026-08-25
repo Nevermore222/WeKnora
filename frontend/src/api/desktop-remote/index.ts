@@ -1,3 +1,5 @@
+import { brandDisplayName } from '../../config/brandName.ts'
+
 export interface DesktopIdentitySnapshot {
   authenticated: boolean
   user_id?: string
@@ -20,6 +22,10 @@ export interface DesktopIdentityState {
     tenant_id: string
     can_access_all_tenants?: boolean
     is_system_admin?: boolean
+    is_client_provisioned?: boolean
+    can_create_knowledge_base?: boolean
+    can_create_agent?: boolean
+    can_bind_model?: boolean
     created_at: string
     updated_at: string
   } | null
@@ -112,6 +118,16 @@ export async function registerDesktopProfile(profileId: string, data: { username
   return post(`/desktop/remote/profiles/${profileId}/register`, data) as unknown as Promise<{ success: boolean; message?: string; data?: any }>
 }
 
+export async function registerDesktopProfileByInvite(profileId: string, data: {
+  token: string
+  username: string
+  email: string
+  password: string
+}) {
+  const { post } = await request()
+  return post(`/desktop/remote/profiles/${profileId}/register-by-invite`, data) as unknown as Promise<any>
+}
+
 export async function ensureDefaultDesktopProfile(config: {
   name?: string
   base_url: string
@@ -125,7 +141,7 @@ export async function ensureDefaultDesktopProfile(config: {
     return existing
   }
   const created = await createDesktopProfile({
-    name: config.name || 'Xelora Server',
+    name: config.name || `${brandDisplayName} Server`,
     base_url: normalized,
     allow_insecure_transport: config.allow_insecure_transport === true,
   })
@@ -144,6 +160,8 @@ export function applyDesktopIdentitySnapshot(snapshot: DesktopIdentitySnapshot):
   }
 
   const tenantID = snapshot.tenant?.id ?? snapshot.tenant_id ?? ''
+  const optionalBoolean = (value: unknown): boolean | undefined =>
+    typeof value === 'boolean' ? value : undefined
   const user = snapshot.user
     ? {
         id: String(snapshot.user.id ?? snapshot.user_id ?? ''),
@@ -153,6 +171,10 @@ export function applyDesktopIdentitySnapshot(snapshot: DesktopIdentitySnapshot):
         tenant_id: String(snapshot.user.tenant_id ?? tenantID),
         can_access_all_tenants: snapshot.user.can_access_all_tenants === true,
         is_system_admin: snapshot.user.is_system_admin === true,
+        is_client_provisioned: snapshot.user.is_client_provisioned === true,
+        can_create_knowledge_base: optionalBoolean(snapshot.user.can_create_knowledge_base),
+        can_create_agent: optionalBoolean(snapshot.user.can_create_agent),
+        can_bind_model: optionalBoolean(snapshot.user.can_bind_model),
         created_at: String(snapshot.user.created_at ?? new Date().toISOString()),
         updated_at: String(snapshot.user.updated_at ?? new Date().toISOString()),
       }

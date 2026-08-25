@@ -39,14 +39,22 @@ func NewUserRepository(db *gorm.DB) interfaces.UserRepository {
 // the capability columns from the in-memory struct so client deny-defaults
 // and non-client allow-defaults both persist accurately.
 func (r *userRepository) CreateUser(ctx context.Context, user *types.User) error {
+	// GORM may read schema defaults back into the struct after INSERT. Keep
+	// the caller's explicit capability values so a false client default is
+	// not turned back into true by the post-insert correction.
+	isClientProvisioned := user.IsClientProvisioned
+	canCreateKnowledgeBase := user.CanCreateKnowledgeBase
+	canCreateAgent := user.CanCreateAgent
+	canBindModel := user.CanBindModel
+
 	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
 		return err
 	}
 	return r.db.WithContext(ctx).Model(user).Updates(map[string]interface{}{
-		"is_client_provisioned":     user.IsClientProvisioned,
-		"can_create_knowledge_base": user.CanCreateKnowledgeBase,
-		"can_create_agent":          user.CanCreateAgent,
-		"can_bind_model":            user.CanBindModel,
+		"is_client_provisioned":     isClientProvisioned,
+		"can_create_knowledge_base": canCreateKnowledgeBase,
+		"can_create_agent":          canCreateAgent,
+		"can_bind_model":            canBindModel,
 	}).Error
 }
 
@@ -253,7 +261,7 @@ func (r *userRepository) ApplyClientCapabilityDefaults(
 			"can_create_agent":           canAgent,
 			"can_bind_model":             canModel,
 			"capabilities_overridden_at": nil,
-			"updated_at":                time.Now(),
+			"updated_at":                 time.Now(),
 		}).Error
 }
 
@@ -268,7 +276,7 @@ func (r *userRepository) ApplyCapabilityOverride(
 			"can_create_agent":           canAgent,
 			"can_bind_model":             canModel,
 			"capabilities_overridden_at": at,
-			"updated_at":                at,
+			"updated_at":                 at,
 		}).Error
 }
 
@@ -280,7 +288,7 @@ func (r *userRepository) TightenClientUserCapabilities(ctx context.Context, canK
 			"can_create_knowledge_base": canKB,
 			"can_create_agent":          canAgent,
 			"can_bind_model":            canModel,
-			"updated_at":               time.Now(),
+			"updated_at":                time.Now(),
 		})
 	return res.RowsAffected, res.Error
 }
