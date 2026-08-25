@@ -1,0 +1,11 @@
+.git
+*.exe
+cmd/desktop/build/
+tmp-*.json
+tmp-*.sse
+frontend/node_modules/
+frontend/dist/
+dist/
+release-bundles/
+.worktrees/
+.tmp/
