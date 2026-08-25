@@ -196,6 +196,7 @@ func main() {
 
 	// Error channel to capture server startup errors
 	serverErrCh := make(chan error, 1)
+	serverReadyCh := make(chan string, 1)
 
 	// Run backend in a separate goroutine
 	go func() {
@@ -227,6 +228,7 @@ func main() {
 					app.apiLanBaseURL = fmt.Sprintf("http://%s:%d/api/v1", ip.String(), port)
 				}
 			}
+			serverReadyCh <- app.backendURL
 
 			// Handle graceful shutdown from Wails OnShutdown hook
 			go func() {
@@ -268,21 +270,24 @@ func main() {
 		}
 	}()
 
-	// Give the server a moment to start and determine its port
-	time.Sleep(500 * time.Millisecond)
+	backendURL, waitErr := waitForDesktopBackend(serverReadyCh, serverErrCh, 30*time.Second)
+	if waitErr != nil {
+		fmt.Fprintf(os.Stderr, "desktop backend startup failed: %v\n", waitErr)
+		return
+	}
 
 	// Create application with options
 	// macOS app menu
 	AppMenu := menu.NewMenu()
-	FileMenu := AppMenu.AddSubmenu("Xelora Personal")
-	FileMenu.AddText("About Xelora", keys.CmdOrCtrl("i"), func(_ *menu.CallbackData) {
+	FileMenu := AppMenu.AddSubmenu(desktopProductName())
+	FileMenu.AddText("About "+desktopBrandName(), keys.CmdOrCtrl("i"), func(_ *menu.CallbackData) {
 		if app.ctx == nil {
 			return
 		}
 		choice, err := wailsruntime.MessageDialog(app.ctx, wailsruntime.MessageDialogOptions{
 			Type:          wailsruntime.InfoDialog,
-			Title:         "Xelora Personal",
-			Message:       fmt.Sprintf("Xelora Personal — Desktop Edition\n\nA local-first RAG framework for document understanding and semantic Q&A over complex, heterogeneous content.\n\nVersion %s\n© 2026 Xelora", desktopAboutVersion()),
+			Title:         desktopProductName(),
+			Message:       fmt.Sprintf("%s — Desktop Edition\n\nA local-first RAG framework for document understanding and semantic Q&A over complex, heterogeneous content.\n\nVersion %s\n© 2026 %s", desktopProductName(), desktopAboutVersion(), desktopBrandName()),
 			Buttons:       []string{"OK"},
 			DefaultButton: "OK",
 		})
@@ -314,13 +319,17 @@ func main() {
 	})
 
 	// Wait for the backend URL to be set
-	targetURL, _ := url.Parse(app.backendURL)
+	targetURL, parseErr := url.Parse(backendURL)
+	if parseErr != nil || targetURL.Scheme == "" || targetURL.Host == "" {
+		fmt.Fprintf(os.Stderr, "desktop backend URL is invalid: %q\n", backendURL)
+		return
+	}
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
 	// Start Wails application
 	// We use a Reverse Proxy to seamlessly proxy Wails' frontend to our Go backend
 	err := wails.Run(&options.App{
-		Title:         "Xelora Personal",
+		Title:         desktopProductName(),
 		Width:         1280,
 		Height:        800,
 		DisableResize: false,
@@ -358,6 +367,30 @@ func main() {
 
 	if err != nil {
 		println("Error:", err.Error())
+	}
+}
+
+func waitForDesktopBackend(ready <-chan string, startupErr <-chan error, timeout time.Duration) (string, error) {
+	if timeout <= 0 {
+		return "", fmt.Errorf("desktop backend startup timeout must be positive")
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case backendURL, ok := <-ready:
+		if !ok || strings.TrimSpace(backendURL) == "" {
+			return "", fmt.Errorf("desktop backend reported an empty URL")
+		}
+		return backendURL, nil
+	case err, ok := <-startupErr:
+		if !ok || err == nil {
+			return "", fmt.Errorf("desktop backend stopped before it became ready")
+		}
+		return "", err
+	case <-timer.C:
+		return "", fmt.Errorf("timed out waiting for desktop backend after %s", timeout)
 	}
 }
 
@@ -451,7 +484,7 @@ func defaultMacAppSupportDir(execPath string) (string, error) {
 		return "", err
 	}
 
-	appName := "Xelora Personal"
+	appName := desktopProductName()
 	if idx := strings.Index(execPath, ".app/Contents/MacOS"); idx >= 0 {
 		bundleName := filepath.Base(execPath[:idx+4])
 		if trimmed := strings.TrimSuffix(bundleName, ".app"); trimmed != "" {

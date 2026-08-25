@@ -11,7 +11,7 @@ import (
 func main() {
 	app := NewApp()
 	_ = wails.Run(&options.App{
-		Title: "Xelora Personal",
+		Title: desktopProductName(),
 		Bind:  []interface{}{app},
 	})
 }

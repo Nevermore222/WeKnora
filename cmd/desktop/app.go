@@ -51,22 +51,24 @@ func (a *App) GetAPIBaseURL() string {
 }
 
 type DesktopBootstrap struct {
-	APIBaseURL                      string `json:"api_base_url"`
-	Session                         string `json:"session"`
-	DefaultEnterpriseServerURL      string `json:"default_enterprise_server_url,omitempty"`
-	DefaultEnterpriseServerName     string `json:"default_enterprise_server_name,omitempty"`
-	DefaultEnterpriseServerRequired bool   `json:"default_enterprise_server_required"`
-	DefaultEnterpriseAllowInsecure  bool   `json:"default_enterprise_allow_insecure"`
+	APIBaseURL                         string `json:"api_base_url"`
+	Session                            string `json:"session"`
+	DefaultEnterpriseServerURL         string `json:"default_enterprise_server_url,omitempty"`
+	DefaultEnterpriseServerFallbackURL string `json:"default_enterprise_server_fallback_url,omitempty"`
+	DefaultEnterpriseServerName        string `json:"default_enterprise_server_name,omitempty"`
+	DefaultEnterpriseServerRequired    bool   `json:"default_enterprise_server_required"`
+	DefaultEnterpriseAllowInsecure     bool   `json:"default_enterprise_allow_insecure"`
 }
 
 func (a *App) GetDesktopBootstrap() DesktopBootstrap {
 	return DesktopBootstrap{
-		APIBaseURL:                      strings.TrimRight(a.backendURL, "/"),
-		Session:                         a.desktopSessionSecret,
-		DefaultEnterpriseServerURL:      defaultEnterpriseServerURL(),
-		DefaultEnterpriseServerName:     defaultEnterpriseServerName(),
-		DefaultEnterpriseServerRequired: defaultEnterpriseServerURL() != "",
-		DefaultEnterpriseAllowInsecure:  defaultEnterpriseAllowInsecure(),
+		APIBaseURL:                         strings.TrimRight(a.backendURL, "/"),
+		Session:                            a.desktopSessionSecret,
+		DefaultEnterpriseServerURL:         defaultEnterpriseServerURL(),
+		DefaultEnterpriseServerFallbackURL: defaultEnterpriseServerFallbackURL(defaultEnterpriseServerURL()),
+		DefaultEnterpriseServerName:        defaultEnterpriseServerName(),
+		DefaultEnterpriseServerRequired:    defaultEnterpriseServerURL() != "",
+		DefaultEnterpriseAllowInsecure:     defaultEnterpriseAllowInsecure(),
 	}
 }
 
