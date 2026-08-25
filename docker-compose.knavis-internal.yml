@@ -1,0 +1,21 @@
+# Local Knavis service overlay. Keep docker-compose.yml public-compatible.
+# The app and frontend use the internal image tag; runtime-only images remain
+# on the existing local tags and data volumes.
+services:
+  app:
+    image: ${XELORA_APP_IMAGE:-wechatopenai/xelora-app:latest}
+    env_file:
+      - .env.knavis-internal
+    environment:
+      - XELORA_BRAND_PROFILE=${XELORA_BRAND_PROFILE:-internal}
+
+  frontend:
+    image: wechatopenai/xelora-ui:${XELORA_VERSION:-knavis-internal-local}
+    volumes:
+      - ${CLIENT_RELEASES_HOST_PATH:-./dist/client-releases}:/usr/share/nginx/html/downloads:ro
+
+  docreader:
+    image: wechatopenai/xelora-docreader:${XELORA_RUNTIME_VERSION:-latest}
+
+  sandbox:
+    image: wechatopenai/xelora-sandbox:${XELORA_RUNTIME_VERSION:-latest}
