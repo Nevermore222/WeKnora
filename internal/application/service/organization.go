@@ -37,6 +37,10 @@ var (
 	ErrOrgMemberLimitTooLow  = errors.New("member limit cannot be lower than current member count")
 )
 
+func normalizeInviteCode(inviteCode string) string {
+	return strings.TrimSpace(inviteCode)
+}
+
 // organizationService implements OrganizationService.
 //
 // Plan 3 of #1303: a "member" of an org is a tenant, identified by
@@ -159,7 +163,7 @@ func (s *organizationService) GetOrganization(ctx context.Context, id string) (*
 
 // GetOrganizationByInviteCode gets an organization by invite code
 func (s *organizationService) GetOrganizationByInviteCode(ctx context.Context, inviteCode string) (*types.Organization, error) {
-	org, err := s.orgRepo.GetByInviteCode(ctx, inviteCode)
+	org, err := s.orgRepo.GetByInviteCode(ctx, normalizeInviteCode(inviteCode))
 	if err != nil {
 		if errors.Is(err, repository.ErrInviteCodeNotFound) {
 			return nil, ErrOrgNotFound
@@ -533,7 +537,7 @@ func (s *organizationService) joinAsViewerWithChecks(ctx context.Context, org *t
 
 // JoinByInviteCode allows a tenant to join via invite code.
 func (s *organizationService) JoinByInviteCode(ctx context.Context, inviteCode string, userID string, tenantID uint64) (*types.Organization, error) {
-	org, err := s.orgRepo.GetByInviteCode(ctx, inviteCode)
+	org, err := s.orgRepo.GetByInviteCode(ctx, normalizeInviteCode(inviteCode))
 	if err != nil {
 		if errors.Is(err, repository.ErrInviteCodeNotFound) {
 			return nil, ErrOrgNotFound
