@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1303" height="504" viewBox="0 0 1303 504" fill="none">
+  <title>Knavis dark-background wordmark</title>
+  <desc>Large geometric Knavis wordmark with a restrained navigation route signature.</desc>
+
+  <text x="150" y="355" font-family="Century Gothic, Segoe UI, sans-serif" font-size="224" font-weight="600" letter-spacing="7">
+    <tspan fill="#36C4AD">K</tspan><tspan fill="#EAF5F2">nav</tspan><tspan fill="#F4BE4C">i</tspan><tspan fill="#EAF5F2">s</tspan>
+  </text>
+
+  <path d="M228 425H676" stroke="#A9BDBF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M676 425H948" stroke="#36C4AD" stroke-width="6" stroke-linecap="round"/>
+  <path d="M948 425C980 425 995 412 1018 394C1042 375 1057 356 1082 356C1111 356 1131 371 1152 390C1171 407 1189 414 1212 414" stroke="#B6C9C9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1018 394C1035 418 1056 442 1080 452C1101 461 1120 461 1140 461" stroke="#36C4AD" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1082 356C1101 332 1120 322 1148 322" stroke="#36C4AD" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="228" cy="425" r="5" fill="#36C4AD"/>
+  <circle cx="948" cy="425" r="6" fill="#F4BE4C"/>
+  <circle cx="1018" cy="394" r="7" fill="#F4BE4C" stroke="#173446" stroke-width="3"/>
+  <circle cx="1082" cy="356" r="7" fill="#36C4AD" stroke="#173446" stroke-width="3"/>
+  <circle cx="1152" cy="390" r="6" fill="#F4BE4C" stroke="#173446" stroke-width="3"/>
+  <circle cx="1080" cy="452" r="6" fill="#36C4AD"/>
+  <circle cx="1140" cy="461" r="5" fill="#36C4AD"/>
+  <circle cx="1148" cy="322" r="5" fill="#36C4AD"/>
+  <circle cx="1212" cy="414" r="5" fill="#B6C9C9"/>
+</svg>
