@@ -13,6 +13,17 @@ fi
 
 export VITE_IS_DOCKER="${VITE_IS_DOCKER:-true}"
 
+BRAND_PROFILE="${XELORA_BRAND_PROFILE:-${VITE_BRAND_PROFILE:-public}}"
+case "$BRAND_PROFILE" in
+	public|internal)
+		;;
+	*)
+		echo "XELORA_BRAND_PROFILE must be public or internal (got: $BRAND_PROFILE)" >&2
+		exit 1
+		;;
+esac
+export VITE_BRAND_PROFILE="$BRAND_PROFILE"
+
 cd "$PROJECT_ROOT/frontend"
 npm ci
 npm run build

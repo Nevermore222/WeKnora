@@ -166,6 +166,7 @@ foreach ($file in $dataFilesManifest) {
 }
 
 $fileReferences = New-Object System.Collections.Generic.List[object]
+$missingLocalFileReferences = New-Object System.Collections.Generic.List[object]
 $pathPattern = '(?:local://|minio://|/data/files/)[^"\s<>\]\},]+'
 foreach ($column in @($columns | Where-Object { $_.data_type -in @('text', 'character varying', 'jsonb') })) {
     $tableName = [string]$column.table_name
@@ -186,29 +187,33 @@ WHERE ($quotedColumn)::text LIKE '%local://%'
         $value = [string]$match.value
         foreach ($regexMatch in [regex]::Matches($value, $pathPattern)) {
             $path = $regexMatch.Value.TrimEnd('.', ',', ';', ')')
+            $storageKey = $null
+            $presentInDeclaredVolume = $null
             if ($path.StartsWith('local://')) {
-                $key = Assert-RelativeStorageKey -Key $path.Substring('local://'.Length)
-                if (-not $dataFilesByKey.ContainsKey($key)) {
-                    throw "Local file reference is absent from the declared data-files volume: $path"
-                }
+                $storageKey = Assert-RelativeStorageKey -Key $path.Substring('local://'.Length)
+                $presentInDeclaredVolume = $dataFilesByKey.ContainsKey($storageKey)
                 $scheme = 'local'
             } elseif ($path.StartsWith('/data/files/')) {
-                $key = Assert-RelativeStorageKey -Key $path.Substring('/data/files/'.Length)
-                if (-not $dataFilesByKey.ContainsKey($key)) {
-                    throw "Legacy file reference is absent from the declared data-files volume: $path"
-                }
+                $storageKey = Assert-RelativeStorageKey -Key $path.Substring('/data/files/'.Length)
+                $presentInDeclaredVolume = $dataFilesByKey.ContainsKey($storageKey)
                 $scheme = 'local'
             } else {
                 $scheme = 'minio'
             }
-            $fileReferences.Add([pscustomobject]@{
+            $reference = [pscustomobject]@{
                     table          = $tableName
                     column         = $columnName
                     primary_key    = [string]$match.primary_key_json
                     path           = $path
                     scheme         = $scheme
+                    storage_key    = $storageKey
+                    is_present     = $presentInDeclaredVolume
                     value_sha256   = Get-Sha256Hex -Bytes ([Text.Encoding]::UTF8.GetBytes($value))
-                })
+                }
+            $fileReferences.Add($reference)
+            if ($scheme -eq 'local' -and -not $presentInDeclaredVolume) {
+                $missingLocalFileReferences.Add($reference)
+            }
         }
     }
 }
@@ -235,13 +240,15 @@ $schemaReport = [ordered]@{
     unsupported     = $unsupportedTables
 }
 $fileReferenceReport = [ordered]@{
-    source_name  = $SourceName
-    generated_at = (Get-Date).ToUniversalTime().ToString('o')
-    references   = @($fileReferences)
+    source_name               = $SourceName
+    generated_at              = (Get-Date).ToUniversalTime().ToString('o')
+    references                = @($fileReferences)
+    missing_local_references  = @($missingLocalFileReferences)
 }
 
 Write-JsonArtifact -Value $schemaReport -Path (Join-Path $artifactRoot 'database-schema.json') | Out-Null
 Write-JsonArtifact -Value $fileReferenceReport -Path (Join-Path $artifactRoot 'file-references.json') | Out-Null
+Write-JsonArtifact -Value ([ordered]@{ source_name = $SourceName; references = @($missingLocalFileReferences) }) -Path (Join-Path $artifactRoot 'missing-local-file-references.json') | Out-Null
 Write-JsonArtifact -Value ([ordered]@{ source_name = $SourceName; files = $dataFilesManifest }) -Path (Join-Path $artifactRoot 'data-files-manifest.json') | Out-Null
 Write-JsonArtifact -Value ([ordered]@{ source_name = $SourceName; root = $resolvedWorkspaceRoot; files = $workspaceManifest }) -Path (Join-Path $artifactRoot 'workspace-manifest.json') | Out-Null
 
@@ -255,11 +262,17 @@ $preflight = [ordered]@{
     extension_count      = $extensions.Count
     table_count          = $tables.Count
     file_reference_count = $fileReferences.Count
+    missing_local_file_reference_count = $missingLocalFileReferences.Count
     data_file_count      = $dataFilesManifest.Count
     workspace_file_count = $workspaceManifest.Count
-    status                = 'success'
+    status                = if ($missingLocalFileReferences.Count -gt 0) { 'blocked' } else { 'success' }
 }
 Write-JsonArtifact -Value $preflight -Path (Join-Path $artifactRoot 'preflight.json') | Out-Null
+if ($missingLocalFileReferences.Count -gt 0) {
+    Write-ArtifactSha256Sums -ArtifactRoot $artifactRoot | Out-Null
+    Write-Host "Preflight blocked: $artifactRoot"
+    throw "Local file references are absent from the declared data-files volume. Review missing-local-file-references.json before snapshot."
+}
 New-Item -ItemType File -Path (Join-Path $artifactRoot 'preflight.ok') | Out-Null
 Write-ArtifactSha256Sums -ArtifactRoot $artifactRoot | Out-Null
 Write-Host "Preflight passed: $artifactRoot"

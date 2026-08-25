@@ -13,12 +13,16 @@ const executeMerge = readScript('execute-merge.ps1')
 const startCandidate = readScript('start-merge-candidate.ps1')
 const importFiles = readScript('import-files-to-minio.ps1')
 const verifyMerge = readScript('verify-merge.ps1')
+const common = readScript('common.ps1')
 
 test('preflight is read-only and records required database facts', () => {
   assert.match(preflight, /information_schema\.tables/)
   assert.match(preflight, /pg_constraint/)
   assert.match(preflight, /pg_extension/)
   assert.match(preflight, /Get-FileHash/)
+  assert.match(preflight, /\$missingLocalFileReferences/)
+  assert.match(preflight, /missing-local-file-references\.json/)
+  assert.match(preflight, /Preflight blocked:/)
   assert.doesNotMatch(preflight, /DROP\s+DATABASE/i)
 })
 
@@ -66,4 +70,11 @@ test('file migration preserves content hashes and only rewrites reviewed knowled
   assert.match(importFiles, /Get-FileHash/)
   assert.match(verifyMerge, /foreign_key_check/)
   assert.match(verifyMerge, /object-manifest/)
+})
+
+test('data-files volume scanning transports nested shell safely from Windows', () => {
+  assert.match(common, /\[Convert\]::ToBase64String/)
+  assert.match(common, /base64 -d \| sh/)
+  assert.doesNotMatch(common, /'alpine:3\.20', 'sh', '-c', \$script/)
+  assert.doesNotMatch(common, /printf '\\t'/)
 })

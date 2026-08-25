@@ -284,19 +284,21 @@ set -eu
 find /scan -type f -exec sh -c '
 for file do
   relative="${file#/scan/}"
-  case "$relative" in
-    *"$(printf '\t')"*|*"$(printf '\n')"*) exit 17 ;;
-  esac
+  if printf "%s" "$relative" | LC_ALL=C grep -q "[[:cntrl:]]"; then
+    exit 17
+  fi
   bytes="$(stat -c %s "$file")"
-  hash="$(sha256sum "$file" | cut -d ' ' -f 1)"
-  printf '%s\t%s\t%s\n' "$relative" "$bytes" "$hash"
+  hash="$(sha256sum "$file" | cut -d " " -f 1)"
+  printf "%s\t%s\t%s\n" "$relative" "$bytes" "$hash"
 done
 ' sh {} +
 '@
+    $encodedScript = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($script))
+    $command = "printf %s $encodedScript | base64 -d | sh"
     $args = @(
         'run', '--rm',
         '--mount', "type=volume,source=$VolumeName,target=/scan,readonly",
-        'alpine:3.20', 'sh', '-c', $script
+        'alpine:3.20', 'sh', '-c', $command
     )
     $lines = Invoke-CheckedOutput -FilePath 'docker' -Arguments $args
     $manifest = foreach ($line in $lines) {
