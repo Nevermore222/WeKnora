@@ -58,6 +58,9 @@ func (c *AuthClient) Login(ctx context.Context, profileID string, body io.Reader
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	// Let the remote server apply client-user capability defaults and repair
+	// accounts created before the client-provisioning flag was introduced.
+	req.Header.Set("X-Xelora-Client", "personal")
 
 	var response authTokenResponse
 	if err := c.doJSON(req, &response); err != nil {

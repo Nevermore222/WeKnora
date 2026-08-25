@@ -7,8 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
+
+	"github.com/Tencent/Xelora/internal/logger"
 )
 
 const gatewayPathPrefix = "/api/v1/desktop/enterprise/"
@@ -93,6 +97,14 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeGatewayError(w, http.StatusBadRequest, "invalid_remote_request")
 		return
 	}
+	fileUploadSummary := ""
+	if strings.HasSuffix(remotePath, "/knowledge/file") {
+		fileUploadSummary = summarizeFileUploadRequest(r, body)
+		logger.Infof(r.Context(), "[desktopremote] knowledge file upload request: %s", fileUploadSummary)
+	}
+	if summary := summarizeMultipartBody(r.Header.Get("Content-Type"), body); summary != "" {
+		logger.Infof(r.Context(), "[desktopremote] multipart request body: %s", summary)
+	}
 
 	resp, err := g.forward(r, target.String(), body, session.AccessToken)
 	if err != nil {
@@ -123,10 +135,60 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		defer resp.Body.Close()
 	}
+	if fileUploadSummary != "" {
+		logger.Infof(r.Context(), "[desktopremote] knowledge file upload response: status=%d content_type=%s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
 
 	copyGatewayResponseHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
 	streamGatewayBody(w, resp.Body)
+}
+
+func summarizeFileUploadRequest(r *http.Request, body []byte) string {
+	contentType := r.Header.Get("Content-Type")
+	summary := fmt.Sprintf("content_type=%s body_size=%d", contentType, len(body))
+	if multipartSummary := summarizeMultipartBody(contentType, body); multipartSummary != "" {
+		return summary + " " + multipartSummary
+	}
+	return summary
+}
+
+func summarizeMultipartBody(contentType string, body []byte) string {
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil || mediaType != "multipart/form-data" || params["boundary"] == "" {
+		return ""
+	}
+
+	reader := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+	var files []string
+	var fields []string
+	for {
+		part, nextErr := reader.NextPart()
+		if nextErr == io.EOF {
+			break
+		}
+		if nextErr != nil {
+			return fmt.Sprintf("parse_error=%v body_size=%d", nextErr, len(body))
+		}
+		partSize, readErr := io.Copy(io.Discard, part)
+		if readErr != nil {
+			return fmt.Sprintf("read_error=%v body_size=%d", readErr, len(body))
+		}
+		if filename := part.FileName(); filename != "" {
+			files = append(files, fmt.Sprintf("file=%s size=%d", filename, partSize))
+		} else if name := part.FormName(); name != "" {
+			fields = append(fields, name)
+		}
+	}
+
+	if len(files) == 0 && len(fields) == 0 {
+		return fmt.Sprintf("parts=0 body_size=%d", len(body))
+	}
+	parts := append([]string{}, files...)
+	if len(fields) > 0 {
+		parts = append(parts, "fields="+strings.Join(fields, ","))
+	}
+	return strings.Join(parts, "; ")
 }
 
 func (g *Gateway) forward(original *http.Request, target string, body []byte, accessToken string) (*http.Response, error) {

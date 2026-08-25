@@ -1,14 +1,64 @@
 package desktopremote
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestMultipartBodySummaryReportsUploadedFileBytes(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "test.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write([]byte("%PDF-1.4")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.WriteField("tag_id", "tag-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := summarizeMultipartBody(writer.FormDataContentType(), body.Bytes())
+	if got != "file=test.pdf size=8; fields=tag_id" {
+		t.Fatalf("summary=%q", got)
+	}
+}
+
+func TestFileUploadRequestSummaryIncludesContentTypeAndFileBytes(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "test.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write([]byte("%PDF-1.4")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/desktop/enterprise/server-a/proxy/api/v1/knowledge-bases/kb/knowledge/file", nil)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	got := summarizeFileUploadRequest(req, body.Bytes())
+	if !strings.Contains(got, "content_type=multipart/form-data") ||
+		!strings.Contains(got, "body_size=") ||
+		!strings.Contains(got, "file=test.pdf size=8") {
+		t.Fatalf("summary=%q", got)
+	}
+}
 
 func TestGatewayLocksTargetAndRebuildsHeaders(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -115,6 +165,57 @@ func TestGatewayPreservesRequestBodyAndRangeResponse(t *testing.T) {
 	}
 	if rec.Header().Get("Content-Range") != "bytes 0-3/8" || rec.Body.String() != "data" {
 		t.Fatalf("headers=%v body=%s", rec.Header(), rec.Body.String())
+	}
+}
+
+func TestGatewayPreservesMultipartFileBody(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Fatal(err)
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer file.Close()
+		data, err := io.ReadAll(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header.Filename != "test.pdf" || string(data) != "%PDF-1.4" {
+			t.Fatalf("filename=%q data=%q", header.Filename, data)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "test.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write([]byte("%PDF-1.4")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	gateway := newGatewayForTest(upstream.URL, &Session{
+		UserID:            "u1",
+		AccessToken:       "access-token",
+		RefreshTokenOwner: "u1",
+		AccessExpiresAt:   time.Now().Add(time.Hour),
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/desktop/enterprise/server-a/proxy/api/v1/knowledge-bases/kb/knowledge/file", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.ContentLength = int64(body.Len())
+	rec := httptest.NewRecorder()
+
+	gateway.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

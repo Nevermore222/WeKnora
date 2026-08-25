@@ -3,6 +3,8 @@ package desktopremote
 import (
 	"context"
 	"errors"
+
+	"github.com/Tencent/Xelora/internal/branding"
 )
 
 var ErrCredentialNotFound = errors.New("credential not found")
@@ -14,7 +16,7 @@ type CredentialStore interface {
 }
 
 func credentialTarget(profileID, userID string) string {
-	return "Xelora Personal/enterprise/" + profileID + "/" + userID
+	return branding.ProductName() + "/enterprise/" + profileID + "/" + userID
 }
 
 func zeroBytes(value []byte) {

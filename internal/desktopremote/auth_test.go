@@ -31,6 +31,9 @@ func TestLoginStoresRefreshTokenAndReturnsRedactedIdentity(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("method=%s", r.Method)
 		}
+		if got := r.Header.Get("X-Xelora-Client"); got != "personal" {
+			t.Fatalf("X-Xelora-Client=%q, want personal", got)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"success": true,
