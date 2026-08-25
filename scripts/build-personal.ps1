@@ -1,5 +1,5 @@
 # build-personal.ps1 — Build Xelora Personal desktop EXE for Windows amd64
-# Usage: .\scripts\build-personal.ps1 [-SkipFrontend] [-OutputDir <path>]
+# Usage: .\scripts\build-personal.ps1 [-BrandProfile public|internal] [-SkipFrontend] [-DefaultServerURL <url>] [-DefaultServerName <name>] [-OutputDir <path>]
 #
 # Prerequisites:
 #   - Go 1.26+ with CGO enabled (gcc / MSVC build tools)
@@ -25,18 +25,104 @@
 #   3. Copies .env.personal.example alongside the output binary
 
 param(
+    [ValidateSet("public", "internal")]
+    [string]$BrandProfile = "public",
+    [string]$ReleaseVersion = "",
     [switch]$SkipFrontend,
+    [string]$DefaultServerURL = "",
+    [string]$DefaultServerName = "",
+    [string]$DefaultUpdateFeedURL = "",
     [string]$OutputDir = ""
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+$NormalizedDefaultServerURL = ""
+if (-not [string]::IsNullOrWhiteSpace($DefaultServerURL)) {
+    $NormalizedDefaultServerURL = $DefaultServerURL.Trim().TrimEnd('/')
+    $parsedDefaultServerURL = $null
+    $isValidDefaultServerURL = [System.Uri]::TryCreate(
+        $NormalizedDefaultServerURL,
+        [System.UriKind]::Absolute,
+        [ref]$parsedDefaultServerURL
+    )
+    if (-not $isValidDefaultServerURL -or
+        $parsedDefaultServerURL.Scheme -notin @('http', 'https') -or
+        [string]::IsNullOrWhiteSpace($parsedDefaultServerURL.Host)) {
+        throw "-DefaultServerURL must be an absolute HTTP or HTTPS URL with a host: $DefaultServerURL"
+    }
+}
+
+$NormalizedDefaultUpdateFeedURL = ""
+if (-not [string]::IsNullOrWhiteSpace($DefaultUpdateFeedURL)) {
+    $NormalizedDefaultUpdateFeedURL = $DefaultUpdateFeedURL.Trim().TrimEnd('/')
+    $parsedDefaultUpdateFeedURL = $null
+    $isValidDefaultUpdateFeedURL = [System.Uri]::TryCreate(
+        $NormalizedDefaultUpdateFeedURL,
+        [System.UriKind]::Absolute,
+        [ref]$parsedDefaultUpdateFeedURL
+    )
+    if (-not $isValidDefaultUpdateFeedURL -or
+        $parsedDefaultUpdateFeedURL.Scheme -notin @('http', 'https') -or
+        [string]::IsNullOrWhiteSpace($parsedDefaultUpdateFeedURL.Host)) {
+        throw "-DefaultUpdateFeedURL must be an absolute HTTP or HTTPS URL with a host: $DefaultUpdateFeedURL"
+    }
+}
+
+$Version = $ReleaseVersion.Trim()
+if ($Version -eq "") {
+    if ($BrandProfile -eq "internal") {
+        # Knavis has its own release train; the public source VERSION remains
+        # independent so public Xelora builds are not renumbered.
+        $Version = "1.0.0"
+    } elseif (Test-Path "VERSION") {
+        $Version = (Get-Content "VERSION" -Raw).Trim()
+    } else {
+        $Version = "unknown"
+    }
+}
+$Version = $Version.TrimStart('v')
+if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$') {
+    throw "Release version must be semantic version 1.2.3 (optionally with prerelease/build metadata): $Version"
+}
+
+$previousViteBrandProfile = [Environment]::GetEnvironmentVariable("VITE_BRAND_PROFILE", "Process")
+$previousViteFrontendVersion = [Environment]::GetEnvironmentVariable("VITE_FRONTEND_VERSION", "Process")
+$env:VITE_BRAND_PROFILE = $BrandProfile
+$env:VITE_FRONTEND_VERSION = $Version
+$EffectiveDefaultServerName = $DefaultServerName.Trim()
+if ($EffectiveDefaultServerName -eq "") {
+    $EffectiveDefaultServerName = if ($BrandProfile -eq "internal") { "Knavis Server" } else { "Xelora Server" }
+}
+$ApplicationName = if ($BrandProfile -eq "internal") { "Knavis Personal" } else { "Xelora Personal" }
+$WailsConfigPath = Join-Path $RepoRoot "cmd\desktop\wails.json"
+$OriginalWailsConfig = $null
 
 Push-Location $RepoRoot
 try {
+    if ($BrandProfile -eq "internal" -and (Test-Path -LiteralPath $WailsConfigPath)) {
+        # Wails reads product metadata from wails.json. Rewrite it only for the
+        # current internal build, then restore the exact original bytes below.
+        $OriginalWailsConfig = [System.IO.File]::ReadAllBytes($WailsConfigPath)
+        $wailsConfig = Get-Content -LiteralPath $WailsConfigPath -Raw | ConvertFrom-Json
+        $wailsConfig.name = $ApplicationName
+        $wailsConfig.outputfilename = $ApplicationName
+        $wailsConfig.author.name = "Knavis Team"
+        $wailsConfig.info.companyName = "Knavis"
+        $wailsConfig.info.productName = $ApplicationName
+        $wailsConfig.info.productVersion = $Version
+        $wailsConfig.info.copyright = "Copyright 2026 Knavis"
+        $wailsConfig.info.comments = "$ApplicationName Desktop Edition"
+        [System.IO.File]::WriteAllText(
+            $WailsConfigPath,
+            ($wailsConfig | ConvertTo-Json -Depth 10),
+            (New-Object System.Text.UTF8Encoding($false))
+        )
+    }
+
     # ── 1. Frontend build ──
     if (-not $SkipFrontend) {
-        Write-Host "==> Building frontend..." -ForegroundColor Cyan
+        Write-Host "==> Building frontend ($BrandProfile brand profile)..." -ForegroundColor Cyan
         Push-Location frontend
         try {
             npm ci --silent
@@ -49,12 +135,8 @@ try {
     }
 
     # ── 2. Wails build ──
-    Write-Host "==> Building Xelora Personal (windows/amd64)..." -ForegroundColor Cyan
+    Write-Host "==> Building $ApplicationName (windows/amd64)..." -ForegroundColor Cyan
 
-    $Version = "1.0.0"
-    if (Test-Path "VERSION") {
-        $Version = (Get-Content "VERSION" -Raw).Trim()
-    }
     $CommitID = git rev-parse --short HEAD 2>$null
     if (-not $CommitID) { $CommitID = "unknown" }
     $BuildTime = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
@@ -63,24 +145,42 @@ try {
         "-X 'github.com/Tencent/Xelora/internal/handler.Version=$Version' " +
         "-X 'github.com/Tencent/Xelora/internal/handler.Edition=personal' " +
         "-X 'github.com/Tencent/Xelora/internal/handler.CommitID=$CommitID' " +
-        "-X 'github.com/Tencent/Xelora/internal/handler.BuildTime=$BuildTime'"
+        "-X 'github.com/Tencent/Xelora/internal/handler.BuildTime=$BuildTime' " +
+        "-X 'github.com/Tencent/Xelora/internal/branding.PackagedProfile=$BrandProfile'"
+    if ($NormalizedDefaultServerURL -ne "") {
+        $LdFlags += " -X 'main.packagedEnterpriseServerURL=$NormalizedDefaultServerURL'"
+    }
+    if ($NormalizedDefaultUpdateFeedURL -ne "") {
+        $LdFlags += " -X 'main.packagedDesktopUpdateFeedURL=$NormalizedDefaultUpdateFeedURL'"
+    }
 
     $env:CGO_ENABLED = "1"
     $env:GOLANG_PROTOBUF_REGISTRATION_CONFLICT = "warn"
 
     Push-Location cmd/desktop
     try {
-        wails build -clean -skipbindings `
-            -tags "sqlite_fts5" `
-            -platform "windows/amd64" `
-            -ldflags "$LdFlags" `
-            -o "Xelora Personal.exe"
+        $WailsBuildArguments = @(
+            "-clean",
+            "-skipbindings",
+            "-tags", "sqlite_fts5",
+            "-platform", "windows/amd64",
+            "-ldflags", $LdFlags,
+            "-o", "$ApplicationName.exe"
+        )
+        if ($SkipFrontend) {
+            $WailsBuildArguments += "-s"
+            $WailsBuildArguments += "-m"
+        }
+        wails build @WailsBuildArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "wails build failed with exit code $LASTEXITCODE"
+        }
     } finally {
         Pop-Location
     }
 
     # ── 3. Package output ──
-    $BinPath = "cmd\desktop\build\bin\Xelora Personal.exe"
+    $BinPath = Join-Path $RepoRoot ("cmd\desktop\build\bin\{0}.exe" -f $ApplicationName)
     if (-not (Test-Path $BinPath)) {
         Write-Error "Build failed: $BinPath not found"
         exit 1
@@ -91,8 +191,36 @@ try {
     }
     New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
-    Copy-Item $BinPath (Join-Path $OutputDir "Xelora Personal.exe") -Force
-    Copy-Item ".env.personal.example" (Join-Path $OutputDir ".env.personal") -Force
+    Copy-Item $BinPath (Join-Path $OutputDir "$ApplicationName.exe") -Force
+    $PersonalEnvPath = Join-Path $OutputDir ".env.personal"
+    Copy-Item ".env.personal.example" $PersonalEnvPath -Force
+
+    # Keep the copied runtime defaults aligned with the build profile. The
+    # linker-injected URL still wins at runtime, but writing it here makes the
+    # portable package self-describing and editable by an administrator.
+    $PersonalEnvContent = Get-Content $PersonalEnvPath -Raw
+    if ($NormalizedDefaultServerURL -ne "") {
+        $PersonalEnvContent = [regex]::Replace(
+            $PersonalEnvContent,
+            '(?m)^XELORA_PERSONAL_SERVER_URL=.*$',
+            "XELORA_PERSONAL_SERVER_URL=$NormalizedDefaultServerURL"
+        )
+    }
+    $PersonalEnvContent = [regex]::Replace(
+        $PersonalEnvContent,
+        '(?m)^XELORA_PERSONAL_SERVER_NAME=.*$',
+        "XELORA_PERSONAL_SERVER_NAME=$EffectiveDefaultServerName"
+    )
+    $PersonalEnvContent = [regex]::Replace(
+        $PersonalEnvContent,
+        '(?m)^XELORA_UPDATE_FEED_URL=.*$',
+        "XELORA_UPDATE_FEED_URL=$NormalizedDefaultUpdateFeedURL"
+    )
+    [System.IO.File]::WriteAllText(
+        $PersonalEnvPath,
+        $PersonalEnvContent,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
 
     # Copy the built frontend as web/ — the embedded backend serves the SPA from
     # ./web (serveFrontendStatic). Without it, GET / falls through to the auth
@@ -152,9 +280,22 @@ try {
     Write-Host ""
     Write-Host "==> Build complete!" -ForegroundColor Green
     Write-Host "    Output: $OutputDir"
-    Write-Host "    Binary: $(Join-Path $OutputDir 'Xelora Personal.exe')"
+    Write-Host "    Binary: $(Join-Path $OutputDir "$ApplicationName.exe")"
     Write-Host ""
-    Write-Host "    To run: cd '$OutputDir'; .\'Xelora Personal.exe'" -ForegroundColor Gray
+    Write-Host "    To run: cd '$OutputDir'; .\'$ApplicationName.exe'" -ForegroundColor Gray
 } finally {
+    if ($null -ne $OriginalWailsConfig) {
+        [System.IO.File]::WriteAllBytes($WailsConfigPath, $OriginalWailsConfig)
+    }
+    if ($null -eq $previousViteBrandProfile) {
+        Remove-Item Env:VITE_BRAND_PROFILE -ErrorAction SilentlyContinue
+    } else {
+        $env:VITE_BRAND_PROFILE = $previousViteBrandProfile
+    }
+    if ($null -eq $previousViteFrontendVersion) {
+        Remove-Item Env:VITE_FRONTEND_VERSION -ErrorAction SilentlyContinue
+    } else {
+        $env:VITE_FRONTEND_VERSION = $previousViteFrontendVersion
+    }
     Pop-Location
 }
