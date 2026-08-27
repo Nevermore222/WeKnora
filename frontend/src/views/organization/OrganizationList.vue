@@ -8,6 +8,12 @@
           <div class="title-row" style="--wails-draggable: drag">
             <h2 style="--wails-draggable: drag">{{ $t('organization.title') }}</h2>
             <div class="header-actions" style="--wails-draggable: no-drag">
+              <t-tooltip content="组织架构" placement="bottom">
+                <t-button variant="text" theme="default" size="small" class="header-action-btn"
+                  style="--wails-draggable: no-drag" @click="router.push('/platform/organization-hierarchy')">
+                  <template #icon><t-icon name="folder" size="16px" /></template>
+                </t-button>
+              </t-tooltip>
               <t-tooltip :content="canManageOrg ? $t('organization.joinOrg') : noPermissionTip" placement="bottom">
                 <t-button variant="text" theme="default" size="small" class="header-action-btn"
                   style="--wails-draggable: no-drag" :disabled="!canManageOrg" @click="handleJoinOrganization">

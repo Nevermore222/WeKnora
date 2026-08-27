@@ -19,6 +19,54 @@
         </div>
       </div>
       <div class="kb-list-main">
+        <section class="kb-classification-panel" aria-label="知识库分类筛选">
+          <div class="classification-sidebar-head">
+            <div class="classification-title">
+              <span>知识库筛选</span>
+              <strong>{{ visibleKnowledgeBaseCount }}</strong>
+            </div>
+            <span class="classification-result">当前显示 {{ visibleKnowledgeBaseCount }} 个</span>
+          </div>
+          <div class="classification-tree-head">
+            <span>筛选分类</span>
+            <small>按层级定位资源</small>
+          </div>
+          <div class="classification-tree" role="tree" aria-label="知识库筛选分类">
+            <div v-for="module in classificationModules" :key="module.id" class="classification-module" :class="{ active: selectedClassifications[module.id] }">
+              <button type="button" class="classification-tree-row classification-module-row" :aria-expanded="isClassificationModuleExpanded(module.id)" @click="toggleClassificationModule(module.id)">
+                <t-icon :name="isClassificationModuleExpanded(module.id) ? 'chevron-down' : 'chevron-right'" size="13px" />
+                <t-icon name="folder-open" size="15px" />
+                <strong>{{ module.name }}</strong>
+                <span class="classification-selected-label">{{ selectedClassificationLabel(module) }}</span>
+              </button>
+              <div v-show="isClassificationModuleExpanded(module.id)" class="classification-tree-children">
+                <button type="button" class="classification-tree-row classification-all-row" :class="{ selected: !selectedClassifications[module.id] }" @click="selectClassification(module.id, '')">
+                  <span class="tree-indent"></span><span class="tree-leaf">·</span><span>全部{{ module.name }}</span>
+                  <small>{{ classificationResourceCount }}</small>
+                </button>
+                <ClassificationTreeOption v-for="option in module.options || []" :key="option.id" :option="option" :module-id="module.id" :selected-id="selectedClassifications[module.id] || ''" :expanded-ids="expandedClassificationOptions" @select="selectClassification" @toggle="toggleClassificationOption" />
+              </div>
+            </div>
+          </div>
+          <t-button v-if="authStore.hasRole('admin')" variant="outline" size="small" class="classification-manage-btn" @click="handleManageClassification">
+            <template #icon><t-icon name="setting-1" /></template>
+            自定义筛选结构
+          </t-button>
+          <div class="classification-path">
+            <span class="path-label">当前路径</span>
+            <template v-if="activeClassificationPath.length">
+              <template v-for="(item, index) in activeClassificationPath" :key="item">
+                <t-icon v-if="index" name="chevron-right" size="12px" class="path-separator" />
+                <span class="path-tag">{{ item }}</span>
+              </template>
+              <button type="button" class="path-clear" @click="clearClassificationFilters">清除</button>
+            </template>
+            <span v-else class="path-tag">全部知识</span>
+          </div>
+          <t-input v-model="knowledgeSearchQuery" size="small" clearable class="classification-search" placeholder="搜索知识库名称、描述或标签">
+            <template #prefix-icon><t-icon name="search" /></template>
+          </t-input>
+        </section>
         <!-- creator filter intentionally removed from chrome: every card
              already shows its creator via ResourceOriginBadge / avatar, so
              a dedicated horizontal switch added more noise than signal.
@@ -236,6 +284,9 @@
                 <div class="card-description">
                   {{ kb.description || $t('knowledgeBase.noDescription') }}
                 </div>
+                <div v-if="getKnowledgeBaseClassificationTags(kb).length" class="kb-classification-tags">
+                  <span v-for="tag in getKnowledgeBaseClassificationTags(kb)" :key="tag" class="kb-classification-tag">{{ tag }}</span>
+                </div>
               </div>
 
               <!-- 卡片底部 -->
@@ -309,6 +360,9 @@
               <div class="card-content">
                 <div class="card-description">
                   {{ kb.description || $t('knowledgeBase.noDescription') }}
+                </div>
+                <div v-if="getKnowledgeBaseClassificationTags(kb).length" class="kb-classification-tags">
+                  <span v-for="tag in getKnowledgeBaseClassificationTags(kb)" :key="tag" class="kb-classification-tag">{{ tag }}</span>
                 </div>
               </div>
 
@@ -459,6 +513,9 @@
                 <div class="card-description">
                   {{ kb.description || $t('knowledgeBase.noDescription') }}
                 </div>
+                <div v-if="getKnowledgeBaseClassificationTags(kb).length" class="kb-classification-tags">
+                  <span v-for="tag in getKnowledgeBaseClassificationTags(kb)" :key="tag" class="kb-classification-tag">{{ tag }}</span>
+                </div>
               </div>
 
               <!-- 卡片底部 -->
@@ -584,6 +641,11 @@
                 <div class="card-description">
                   {{ shared.knowledge_base.description || $t('knowledgeBase.noDescription') }}
                 </div>
+                <div v-if="getKnowledgeBaseClassificationTags(shared.knowledge_base).length"
+                  class="kb-classification-tags">
+                  <span v-for="tag in getKnowledgeBaseClassificationTags(shared.knowledge_base)" :key="tag"
+                    class="kb-classification-tag">{{ tag }}</span>
+                </div>
               </div>
 
               <!-- 卡片底部 -->
@@ -618,8 +680,17 @@
           </template>
         </div>
 
+        <!-- 已有资源但组合筛选无结果 -->
+        <div v-if="hasActiveKnowledgeFilters && currentScopeHasKnowledgeBases && visibleKnowledgeBaseCount === 0 && !loading"
+          class="empty-state classification-empty-state">
+          <t-icon name="filter-clear" size="44px" class="empty-icon" />
+          <span class="empty-txt">没有匹配的知识库</span>
+          <span class="empty-desc">尝试调整机型、项目、知识域或搜索关键词。</span>
+          <t-button variant="outline" size="small" @click="clearAllKnowledgeFilters">清除筛选</t-button>
+        </div>
+
         <!-- 全部空状态：保留「新建知识库」CTA，因为是租户没有任何 KB 的真空场景 -->
-        <div v-if="spaceSelection === 'all' && filteredKnowledgeBases.length === 0 && !loading" class="empty-state">
+        <div v-if="spaceSelection === 'all' && filteredKnowledgeBases.length === 0 && !loading && !hasActiveKnowledgeFilters" class="empty-state">
           <img class="empty-img" src="@/assets/img/upload.svg" alt="">
           <span class="empty-txt">{{ $t('knowledgeList.empty.title') }}</span>
           <span class="empty-desc">{{ $t('knowledgeList.empty.description') }}</span>
@@ -632,7 +703,7 @@
 
         <!-- 收藏空状态：不放创建按钮——「没有收藏」 ≠ 「没有知识库」，
              正确引导是「去星标一下」，不是「再建一个」。 -->
-        <div v-if="spaceSelection === 'favorites' && filteredKnowledgeBases.length === 0 && !loading"
+        <div v-if="spaceSelection === 'favorites' && filteredKnowledgeBases.length === 0 && !loading && !hasActiveKnowledgeFilters"
           class="empty-state">
           <t-icon name="star" size="48px" class="empty-icon" />
           <span class="empty-txt">{{ $t('knowledgeList.empty.favoritesTitle') }}</span>
@@ -640,14 +711,14 @@
         </div>
 
         <!-- 最近空状态：同理，引导是「去打开一个」。 -->
-        <div v-if="spaceSelection === 'recents' && filteredKnowledgeBases.length === 0 && !loading" class="empty-state">
+        <div v-if="spaceSelection === 'recents' && filteredKnowledgeBases.length === 0 && !loading && !hasActiveKnowledgeFilters" class="empty-state">
           <t-icon name="history" size="48px" class="empty-icon" />
           <span class="empty-txt">{{ $t('knowledgeList.empty.recentsTitle') }}</span>
           <span class="empty-desc">{{ $t('knowledgeList.empty.recentsDescription') }}</span>
         </div>
 
         <!-- 我的知识库空状态 -->
-        <div v-if="spaceSelection === 'mine' && kbs.length === 0 && !loading" class="empty-state">
+        <div v-if="spaceSelection === 'mine' && kbs.length === 0 && !loading && !hasActiveKnowledgeFilters" class="empty-state">
           <img class="empty-img" src="@/assets/img/upload.svg" alt="">
           <span class="empty-txt">{{ $t('knowledgeList.empty.title') }}</span>
           <span class="empty-desc">{{ $t('knowledgeList.empty.description') }}</span>
@@ -659,7 +730,7 @@
         </div>
 
         <!-- 空间下知识库空状态 -->
-        <div v-if="spaceSelectionOrgId && !spaceKbsLoading && spaceKbsList.length === 0" class="empty-state">
+        <div v-if="spaceSelectionOrgId && !spaceKbsLoading && spaceKbsList.length === 0 && !hasActiveKnowledgeFilters" class="empty-state">
           <img class="empty-img" src="@/assets/img/upload.svg" alt="">
           <span class="empty-txt">{{ $t('knowledgeList.empty.sharedTitle') }}</span>
           <span class="empty-desc">{{ $t('knowledgeList.empty.sharedDescription') }}</span>
@@ -765,12 +836,62 @@
       </Transition>
     </Teleport>
 
+    <t-drawer v-model:visible="classificationManageVisible" header="标签与筛选菜单管理" size="760px">
+      <div class="classification-manager">
+        <aside class="classification-module-pane">
+          <div class="manager-section-title">筛选模块</div>
+          <div v-for="(module, moduleIndex) in classificationModules" :key="module.id"
+            class="manager-module-row" :class="{ active: classificationManageModule?.id === module.id }">
+            <button type="button" class="manager-module-select" @click="classificationManageModule = module">
+              <span>{{ module.name }}</span><span>{{ flattenOptions(module.options).length }}</span>
+            </button>
+            <span class="manager-module-order">
+              <t-button size="small" variant="text" :disabled="moduleIndex === 0" title="上移筛选模块"
+                @click="moveClassificationModule(moduleIndex, -1)"><template #icon><t-icon name="chevron-up" /></template></t-button>
+              <t-button size="small" variant="text" :disabled="moduleIndex === classificationModules.length - 1" title="下移筛选模块"
+                @click="moveClassificationModule(moduleIndex, 1)"><template #icon><t-icon name="chevron-down" /></template></t-button>
+            </span>
+          </div>
+          <div class="manager-add-row">
+            <t-input v-model="classificationModuleName" size="small" placeholder="新增模块名称" @enter="addClassificationModule" />
+            <t-button size="small" theme="primary" @click="addClassificationModule"><template #icon><t-icon name="add" /></template></t-button>
+          </div>
+        </aside>
+        <main class="classification-option-pane">
+          <template v-if="classificationManageModule">
+            <div class="manager-option-header">
+              <div><strong>{{ classificationManageModule.name }}</strong><p>维护下拉框层级；知识库选择子分类后会自动归入祖先分类。</p></div>
+              <t-popconfirm content="删除模块及全部选项？" @confirm="removeClassificationModule(classificationManageModule.id)">
+                <t-button size="small" theme="danger" variant="text"><template #icon><t-icon name="delete" /></template></t-button>
+              </t-popconfirm>
+            </div>
+            <div class="manager-option-list">
+              <div v-for="option in flattenManagedOptions(classificationManageModule.options)" :key="option.id"
+                class="manager-option-row" :style="{ paddingLeft: `${12 + option.depth * 24}px` }">
+                <t-icon :name="option.depth ? 'git-branch' : 'folder'" />
+                <t-input v-model="option.name" size="small" @blur="saveClassificationOption(option)" />
+                <t-switch v-model="option.enabled" size="small" @change="saveClassificationOption(option)" />
+                <t-button size="small" variant="text" title="在此分类下新增子分类" @click="classificationParentID = option.id"><template #icon><t-icon name="add" /></template></t-button>
+                <t-popconfirm content="删除该选项及其子选项？" @confirm="removeClassificationOption(option.id)"><t-button size="small" theme="danger" variant="text"><template #icon><t-icon name="delete" /></template></t-button></t-popconfirm>
+              </div>
+            </div>
+            <div class="manager-add-option">
+              <t-select v-model="classificationParentID" clearable size="small" :options="[{ label: '一级分类', value: '' }, ...flattenOptions(classificationManageModule.options)]" placeholder="上级分类" />
+              <t-input v-model="classificationOptionName" size="small" placeholder="新增选项名称" @enter="addClassificationOption" />
+              <t-button size="small" theme="primary" :loading="classificationOptionSubmitting" :disabled="classificationOptionSubmitting" @click="addClassificationOption"><template #icon><t-icon name="add" /></template>添加</t-button>
+            </div>
+          </template>
+          <t-empty v-else description="选择或新增一个筛选模块" />
+        </main>
+      </div>
+    </t-drawer>
+
     <ContextualGuide tour="kbList" :when="showKbListContextualGuide" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, watch, nextTick } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch, nextTick, defineComponent, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { MessagePlugin, Icon as TIcon } from 'tdesign-vue-next'
 import { deleteKnowledgeBase, togglePinKnowledgeBase } from '@/api/knowledge-base'
@@ -786,7 +907,7 @@ import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
 import ListSpaceSidebar from '@/components/ListSpaceSidebar.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
-import ContextualGuide from '@/components/ContextualGuide.vue'
+import { listClassifications, createClassificationModule, createClassificationOption, updateClassificationModule, updateClassificationOption, deleteClassificationModule, deleteClassificationOption, type ClassificationModule, type ClassificationOption } from '@/api/classification'
 import { isContextualGuideDone, markContextualGuideDone } from '@/config/contextualGuides'
 import { useTenantModelReadiness } from '@/composables/useTenantModelReadiness'
 import { useI18n } from 'vue-i18n'
@@ -813,7 +934,7 @@ const { t } = useI18n()
 // that might point at the old query — its display label is rebranded
 // via ListSpaceSidebar's workspaceLabel computed.
 const defaultScope: 'all' | 'mine' = authStore.hasRole('contributor') ? 'mine' : 'all'
-const { scope: spaceSelection, creator: creatorFilter } = useListUrlState({
+const { scope: spaceSelection, creator: creatorFilter, query: knowledgeSearchQuery } = useListUrlState({
   defaultScope,
   defaultCreator: 'all',
 })
@@ -833,6 +954,8 @@ interface KB {
   name: string;
   description?: string;
   updated_at?: string;
+  created_at?: string;
+  pinned_at?: string;
   embedding_model_id?: string;
   summary_model_id?: string;
   type?: 'document' | 'faq';
@@ -854,6 +977,9 @@ interface KB {
   creator_id?: string;
   // creator_name 由后端 list 接口回填，仅用于卡片右下角来源徽章的 tooltip。
   creator_name?: string;
+  classification_tags?: Array<string | { dimension?: string; category?: string; value?: string; name?: string }>;
+  business_tags?: Array<string | { dimension?: string; category?: string; value?: string; name?: string }>;
+  tags?: Array<string | { dimension?: string; category?: string; value?: string; name?: string }>;
 }
 
 const kbs = ref<KB[]>([])
@@ -880,6 +1006,142 @@ const sharingKbName = ref('')
 const sharedKbs = computed<SharedKnowledgeBase[]>(() => orgStore.sharedKnowledgeBases || [])
 
 const allKnowledgeBases = computed(() => kbs.value.length + sharedKbs.value.length)
+
+type ClassificationDimensionKey = string
+  type ClassificationEntry = { dimension: string; label: string; value: string }
+
+const classificationModules = ref<ClassificationModule[]>([])
+const selectedClassifications = ref<Record<string, string>>({})
+const classificationManageVisible = ref(false)
+const classificationModuleName = ref('')
+const classificationOptionName = ref('')
+const classificationParentID = ref<string | undefined>()
+const classificationOptionSubmitting = ref(false)
+const classificationManageModule = ref<ClassificationModule | null>(null)
+const expandedClassificationModules = ref<Set<string>>(new Set())
+const expandedClassificationOptions = ref<Set<string>>(new Set())
+
+const ClassificationTreeOption = defineComponent({
+  name: 'ClassificationTreeOption',
+  props: {
+    option: { type: Object as () => ClassificationOption, required: true },
+    moduleId: { type: String, required: true },
+    selectedId: { type: String, required: true },
+    expandedIds: { type: Object as () => Set<string>, required: true },
+  },
+  emits: ['select', 'toggle'],
+  setup(props, { emit }) {
+    return () => {
+      const hasChildren = !!props.option.children?.length
+      const isExpanded = props.expandedIds.has(props.option.id) || props.selectedId === props.option.id
+      return h('div', { class: 'classification-tree-node' }, [
+        h('button', {
+          type: 'button',
+          class: ['classification-tree-row', 'classification-option-row', { selected: props.selectedId === props.option.id }],
+          onClick: () => emit('select', props.moduleId, props.option.id),
+        }, [
+          h('span', { class: 'tree-indent' }),
+          h('span', {
+            class: 'tree-toggle',
+            onClick: (event: MouseEvent) => { if (hasChildren) { event.stopPropagation(); emit('toggle', props.option.id) } },
+          }, hasChildren ? [h(TIcon, { name: isExpanded ? 'chevron-down' : 'chevron-right', size: '12px' })] : undefined),
+          h(TIcon, { name: hasChildren ? 'folder-open' : 'file', size: '14px' }),
+          h('span', props.option.name),
+        ]),
+        hasChildren && isExpanded
+          ? h('div', { class: 'classification-tree-children nested' }, props.option.children!.map(child => h(ClassificationTreeOption, {
+            key: child.id, option: child, 'module-id': props.moduleId, 'selected-id': props.selectedId,
+            'expanded-ids': props.expandedIds, onSelect: (moduleId: string, id: string) => emit('select', moduleId, id),
+            onToggle: (id: string) => emit('toggle', id),
+          })))
+          : null,
+      ])
+    }
+  },
+})
+const loadClassifications = async () => {
+  try { const res = await listClassifications('knowledge_base'); classificationModules.value = (res.data || []).filter(m => m.enabled); for (const m of classificationModules.value) selectedClassifications.value[m.id] ||= '' } catch { classificationModules.value = [] }
+}
+function flattenOptions(options: ClassificationOption[] = [], prefix: string[] = []): Array<{ label: string; value: string }> {
+  return options.flatMap(o => [{ label: [...prefix, o.name].join(' / '), value: o.id }, ...flattenOptions(o.children, [...prefix, o.name])])
+}
+function classificationOptions(module: ClassificationModule) { return [{ label: `${module.name}：全部`, value: '' }, ...flattenOptions(module.options)] }
+function selectedClassificationLabel(module: ClassificationModule) { const selected = selectedClassifications.value[module.id]; return selected ? flattenOptions(module.options).find(option => option.value === selected)?.label.split(' / ').pop() || '已选择' : '全部' }
+const classificationResourceCount = computed(() => kbs.value.length + sharedKbs.value.length)
+function isClassificationModuleExpanded(moduleId: string) { return expandedClassificationModules.value.has(moduleId) }
+function toggleClassificationModule(moduleId: string) { const next = new Set(expandedClassificationModules.value); next.has(moduleId) ? next.delete(moduleId) : next.add(moduleId); expandedClassificationModules.value = next }
+function toggleClassificationOption(optionId: string) { const next = new Set(expandedClassificationOptions.value); next.has(optionId) ? next.delete(optionId) : next.add(optionId); expandedClassificationOptions.value = next }
+function selectClassification(moduleId: string, optionId: string) { selectedClassifications.value = { ...selectedClassifications.value, [moduleId]: optionId }; expandedClassificationModules.value = new Set([...expandedClassificationModules.value, moduleId]) }
+function getSelectedOptionPath(moduleID: string, id: string): string[] { const module = classificationModules.value.find(m => m.id === moduleID); const found = flattenOptions(module?.options).find(o => o.value === id); return found ? [module?.name || '', found.label] : [] }
+function getKnowledgeBaseClassificationEntries(kb: any): ClassificationEntry[] {
+  const raw = kb?.classification_tags
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return Object.entries(raw).flatMap(([moduleID, ids]) => (ids as string[]).map(id => ({ dimension: moduleID, label: classificationModules.value.find(m => m.id === moduleID)?.name || moduleID, value: id })))
+  const legacy = kb?.business_tags ?? kb?.tags ?? []
+  return Array.isArray(legacy) ? legacy.flatMap((value: any) => [{ dimension: 'legacy', label: '标签', value: String(value?.value ?? value?.name ?? value) }]) : []
+}
+
+function getKnowledgeBaseClassificationTags(kb: any): string[] {
+  return getKnowledgeBaseClassificationEntries(kb).flatMap(entry => {
+    const path = getSelectedOptionPath(entry.dimension, entry.value)
+    return `${entry.label} / ${path[1] || entry.value}`
+  })
+}
+
+function matchesKnowledgeFilters(kb: any): boolean {
+  const entries = getKnowledgeBaseClassificationEntries(kb)
+  const classificationMatches = classificationModules.value
+    .every(module => {
+      const selected = selectedClassifications.value[module.id]
+      if (!selected) return true
+      const selectedPath = new Set(flattenOptions(module.options).find(o => o.value === selected)?.label.split(' / ') || [])
+      return entries.some(entry => entry.dimension === module.id && (entry.value === selected || selectedPath.has(entry.value) || getSelectedOptionPath(module.id, entry.value).slice(1).join(' / ').startsWith([...selectedPath].join(' / '))))
+    })
+  if (!classificationMatches) return false
+
+  const query = knowledgeSearchQuery.value.trim().toLowerCase()
+  if (!query) return true
+  return [kb?.name, kb?.description, ...entries.map(entry => `${entry.label} ${entry.value}`)]
+    .filter(Boolean)
+    .some(value => String(value).toLowerCase().includes(query))
+}
+
+function filterKnowledgeBases<T>(items: T[], getKb: (item: T) => any = item => item): T[] {
+  return items.filter(item => matchesKnowledgeFilters(getKb(item)))
+}
+
+const classificationResources = computed<any[]>(() => [
+  ...kbs.value,
+  ...sharedKbs.value.map(shared => shared.knowledge_base).filter(Boolean),
+])
+
+const activeClassificationPath = computed(() => Object.entries(selectedClassifications.value).filter(([, value]) => value).flatMap(([moduleID, value]) => { const m = classificationModules.value.find(x => x.id === moduleID); const o = flattenOptions(m?.options).find(x => x.value === value); return o ? [`${m?.name} / ${o.label}`] : [] }))
+const clearClassificationFilters = () => { selectedClassifications.value = Object.fromEntries(classificationModules.value.map(m => [m.id, ''])) }
+const handleManageClassification = () => { classificationManageVisible.value = true }
+const moveClassificationModule = async (index: number, direction: -1 | 1) => {
+  const targetIndex = index + direction
+  if (targetIndex < 0 || targetIndex >= classificationModules.value.length) return
+  const reordered = [...classificationModules.value]
+  const [moved] = reordered.splice(index, 1)
+  reordered.splice(targetIndex, 0, moved)
+  try {
+    await Promise.all(reordered.map((module, sortIndex) =>
+      updateClassificationModule(module.id, { sort_order: sortIndex }, 'knowledge_base')
+    ))
+    classificationModules.value = reordered.map((module, sortIndex) => ({ ...module, sort_order: sortIndex }))
+    classificationManageModule.value = classificationModules.value.find(module => module.id === classificationManageModule.value?.id) || null
+    MessagePlugin.success('筛选模块顺序已更新')
+  } catch {
+    MessagePlugin.error('筛选模块顺序更新失败')
+  }
+}
+const addClassificationModule = async () => { if (!classificationModuleName.value.trim()) return; await createClassificationModule({ name: classificationModuleName.value.trim(), sort_order: classificationModules.value.length }, 'knowledge_base'); classificationModuleName.value = ''; await loadClassifications() }
+const addClassificationOption = async () => { if (!classificationManageModule.value || !classificationOptionName.value.trim() || classificationOptionSubmitting.value) return; classificationOptionSubmitting.value = true; try { await createClassificationOption({ module_id: classificationManageModule.value.id, parent_id: classificationParentID.value || undefined, name: classificationOptionName.value.trim() }, 'knowledge_base'); classificationOptionName.value = ''; classificationParentID.value = undefined; await refreshManagedClassifications(); MessagePlugin.success('筛选选项已添加') } catch (error: any) { MessagePlugin.error(error?.message || error?.error?.message || error?.response?.data?.message || error?.response?.data?.error?.message || '筛选选项添加失败，请检查同级名称是否重复') } finally { classificationOptionSubmitting.value = false } }
+type ManagedOption = ClassificationOption & { depth: number }
+const flattenManagedOptions = (options: ClassificationOption[] = [], depth = 0): ManagedOption[] => options.flatMap(o => [{ ...o, depth }, ...flattenManagedOptions(o.children, depth + 1)])
+const refreshManagedClassifications = async () => { const selectedID = classificationManageModule.value?.id; await loadClassifications(); classificationManageModule.value = classificationModules.value.find(m => m.id === selectedID) || classificationModules.value[0] || null }
+const saveClassificationOption = async (option: ManagedOption) => { await updateClassificationOption(option.id, { name: option.name, enabled: option.enabled }, 'knowledge_base'); await refreshManagedClassifications() }
+const removeClassificationOption = async (id: string) => { await deleteClassificationOption(id, 'knowledge_base'); await refreshManagedClassifications() }
+const removeClassificationModule = async (id: string) => { await deleteClassificationModule(id, 'knowledge_base'); classificationManageModule.value = null; await refreshManagedClassifications() }
 
 // 当前选中的是空间 ID（非全部、非我的、非收藏/最近这类伪 scope）
 // NB: keep the reserved-scope list in sync with ListSpaceSidebar's
@@ -917,7 +1179,7 @@ const spaceKbsLoading = ref(false)
 // previous version only bucketed by isMyKb and silently demoted these
 // pinned-but-teammate KBs.
 const sortedMineKbs = computed<KB[]>(() => {
-  return [...kbs.value].sort((a, b) => {
+  return filterKnowledgeBases([...kbs.value]).sort((a, b) => {
     const ap = a.is_pinned ? 0 : 1
     const bp = b.is_pinned ? 0 : 1
     if (ap !== bp) return ap - bp
@@ -938,7 +1200,7 @@ const sortedMineKbs = computed<KB[]>(() => {
 // 空间视角下的稳定排序：我创建的（is_mine）放在前面，剩下的共享部分再按
 // 可编辑 / 仅查看 排序——这样空间列表跟「全部」视图的视觉顺序一致。
 const sortedSpaceKbsList = computed(() => {
-  return [...spaceKbsList.value].sort((a, b) => {
+  return filterKnowledgeBases([...spaceKbsList.value], item => item.knowledge_base).sort((a, b) => {
     const aMine = a.is_mine ? 0 : 1
     const bMine = b.is_mine ? 0 : 1
     if (aMine !== bMine) return aMine - bMine
@@ -1146,13 +1408,13 @@ const spaceKbSectionCounts = computed<Record<KbSectionKey, number>>(() => {
 // preserved via the upstream array (pins order is ts-desc).
 const filteredKnowledgeBases = computed(() => {
   if (spaceSelection.value === 'favorites') {
-    return favoritesList.value
+    return filterKnowledgeBases(favoritesList.value)
   }
   if (spaceSelection.value === 'recents') {
-    return recentsList.value
+    return filterKnowledgeBases(recentsList.value)
   }
   if (spaceSelection.value === 'mine') {
-    return kbs.value.map(kb => ({ ...kb, isMine: true as const }))
+    return filterKnowledgeBases(kbs.value).map(kb => ({ ...kb, isMine: true as const }))
   }
   if (spaceSelection.value !== 'all') {
     return []
@@ -1164,15 +1426,41 @@ const filteredKnowledgeBases = computed(() => {
   // ≥2 entries (#795). mergeAllScopeKnowledgeBases de-duplicates by KB id
   // (owned wins; most-privileged share kept) while preserving the existing
   // pinned → mine → teammate → shared(editable-first) ordering.
-  return mergeAllScopeKnowledgeBases(
+  return filterKnowledgeBases(mergeAllScopeKnowledgeBases(
     kbs.value as unknown as OwnedKnowledgeBase[],
     sharedKbs.value as unknown as SharedKnowledgeBaseLike[],
     authStore.user?.id,
-  ) as unknown as Array<(KB & { isMine: true }) | (SharedKnowledgeBase['knowledge_base'] & { isMine: false; permission: string; shared_at: string; share_id: string } & any)>
+  ) as unknown as Array<(KB & { isMine: true }) | (SharedKnowledgeBase['knowledge_base'] & { isMine: false; permission: string; shared_at: string; share_id: string } & any)>)
 })
 
+const visibleKnowledgeBaseCount = computed(() => {
+  if (spaceSelectionOrgId.value) return sortedSpaceKbsList.value.length
+  if (spaceSelection.value === 'mine') return sortedMineKbs.value.length
+  return filteredKnowledgeBases.value.length
+})
+
+const hasActiveKnowledgeFilters = computed(() =>
+  !!knowledgeSearchQuery.value.trim()
+  || (Object.keys(selectedClassifications.value) as ClassificationDimensionKey[])
+    .some(dimension => !!selectedClassifications.value[dimension])
+)
+
+const currentScopeHasKnowledgeBases = computed(() => {
+  if (spaceSelectionOrgId.value) return spaceKbsList.value.length > 0
+  if (spaceSelection.value === 'mine') return kbs.value.length > 0
+  if (spaceSelection.value === 'favorites') return favoritesList.value.length > 0
+  if (spaceSelection.value === 'recents') return recentsList.value.length > 0
+  if (spaceSelection.value === 'all') return allKnowledgeBases.value > 0
+  return kbs.value.length > 0
+})
+
+const clearAllKnowledgeFilters = () => {
+  clearClassificationFilters()
+  knowledgeSearchQuery.value = ''
+}
+
 const showKbListEmpty = computed(() => {
-  if (loading.value) return false
+  if (loading.value || hasActiveKnowledgeFilters.value) return false
   if (!authStore.hasRole('contributor')) return false
   if (spaceSelection.value === 'all' && filteredKnowledgeBases.value.length === 0) return true
   if (spaceSelection.value === 'mine' && kbs.value.length === 0) return true
@@ -1262,7 +1550,8 @@ watch(creatorFilter, () => {
   fetchList(true)
 })
 
-onMounted(() => {
+onMounted(async () => {
+  await loadClassifications()
   fetchList().then(() => {
     // 检查路由参数中是否有需要高亮的知识库ID
     const highlightKbId = route.query.highlightKbId as string
@@ -1816,6 +2105,383 @@ const handleUploadFinishedEvent = (event: Event) => {
   background: var(--td-bg-color-container);
 }
 
+.kb-classification-panel {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  background: var(--td-bg-color-container);
+
+  .classification-summary,
+  .classification-controls,
+  .classification-path-row,
+  .classification-path {
+    display: flex;
+    align-items: center;
+  }
+
+  .classification-summary {
+    justify-content: space-between;
+    min-height: 24px;
+    margin-bottom: 12px;
+  }
+
+  .classification-title {
+    color: var(--td-text-color-primary);
+    font-size: 14px;
+    font-weight: 500;
+
+    strong {
+      margin-left: 5px;
+      color: var(--td-brand-color);
+      font-size: 13px;
+    }
+  }
+
+  .classification-result,
+  .classification-label,
+  .path-label {
+    color: var(--td-text-color-placeholder);
+    font-size: 12px;
+  }
+
+  .classification-controls {
+    gap: 10px;
+  }
+
+  .classification-label {
+    flex: 0 0 64px;
+    color: var(--td-text-color-secondary);
+    font-weight: 500;
+  }
+
+  .classification-selects {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .classification-select {
+    width: 176px;
+  }
+
+  .classification-manage-btn {
+    flex: 0 0 auto;
+    color: var(--td-brand-color);
+    border-style: dashed;
+  }
+
+  .classification-path-row {
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 12px;
+  }
+
+  .classification-path {
+    flex: 1;
+    min-width: 0;
+    min-height: 34px;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--td-component-stroke);
+    border-radius: 6px;
+    background: var(--td-bg-color-secondarycontainer);
+    overflow: hidden;
+  }
+
+  .path-label {
+    flex: 0 0 auto;
+    margin-right: 2px;
+  }
+
+  .path-tag {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--td-brand-color-light);
+    color: var(--td-brand-color);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .path-separator {
+    flex: 0 0 auto;
+    color: var(--td-text-color-placeholder);
+  }
+
+  .path-clear {
+    flex: 0 0 auto;
+    padding: 2px 4px;
+    border: 0;
+    background: transparent;
+    color: var(--td-brand-color);
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .classification-search {
+    flex: 0 0 240px;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .kb-classification-panel {
+    .classification-controls,
+    .classification-path-row {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .classification-label {
+      flex-basis: auto;
+    }
+
+    .classification-selects {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .classification-select,
+    .classification-search {
+      width: 100%;
+      flex-basis: auto;
+    }
+
+    .classification-manage-btn {
+      align-self: flex-start;
+    }
+  }
+}
+
+@media (max-width: 620px) {
+  .kb-list-content {
+    padding-left: 16px;
+  }
+
+  .header,
+  .kb-list-main {
+    padding-right: 16px;
+  }
+
+  .kb-classification-panel {
+    padding: 12px;
+
+    .classification-selects {
+      grid-template-columns: 1fr;
+    }
+
+    .classification-summary {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .classification-path {
+      flex-wrap: wrap;
+    }
+  }
+}
+
+/* Classification tree sidebar */
+.kb-list-main {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+.kb-list-main > :not(.kb-classification-panel) { grid-column: 2; min-width: 0; }
+.kb-classification-panel {
+  grid-column: 1;
+  grid-row: 1 / span 20;
+  margin: 0;
+  padding: 14px 12px 12px;
+  min-width: 0;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  background: var(--td-bg-color-container);
+  box-sizing: border-box;
+}
+.classification-sidebar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px 12px;
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+.classification-sidebar-head .classification-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+.classification-sidebar-head .classification-title strong {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--td-brand-color-light);
+  color: var(--td-brand-color);
+  font-size: 11px;
+  line-height: 18px;
+}
+.classification-sidebar-head .classification-result {
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.classification-tree-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 4px 7px;
+  color: var(--td-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.classification-tree-head small {
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  font-weight: 400;
+}
+.classification-tree {
+  min-width: 0;
+  padding: 2px 0 4px;
+}
+.classification-module {
+  padding-bottom: 4px;
+}
+.classification-module + .classification-module {
+  padding-top: 4px;
+  border-top: 1px solid var(--td-component-stroke);
+}
+.kb-classification-panel :deep(.classification-tree-row) {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 5px;
+  outline: none;
+  background: transparent;
+  color: var(--td-text-color-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.kb-classification-panel :deep(.classification-tree-row:hover) {
+  background: var(--td-bg-color-secondarycontainer);
+  color: var(--td-text-color-primary);
+}
+.kb-classification-panel :deep(.classification-tree-row:focus-visible) {
+  box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+}
+.kb-classification-panel :deep(.classification-tree-row.selected) {
+  background: var(--td-brand-color-light);
+  color: var(--td-brand-color);
+  font-weight: 500;
+}
+.classification-module-row {
+  min-height: 36px !important;
+  color: var(--td-text-color-primary) !important;
+  font-size: 13px !important;
+}
+.classification-module.active .classification-module-row {
+  color: var(--td-brand-color) !important;
+}
+.kb-classification-panel :deep(.classification-tree-row .t-icon) {
+  flex: 0 0 auto;
+  color: var(--td-text-color-placeholder);
+}
+.kb-classification-panel :deep(.classification-tree-row.selected .t-icon),
+.classification-module.active :deep(.classification-module-row .t-icon) {
+  color: var(--td-brand-color);
+}
+.classification-tree-row strong { font-weight: 600; }
+.classification-selected-label {
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.classification-tree-children {
+  margin: 2px 0 0 12px;
+  padding: 2px 0 2px 12px;
+  border-left: 1px solid var(--td-component-stroke);
+}
+.classification-tree-children.nested {
+  margin-left: 18px;
+  padding-left: 8px;
+}
+.classification-option-row { min-height: 31px !important; }
+.classification-option-row > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.classification-all-row small {
+  margin-left: auto;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+}
+.tree-indent { flex: 0 0 6px; }
+.tree-leaf {
+  width: 12px;
+  color: var(--td-text-color-placeholder);
+  text-align: center;
+}
+.tree-toggle {
+  display: inline-flex;
+  width: 14px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 14px;
+  color: var(--td-text-color-placeholder);
+}
+.classification-manage-btn {
+  width: 100%;
+  margin-top: 12px;
+  color: var(--td-brand-color);
+  border-style: dashed;
+}
+.kb-classification-panel .classification-path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 34px; margin-top: 14px; padding: 6px 8px; border: 1px solid var(--td-component-stroke); border-radius: 6px; background: var(--td-bg-color-secondarycontainer); }
+.kb-classification-panel .classification-path .path-label { flex: 0 0 100%; }
+.kb-classification-panel .classification-search { width: 100%; margin-top: 10px; }
+@media (max-width: 960px) {
+  .kb-list-main { grid-template-columns: 220px minmax(0, 1fr); gap: 14px; }
+}
+@media (max-width: 620px) {
+  .kb-list-main { display: block; }
+  .kb-list-main > :not(.kb-classification-panel) { margin-top: 14px; }
+  .kb-classification-panel { margin-bottom: 14px; }
+  .classification-tree { max-height: 360px; overflow-y: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-classification-panel :deep(.classification-tree-row) {
+    transition: none;
+  }
+}
+
 .shared-by-me-badge {
   display: inline-flex;
   align-items: center;
@@ -2244,8 +2910,8 @@ const handleUploadFinishedEvent = (event: Event) => {
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  height: 136px;
-  min-height: 136px;
+  height: auto;
+  min-height: 150px;
 
   &.kb-card-skeleton {
     cursor: default;
@@ -2376,6 +3042,26 @@ const handleUploadFinishedEvent = (event: Event) => {
 
   .card-content {
     margin-bottom: 6px;
+  }
+
+  .kb-classification-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 7px;
+  }
+
+  .kb-classification-tag {
+    max-width: 100%;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--td-bg-color-secondarycontainer);
+    color: var(--td-text-color-secondary);
+    font-size: 10px;
+    line-height: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .card-description {
@@ -2862,6 +3548,31 @@ const handleUploadFinishedEvent = (event: Event) => {
       opacity: 0.8;
     }
   }
+}
+
+.classification-manager {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 520px;
+  border: 1px solid var(--td-component-border);
+}
+.classification-module-pane { padding: 16px; border-right: 1px solid var(--td-component-border); background: var(--td-bg-color-secondarycontainer); }
+.manager-section-title { margin-bottom: 12px; font-size: 13px; font-weight: 600; color: var(--td-text-color-secondary); }
+.manager-module-row { width: 100%; min-height: 36px; display: flex; align-items: center; gap: 4px; padding: 0 4px 0 10px; border: 0; background: transparent; color: var(--td-text-color-primary); }
+.manager-module-select { flex: 1; min-width: 0; min-height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 0; border: 0; background: transparent; cursor: pointer; color: inherit; text-align: left; }
+.manager-module-order { display: inline-flex; flex: 0 0 auto; }
+.manager-module-row.active { background: var(--td-brand-color-light); color: var(--td-brand-color); }
+.manager-add-row, .manager-add-option { display: flex; gap: 8px; margin-top: 12px; }
+.classification-option-pane { padding: 18px; min-width: 0; }
+.manager-option-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 14px; border-bottom: 1px solid var(--td-component-stroke); }
+.manager-option-header p { margin: 4px 0 0; font-size: 12px; color: var(--td-text-color-secondary); }
+.manager-option-list { max-height: 390px; overflow: auto; }
+.manager-option-row { display: grid; grid-template-columns: 18px minmax(120px, 1fr) auto 32px 32px; gap: 8px; align-items: center; min-height: 46px; border-bottom: 1px solid var(--td-component-stroke); }
+.manager-add-option > :first-child { flex: 0 0 180px; }
+
+@media (max-width: 760px) {
+  .classification-manager { grid-template-columns: 1fr; }
+  .classification-module-pane { border-right: 0; border-bottom: 1px solid var(--td-component-border); }
 }
 </style>
 

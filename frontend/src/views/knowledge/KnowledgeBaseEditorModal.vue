@@ -143,15 +143,16 @@
                           :maxlength="50"
                         />
                       </div>
-                      <div class="form-item">
-                        <label class="form-label">{{ $t('knowledgeEditor.basic.descriptionLabel') }}</label>
-                        <t-textarea
-                          v-model="formData.description"
-                          :placeholder="$t('knowledgeEditor.basic.descriptionPlaceholder')"
-                          :maxlength="200"
-                          :autosize="{ minRows: 3, maxRows: 6 }"
-                        />
+                      <div v-if="classificationModules.length" class="form-item">
+                        <label class="form-label">知识库分类标签</label>
+                        <p class="form-tip">选择子分类后，知识库会自动归入它的全部上级分类。</p>
+                        <div class="classification-editor-grid">
+                          <t-select v-for="module in classificationModules" :key="module.id" :value="classificationTags[module.id]?.[0] || ''"
+                            :options="[{ label: `${module.name}：未分类`, value: '' }, ...flattenClassificationOptions(module.options)]"
+                            :placeholder="`${module.name}：请选择`" @change="(value: string) => setClassificationTag(module.id, value)" />
+                        </div>
                       </div>
+
 
                       <!-- Wiki 合成模型移至模型配置页 -->
                     </div>
@@ -414,6 +415,7 @@ import GraphSettings from './settings/GraphSettings.vue'
 import KBShareSettings from './settings/KBShareSettings.vue'
 import DataSourceSettings from './settings/DataSourceSettings.vue'
 import { useI18n } from 'vue-i18n'
+import { listClassifications, updateKnowledgeBaseClassificationTags, type ClassificationModule, type ClassificationOption } from '@/api/classification'
 
 const uiStore = useUIStore()
 const authStore = useAuthStore()
@@ -458,6 +460,12 @@ const copyKbId = async () => {
     MessagePlugin.error(t('common.copyFailed'))
   }
 }
+
+const classificationModules = ref<ClassificationModule[]>([])
+const classificationTags = ref<Record<string, string[]>>({})
+const flattenClassificationOptions = (options: ClassificationOption[] = [], prefix: string[] = []): Array<{ label: string; value: string }> => options.flatMap(o => [{ label: [...prefix, o.name].join(' / '), value: o.id }, ...flattenClassificationOptions(o.children, [...prefix, o.name])])
+const loadClassificationModules = async () => { try { const res = await listClassifications(); classificationModules.value = (res.data || []).filter(m => m.enabled) } catch { classificationModules.value = [] } }
+const setClassificationTag = (moduleID: string, value: string) => { classificationTags.value[moduleID] = value ? [value] : [] }
 
 const currentSection = ref<string>('basic')
 
@@ -743,6 +751,8 @@ const loadKBData = async () => {
 
     // 设置表单数据
     const kbType = (kb.type as 'document' | 'faq') || 'document'
+    classificationTags.value = { ...(kb.classification_tags || {}) }
+    await loadClassificationModules()
     formData.value = {
       type: kbType,
       name: kb.name || '',
@@ -1072,7 +1082,8 @@ const buildSubmitData = () => {
         : {})
     },
     embedding_model_id: formData.value.modelConfig.embeddingModelId,
-    summary_model_id: formData.value.modelConfig.llmModelId
+    summary_model_id: formData.value.modelConfig.llmModelId,
+    classification_tags: classificationTags.value
   }
 
   // Vector-store binding. Only attach the field when the user actively
@@ -1288,6 +1299,9 @@ const doSubmit = async () => {
       }
 
       await updateKBConfig(props.kbId, config)
+
+      // 分类标签最后保存，避免完整配置接口使用旧表单快照覆盖分类元数据。
+      await updateKnowledgeBaseClassificationTags(props.kbId, classificationTags.value)
       MessagePlugin.success(t('knowledgeEditor.messages.updateSuccess'))
 
       // Check if indexing strategy changed and offer rebuild
@@ -1386,7 +1400,7 @@ watch(() => props.visible, async (newVal) => {
     }
     
     // 加载模型列表与租户默认存储引擎（创建 KB 时即使用，不依赖是否打开「存储引擎」Tab）
-    await Promise.all([loadAllModels(), loadTenantDefaultStorageProvider()])
+    await Promise.all([loadAllModels(), loadTenantDefaultStorageProvider(), loadClassificationModules()])
     
     // 根据模式加载数据
     if (props.mode === 'edit' && props.kbId) {
@@ -1394,6 +1408,7 @@ watch(() => props.visible, async (newVal) => {
     } else {
       // 创建模式：初始化空表单，并预填租户默认存储引擎
       formData.value = initFormData(props.initialType || 'document')
+      classificationTags.value = {}
       formData.value.storageProvider = tenantDefaultStorageProvider.value
       hasFiles.value = false
       applyDefaultModelsIfEmpty()

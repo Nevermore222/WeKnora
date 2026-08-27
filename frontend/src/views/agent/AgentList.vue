@@ -37,6 +37,24 @@
         </div>
       </div>
       <div class="agent-list-main">
+        <section class="agent-classification-panel" aria-label="智能体分类筛选">
+          <div class="classification-sidebar-head"><div class="classification-title"><span>智能体筛选</span><strong>{{ filteredAgents.length }}</strong></div><span class="classification-result">当前显示 {{ filteredAgents.length }} 个</span></div>
+          <div class="classification-tree-head"><span>筛选分类</span><small>按层级定位资源</small></div>
+          <div class="classification-tree" role="tree" aria-label="智能体筛选分类">
+            <div v-for="module in classificationModules" :key="module.id" class="classification-module" :class="{ active: selectedClassifications[module.id] }">
+              <button type="button" class="classification-tree-row classification-module-row" :aria-expanded="isClassificationModuleExpanded(module.id)" @click="toggleClassificationModule(module.id)">
+                <t-icon :name="isClassificationModuleExpanded(module.id) ? 'chevron-down' : 'chevron-right'" size="13px" /><t-icon name="folder-open" size="15px" /><strong>{{ module.name }}</strong><span class="classification-selected-label">{{ selectedClassificationLabel(module) }}</span>
+              </button>
+              <div v-show="isClassificationModuleExpanded(module.id)" class="classification-tree-children">
+                <button type="button" class="classification-tree-row classification-all-row" :class="{ selected: !selectedClassifications[module.id] }" @click="selectClassification(module.id, '')"><span class="tree-indent"></span><span class="tree-leaf">·</span><span>全部{{ module.name }}</span><small>{{ classificationResourceCount }}</small></button>
+                <AgentClassificationTreeOption v-for="option in module.options || []" :key="option.id" :option="option" :module-id="module.id" :selected-id="selectedClassifications[module.id] || ''" :expanded-ids="expandedClassificationOptions" @select="selectClassification" @toggle="toggleClassificationOption" />
+              </div>
+            </div>
+          </div>
+          <t-button v-if="authStore.hasRole('admin')" variant="outline" size="small" class="classification-manage-btn" @click="handleManageClassification"><template #icon><t-icon name="setting-1" /></template>自定义筛选结构</t-button>
+          <div class="classification-path"><span class="path-label">当前路径</span><template v-if="activeClassificationPath.length"><template v-for="(item, index) in activeClassificationPath" :key="item"><t-icon v-if="index" name="chevron-right" size="12px" class="path-separator" /><span class="path-tag">{{ item }}</span></template><button type="button" class="path-clear" @click="clearClassificationFilters">清除</button></template><span v-else class="path-tag">全部智能体</span></div>
+          <t-input v-model="agentSearchQuery" size="small" clearable class="classification-search" placeholder="搜索智能体名称、描述或标签"><template #prefix-icon><t-icon name="search" /></template></t-input>
+        </section>
         <!-- creator filter removed; see KnowledgeBaseList for rationale.
              Card-level creator display + URL-state field are retained. -->
 
@@ -812,13 +830,20 @@
       :readOnly="editorMode === 'edit' && editingAgent != null && !canManageAgent(editingAgent as AgentWithUI)"
       @update:visible="editorVisible = $event" @success="handleEditorSuccess" />
 
+    <t-drawer v-model:visible="classificationManageVisible" header="标签与筛选菜单管理" size="760px">
+      <div class="classification-manager">
+        <aside class="classification-module-pane"><div class="manager-section-title">筛选模块</div><div v-for="module in classificationModules" :key="module.id" class="manager-module-row" :class="{ active: classificationManageModule?.id === module.id }"><button type="button" class="manager-module-select" @click="classificationManageModule = module"><span>{{ module.name }}</span><span>{{ flattenClassificationOptions(module.options).length }}</span></button></div><div class="manager-add-row"><t-input v-model="classificationModuleName" size="small" placeholder="新增模块名称" @enter="addClassificationModule" /><t-button size="small" theme="primary" @click="addClassificationModule"><template #icon><t-icon name="add" /></template></t-button></div></aside>
+        <main class="classification-option-pane"><template v-if="classificationManageModule"><div class="manager-option-header"><div><strong>{{ classificationManageModule.name }}</strong><p>维护智能体筛选的层级选项。</p></div><t-popconfirm content="删除模块及全部选项？" @confirm="removeClassificationModule(classificationManageModule.id)"><t-button size="small" theme="danger" variant="text"><template #icon><t-icon name="delete" /></template></t-button></t-popconfirm></div><div class="manager-option-list"><div v-for="option in flattenManagedOptions(classificationManageModule.options)" :key="option.id" class="manager-option-row" :style="{ paddingLeft: `${12 + option.depth * 24}px` }"><t-icon :name="option.depth ? 'git-branch' : 'folder'" /><t-input v-model="option.name" size="small" @blur="saveClassificationOption(option)" /><t-switch v-model="option.enabled" size="small" @change="saveClassificationOption(option)" /><t-button size="small" variant="text" title="在此分类下新增子分类" @click="classificationParentID = option.id"><template #icon><t-icon name="add" /></template></t-button><t-popconfirm content="删除该选项及其子选项？" @confirm="removeClassificationOption(option.id)"><t-button size="small" theme="danger" variant="text"><template #icon><t-icon name="delete" /></template></t-button></t-popconfirm></div></div><div class="manager-add-option"><t-select v-model="classificationParentID" clearable size="small" :options="[{ label: '一级分类', value: '' }, ...flattenClassificationOptions(classificationManageModule.options)]" placeholder="上级分类" /><t-input v-model="classificationOptionName" size="small" placeholder="新增选项名称" @enter="addClassificationOption" /><t-button size="small" theme="primary" :loading="classificationOptionSubmitting" :disabled="classificationOptionSubmitting" @click="addClassificationOption"><template #icon><t-icon name="add" /></template>添加</t-button></div></template><t-empty v-else description="选择或新增一个筛选模块" /></main>
+      </div>
+    </t-drawer>
+
     <TenantModelsGuide :when="showAgentTenantModelsGuide" variant="agent" />
     <ContextualGuide tour="agentList" :when="showAgentListContextualGuide" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, nextTick, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin, Icon as TIcon } from 'tdesign-vue-next'
 import { deleteAgent, copyAgent, type CustomAgent } from '@/api/agent'
@@ -831,6 +856,7 @@ import { setSharedAgentDisabledByMe, listOrganizationSharedAgents } from '@/api/
 import { useSettingsStore } from '@/stores/settings'
 import { useMenuStore } from '@/stores/menu'
 import type { SharedAgentInfo, OrganizationSharedAgentItem } from '@/api/organization'
+import { listClassifications, createClassificationModule, createClassificationOption, updateClassificationModule, updateClassificationOption, deleteClassificationModule, deleteClassificationOption, type ClassificationModule, type ClassificationOption } from '@/api/classification'
 import AgentEditorModal from './AgentEditorModal.vue'
 import ContextualGuide from '@/components/ContextualGuide.vue'
 import TenantModelsGuide from '@/components/TenantModelsGuide.vue'
@@ -984,11 +1010,45 @@ const recentsAgentList = computed<DisplayAgent[]>(() => {
     .filter((x): x is DisplayAgent => x !== null)
 })
 
+const classificationModules = ref<ClassificationModule[]>([])
+const selectedClassifications = ref<Record<string, string>>({})
+const expandedClassificationModules = ref<Set<string>>(new Set())
+const expandedClassificationOptions = ref<Set<string>>(new Set())
+const agentSearchQuery = ref('')
+const classificationManageVisible = ref(false)
+const classificationManageModule = ref<ClassificationModule | null>(null)
+const classificationModuleName = ref('')
+const classificationOptionName = ref('')
+const classificationParentID = ref<string | undefined>()
+const classificationOptionSubmitting = ref(false)
+const loadClassifications = async () => { try { const res = await listClassifications('agent'); classificationModules.value = (res.data || []).filter(m => m.enabled); classificationModules.value.forEach(m => { selectedClassifications.value[m.id] ||= '' }) } catch { classificationModules.value = [] } }
+function flattenClassificationOptions(options: ClassificationOption[] = [], prefix: string[] = []): Array<{ label: string; value: string }> { return options.flatMap(o => [{ label: [...prefix, o.name].join(' / '), value: o.id }, ...flattenClassificationOptions(o.children, [...prefix, o.name])]) }
+function selectedClassificationLabel(module: ClassificationModule) { const id = selectedClassifications.value[module.id]; return id ? flattenClassificationOptions(module.options).find(o => o.value === id)?.label.split(' / ').pop() || '已选择' : '全部' }
+function isClassificationModuleExpanded(id: string) { return expandedClassificationModules.value.has(id) }
+function toggleClassificationModule(id: string) { const next = new Set(expandedClassificationModules.value); next.has(id) ? next.delete(id) : next.add(id); expandedClassificationModules.value = next }
+function toggleClassificationOption(id: string) { const next = new Set(expandedClassificationOptions.value); next.has(id) ? next.delete(id) : next.add(id); expandedClassificationOptions.value = next }
+function selectClassification(moduleId: string, optionId: string) { selectedClassifications.value = { ...selectedClassifications.value, [moduleId]: optionId }; expandedClassificationModules.value = new Set([...expandedClassificationModules.value, moduleId]) }
+const classificationResourceCount = computed(() => agents.value.length + sharedAgents.value.filter(s => !!s.agent).length)
+const activeClassificationPath = computed(() => Object.entries(selectedClassifications.value).filter(([, id]) => id).flatMap(([moduleId, id]) => { const m = classificationModules.value.find(x => x.id === moduleId); const o = flattenClassificationOptions(m?.options).find(x => x.value === id); return o ? [`${m?.name} / ${o.label}`] : [] }))
+const clearClassificationFilters = () => { selectedClassifications.value = Object.fromEntries(classificationModules.value.map(m => [m.id, ''])) }
+function handleManageClassification() { classificationManageVisible.value = true; classificationManageModule.value ||= classificationModules.value[0] || null }
+const flattenManagedOptions = (options: ClassificationOption[] = [], depth = 0): Array<ClassificationOption & { depth: number }> => options.flatMap(option => [{ ...option, depth }, ...flattenManagedOptions(option.children, depth + 1)])
+const refreshManagedClassifications = async () => { const selectedID = classificationManageModule.value?.id; await loadClassifications(); classificationManageModule.value = classificationModules.value.find(module => module.id === selectedID) || classificationModules.value[0] || null }
+const addClassificationModule = async () => { const name = classificationModuleName.value.trim(); if (!name) return; await createClassificationModule({ name, sort_order: classificationModules.value.length }, 'agent'); classificationModuleName.value = ''; await refreshManagedClassifications() }
+const addClassificationOption = async () => { const module = classificationManageModule.value; const name = classificationOptionName.value.trim(); if (!module || !name || classificationOptionSubmitting.value) return; classificationOptionSubmitting.value = true; try { await createClassificationOption({ module_id: module.id, parent_id: classificationParentID.value || undefined, name }, 'agent'); classificationOptionName.value = ''; classificationParentID.value = undefined; await refreshManagedClassifications(); MessagePlugin.success('筛选选项已添加') } catch (error: any) { MessagePlugin.error(error?.message || error?.error?.message || error?.response?.data?.message || error?.response?.data?.error?.message || '筛选选项添加失败，请检查同级名称是否重复') } finally { classificationOptionSubmitting.value = false } }
+const saveClassificationOption = async (option: ClassificationOption & { depth: number }) => { await updateClassificationOption(option.id, { name: option.name, enabled: option.enabled }, 'agent'); await refreshManagedClassifications() }
+const removeClassificationOption = async (id: string) => { await deleteClassificationOption(id, 'agent'); await refreshManagedClassifications() }
+const removeClassificationModule = async (id: string) => { await deleteClassificationModule(id, 'agent'); classificationManageModule.value = null; await refreshManagedClassifications() }
+function agentClassificationEntries(agent: any): Array<{ dimension: string; value: string }> { const raw = agent?.classification_tags; if (raw && typeof raw === 'object' && !Array.isArray(raw)) return Object.entries(raw).flatMap(([dimension, ids]) => (ids as string[]).map(value => ({ dimension, value }))); const tags = agent?.business_tags ?? agent?.tags ?? []; return Array.isArray(tags) ? tags.map((value: any) => ({ dimension: 'legacy', value: String(value?.value ?? value?.name ?? value) })) : [] }
+function matchesAgentClassifications(agent: any) { const entries = agentClassificationEntries(agent); return classificationModules.value.every(module => { const selected = selectedClassifications.value[module.id]; if (!selected) return true; const path = flattenClassificationOptions(module.options).find(o => o.value === selected)?.label || ''; return entries.some(entry => entry.dimension === module.id && (entry.value === selected || entry.value === path || entry.value.includes(path))) }) && (!agentSearchQuery.value.trim() || [agent?.name, agent?.description, ...entries.map(e => e.value)].filter(Boolean).join(' ').toLowerCase().includes(agentSearchQuery.value.trim().toLowerCase())) }
+const filterAgentsByClassification = <T,>(items: T[], getAgent: (item: T) => any = item => item) => items.filter(item => matchesAgentClassifications(getAgent(item)))
+
+const AgentClassificationTreeOption = defineComponent({ name: 'AgentClassificationTreeOption', props: { option: { type: Object as () => ClassificationOption, required: true }, moduleId: { type: String, required: true }, selectedId: { type: String, required: true }, expandedIds: { type: Object as () => Set<string>, required: true } }, emits: ['select', 'toggle'], setup(props, { emit }) { return () => { const hasChildren = !!props.option.children?.length; const open = props.expandedIds.has(props.option.id) || props.selectedId === props.option.id; return h('div', { class: 'classification-tree-node' }, [h('button', { type: 'button', class: ['classification-tree-row', 'classification-option-row', { selected: props.selectedId === props.option.id }], onClick: () => emit('select', props.moduleId, props.option.id) }, [h('span', { class: 'tree-indent' }), h('span', { class: 'tree-toggle', onClick: (event: MouseEvent) => { if (hasChildren) { event.stopPropagation(); emit('toggle', props.option.id) } } }, hasChildren ? [h(TIcon, { name: open ? 'chevron-down' : 'chevron-right', size: '12px' })] : undefined), h(TIcon, { name: hasChildren ? 'folder-open' : 'file', size: '14px' }), h('span', props.option.name)]), hasChildren && open ? h('div', { class: 'classification-tree-children nested' }, props.option.children!.map(child => h(AgentClassificationTreeOption, { key: child.id, option: child, 'module-id': props.moduleId, 'selected-id': props.selectedId, 'expanded-ids': props.expandedIds, onSelect: (moduleId: string, id: string) => emit('select', moduleId, id), onToggle: (id: string) => emit('toggle', id) }))) : null]) } } })
 const filteredAgents = computed<DisplayAgent[]>(() => {
-  if (spaceSelection.value === 'favorites') return favoritesAgentList.value
-  if (spaceSelection.value === 'recents') return recentsAgentList.value
+  if (spaceSelection.value === 'favorites') return filterAgentsByClassification(favoritesAgentList.value)
+  if (spaceSelection.value === 'recents') return filterAgentsByClassification(recentsAgentList.value)
   if (spaceSelection.value === 'mine') {
-    return agents.value.map(a => ({ ...a, isMine: true as const }))
+    return filterAgentsByClassification(agents.value.map(a => ({ ...a, isMine: true as const })))
   }
   if (spaceSelection.value !== 'all') return []
   const list: DisplayAgent[] = []
@@ -1029,7 +1089,7 @@ const filteredAgents = computed<DisplayAgent[]>(() => {
       showMore: false
     } as DisplayAgent)
   })
-  return list
+  return filterAgentsByClassification(list)
 })
 
 // 「工作空间」视图下的稳定排序：本租户内「我创建」在前、「同事创建 / 内建」
@@ -1049,14 +1109,14 @@ const sortedMineAgents = computed(() => {
 
 // 空间视角下的稳定排序：我自己创建的（is_mine）放前面，其余按 permission 切分。
 const sortedSpaceAgentsList = computed(() => {
-  return [...spaceAgentsList.value].sort((a, b) => {
+  return filterAgentsByClassification([...spaceAgentsList.value].sort((a, b) => {
     const aMine = a.is_mine ? 0 : 1
     const bMine = b.is_mine ? 0 : 1
     if (aMine !== bMine) return aMine - bMine
     const aE = isSharedAgentEditable(a.permission) ? 0 : 1
     const bE = isSharedAgentEditable(b.permission) ? 0 : 1
     return aE - bE
-  })
+  }))
 })
 const loading = ref(false)
 const deleteVisible = ref(false)
@@ -1193,6 +1253,7 @@ watch(creatorFilter, () => {
 })
 
 onMounted(() => {
+  loadClassifications()
   fetchList()
   window.addEventListener('openAgentEditor', handleOpenAgentEditor as EventListener)
 })
@@ -1591,6 +1652,218 @@ defineExpose({
   padding: 12px;
   background: var(--td-bg-color-container);
 }
+
+.agent-list-main {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+.agent-list-main > :not(.agent-classification-panel) { grid-column: 2; min-width: 0; }
+.agent-classification-panel {
+  grid-column: 1;
+  grid-row: 1 / span 20;
+  margin: 0;
+  min-width: 0;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  background: var(--td-bg-color-container);
+  box-sizing: border-box;
+}
+.classification-sidebar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px 12px;
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+.classification-sidebar-head .classification-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+.classification-sidebar-head .classification-title strong {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--td-brand-color-light);
+  color: var(--td-brand-color);
+  font-size: 11px;
+  line-height: 18px;
+}
+.classification-result {
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.classification-tree-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 4px 7px;
+  color: var(--td-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.classification-tree-head small {
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  font-weight: 400;
+}
+.classification-tree {
+  min-width: 0;
+  padding: 2px 0 4px;
+}
+.classification-module {
+  padding-bottom: 4px;
+}
+.classification-module + .classification-module {
+  padding-top: 4px;
+  border-top: 1px solid var(--td-component-stroke);
+}
+.agent-classification-panel :deep(.classification-tree-row) {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 5px;
+  outline: none;
+  background: transparent;
+  color: var(--td-text-color-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.agent-classification-panel :deep(.classification-tree-row:hover) {
+  background: var(--td-bg-color-secondarycontainer);
+  color: var(--td-text-color-primary);
+}
+.agent-classification-panel :deep(.classification-tree-row:focus-visible) {
+  box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+}
+.agent-classification-panel :deep(.classification-tree-row.selected) {
+  background: var(--td-brand-color-light);
+  color: var(--td-brand-color);
+  font-weight: 500;
+}
+.classification-module-row {
+  min-height: 36px !important;
+  color: var(--td-text-color-primary) !important;
+  font-size: 13px !important;
+}
+.classification-module.active .classification-module-row {
+  color: var(--td-brand-color) !important;
+}
+.agent-classification-panel :deep(.classification-tree-row .t-icon) {
+  flex: 0 0 auto;
+  color: var(--td-text-color-placeholder);
+}
+.agent-classification-panel :deep(.classification-tree-row.selected .t-icon),
+.classification-module.active :deep(.classification-module-row .t-icon) {
+  color: var(--td-brand-color);
+}
+.classification-tree-row strong {
+  font-weight: 600;
+}
+.classification-selected-label {
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.classification-tree-children {
+  margin: 2px 0 0 12px;
+  padding: 2px 0 2px 12px;
+  border-left: 1px solid var(--td-component-stroke);
+}
+.classification-tree-children.nested {
+  margin-left: 18px;
+  padding-left: 8px;
+}
+.classification-option-row {
+  min-height: 31px !important;
+}
+.classification-option-row > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.classification-all-row small {
+  margin-left: auto;
+  color: var(--td-text-color-placeholder);
+  font-size: 11px;
+}
+.tree-indent {
+  flex: 0 0 6px;
+}
+.tree-leaf {
+  width: 12px;
+  color: var(--td-text-color-placeholder);
+  text-align: center;
+}
+.tree-toggle {
+  display: inline-flex;
+  width: 14px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 14px;
+  color: var(--td-text-color-placeholder);
+}
+.classification-manage-btn {
+  width: 100%;
+  margin-top: 12px;
+  color: var(--td-brand-color);
+  border-style: dashed;
+}
+.agent-classification-panel .classification-path { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-height:34px; margin-top:14px; padding:6px 8px; border:1px solid var(--td-component-stroke); border-radius:6px; background:var(--td-bg-color-secondarycontainer); }
+.agent-classification-panel .classification-path .path-label { flex:0 0 100%; color:var(--td-text-color-placeholder); font-size:12px; }
+.agent-classification-panel .path-tag { display:inline-flex; padding:2px 7px; border-radius:4px; background:var(--td-brand-color-light); color:var(--td-brand-color); font-size:12px; }
+.agent-classification-panel .path-clear { padding:2px 4px; color:var(--td-brand-color); font-size:12px; }
+.agent-classification-panel .classification-search { width:100%; margin-top:10px; }
+@media (max-width: 960px) { .agent-list-main { grid-template-columns:220px minmax(0,1fr); gap:14px; } }
+@media (max-width: 620px) { .agent-list-main { display:block; } .agent-list-main > :not(.agent-classification-panel) { margin-top:14px; } .agent-classification-panel { margin-bottom:14px; } .agent-classification-panel .classification-tree { max-height:360px; overflow-y:auto; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-classification-panel :deep(.classification-tree-row) {
+    transition: none;
+  }
+}
+
+.classification-manager { display:grid; grid-template-columns:220px minmax(0,1fr); height:100%; min-height:360px; }
+.classification-module-pane { padding:16px; border-right:1px solid var(--td-component-border); background:var(--td-bg-color-secondarycontainer); }
+.manager-section-title { margin-bottom:12px; color:var(--td-text-color-secondary); font-size:12px; font-weight:600; }
+.manager-module-row { display:flex; align-items:center; margin-bottom:5px; border-radius:4px; }
+.manager-module-row.active { background:var(--td-brand-color-light); }
+.manager-module-select { display:flex; width:100%; justify-content:space-between; padding:9px 8px; border:0; background:transparent; color:var(--td-text-color-primary); text-align:left; cursor:pointer; }
+.manager-add-row, .manager-add-option { display:flex; gap:8px; margin-top:14px; }
+.manager-add-row .t-input { min-width:0; flex:1; }
+.classification-option-pane { padding:18px; min-width:0; }
+.manager-option-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.manager-option-header p { margin:6px 0 0; color:var(--td-text-color-placeholder); font-size:12px; }
+.manager-option-list { margin-top:16px; }
+.manager-option-row { display:flex; align-items:center; gap:8px; min-height:42px; }
+.manager-option-row .t-input { min-width:0; flex:1; }
+.manager-add-option .t-select, .manager-add-option .t-input { min-width:0; flex:1; }
+@media (max-width:620px) { .classification-manager { grid-template-columns:1fr; } .classification-module-pane { border-right:0; border-bottom:1px solid var(--td-component-border); } }
 
 .shared-by-me-badge {
   display: inline-flex;

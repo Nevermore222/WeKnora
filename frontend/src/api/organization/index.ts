@@ -323,6 +323,69 @@ export interface ListAgentSharesResponse {
   total: number
 }
 
+export type OrganizationNodeType = 'company' | 'department' | 'group'
+
+export interface OrganizationNode {
+  id: string
+  tenant_id: number
+  parent_id?: string | null
+  name: string
+  type: OrganizationNodeType
+  depth: number
+  children?: OrganizationNode[]
+  created_at: string
+  updated_at: string
+}
+
+export interface OrganizationNodeResources {
+  node: OrganizationNode
+  knowledge_bases: Array<{ id: string; name: string; description?: string; type?: string; organization_node_id?: string | null; [key: string]: unknown }>
+  agents: Array<{ id: string; name: string; description?: string; organization_node_id?: string | null; [key: string]: unknown }>
+  unassigned_knowledge_bases: Array<{ id: string; name: string; description?: string; type?: string; organization_node_id?: string | null; [key: string]: unknown }>
+  unassigned_agents: Array<{ id: string; name: string; description?: string; organization_node_id?: string | null; [key: string]: unknown }>
+}
+
+export interface CreateOrganizationNodeRequest {
+  parent_id?: string | null
+  name: string
+  type: OrganizationNodeType
+}
+
+export interface AssignOrganizationNodeResourceRequest {
+  resource_type: 'knowledge_base' | 'agent'
+  resource_id: string
+}
+
+export async function listOrganizationNodeTree(): Promise<ApiResponse<OrganizationNode[]>> {
+  try { return await get('/api/v1/organization-nodes') as unknown as ApiResponse<OrganizationNode[]> }
+  catch (error: any) { return { success: false, message: error.message || 'Failed to list organization nodes' } }
+}
+
+export async function createOrganizationNode(req: CreateOrganizationNodeRequest): Promise<ApiResponse<OrganizationNode>> {
+  try { return await post('/api/v1/organization-nodes', req) as unknown as ApiResponse<OrganizationNode> }
+  catch (error: any) { return { success: false, message: error.message || 'Failed to create organization node' } }
+}
+
+export async function updateOrganizationNode(id: string, name: string): Promise<ApiResponse<OrganizationNode>> {
+  try { return await put(`/api/v1/organization-nodes/${id}`, { name }) as unknown as ApiResponse<OrganizationNode> }
+  catch (error: any) { return { success: false, message: error.message || 'Failed to update organization node' } }
+}
+
+export async function deleteOrganizationNode(id: string): Promise<ApiResponse<void>> {
+  try { return await del(`/api/v1/organization-nodes/${id}`) as unknown as ApiResponse<void> }
+  catch (error: any) { return { success: false, message: error.message || 'Failed to delete organization node' } }
+}
+
+export async function getOrganizationNodeResources(id: string): Promise<ApiResponse<OrganizationNodeResources>> {
+  try { return await get(`/api/v1/organization-nodes/${id}/resources`) as unknown as ApiResponse<OrganizationNodeResources> }
+  catch (error: any) { return { success: false, message: error.message || 'Failed to load node resources' } }
+}
+
+export async function assignOrganizationNodeResource(id: string, req: AssignOrganizationNodeResourceRequest): Promise<ApiResponse<void>> {
+  try { return await put(`/api/v1/organization-nodes/${id}/resources`, req) as unknown as ApiResponse<void> }
+  catch (error: any) { return { success: false, message: error.message || 'Failed to assign resource' } }
+}
+
 // Organization API functions
 
 /**

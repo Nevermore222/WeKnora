@@ -155,6 +155,12 @@ const router = createRouter({
           meta: { requiresInit: true, requiresAuth: true }
         },
         {
+          path: "organization-hierarchy",
+          name: "organizationHierarchy",
+          component: () => import("../views/organization/OrganizationHierarchy.vue"),
+          meta: { requiresInit: true, requiresAuth: true }
+        },
+        {
           path: "organizations",
           name: "organizationList",
           component: () => import("../views/organization/OrganizationList.vue"),

@@ -322,10 +322,10 @@ export function post(url: string, data = {}, config?: any) {
   return instance.post(url, data, config);
 }
 
-export function put(url: string, data = {}) {
-  return instance.put(url, data);
+export function put(url: string, data = {}, config?: any) {
+  return instance.put(url, data, config);
 }
 
-export function del(url: string, data?: any) {
-  return instance.delete(url, { data });
+export function del(url: string, config?: any) {
+  return instance.delete(url, config);
 }
