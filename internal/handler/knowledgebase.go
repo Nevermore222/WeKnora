@@ -854,6 +854,33 @@ func (h *KnowledgeBaseHandler) UpdateKnowledgeBase(c *gin.Context) {
 	})
 }
 
+func (h *KnowledgeBaseHandler) UpdateClassificationTags(c *gin.Context) {
+	ctx := c.Request.Context()
+	_, id, _, permission, err := h.validateAndGetKnowledgeBase(c)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	if permission != types.OrgRoleAdmin && permission != types.OrgRoleEditor {
+		c.Error(apperrors.NewForbiddenError("No permission to update knowledge base"))
+		return
+	}
+	var req struct {
+		ClassificationTags map[string][]string `json:"classification_tags"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(apperrors.NewBadRequestError("Invalid request parameters"))
+		return
+	}
+	kb, err := h.service.UpdateClassificationTags(ctx, id, req.ClassificationTags)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	callerTenantID := c.GetUint64(types.TenantIDContextKey.String())
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": buildKBResponse(kb, h.resolveKBStoreView(ctx, kb, callerTenantID), nil)})
+}
+
 // DeleteKnowledgeBase godoc
 // @Summary      删除知识库
 // @Description  删除指定的知识库及其所有内容

@@ -479,6 +479,19 @@ func (s *knowledgeBaseService) UpdateKnowledgeBase(ctx context.Context,
 	return kb, nil
 }
 
+func (s *knowledgeBaseService) UpdateClassificationTags(ctx context.Context, id string, tags map[string][]string) (*types.KnowledgeBase, error) {
+	kb, err := s.repo.GetKnowledgeBaseByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	kb.ClassificationTags = types.ClassificationTags(tags)
+	kb.UpdatedAt = time.Now()
+	if err := s.repo.UpdateKnowledgeBase(ctx, kb); err != nil {
+		return nil, err
+	}
+	return kb, nil
+}
+
 // TogglePinKnowledgeBase toggles whether the calling user has pinned
 // this knowledge base. Pin state is per-(user, kb) as of migration
 // 000050; previously this method flipped a tenant-wide column on the

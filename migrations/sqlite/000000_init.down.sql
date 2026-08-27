@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS organization_nodes;
 DROP TABLE IF EXISTS tenant_invitations;
 DROP TABLE IF EXISTS user_kb_pins;
 DROP TABLE IF EXISTS user_resource_favorites;

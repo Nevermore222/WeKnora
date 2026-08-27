@@ -57,6 +57,11 @@ type KnowledgeBase struct {
 	// Nullable for backward compatibility with rows created before the
 	// RBAC migration backfilled the column to the tenant Owner.
 	CreatorID string `yaml:"creator_id"              json:"creator_id"              gorm:"type:varchar(36);index"`
+	// OrganizationNodeID is the optional tenant-local hierarchy assignment.
+	// Assigning it never changes the KB ID, documents, vectors, or processing state.
+	OrganizationNodeID *string `yaml:"organization_node_id" json:"organization_node_id,omitempty" gorm:"type:varchar(36);index"`
+	// ClassificationTags stores tenant-managed module -> selected leaf option IDs.
+	ClassificationTags ClassificationTags `yaml:"classification_tags" json:"classification_tags,omitempty" gorm:"column:classification_tags;type:jsonb"`
 	// Chunking configuration
 	ChunkingConfig ChunkingConfig `yaml:"chunking_config"         json:"chunking_config"         gorm:"type:json"`
 	// Image processing configuration

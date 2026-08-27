@@ -50,6 +50,22 @@ CREATE INDEX IF NOT EXISTS idx_models_source ON models(source);
 CREATE INDEX IF NOT EXISTS idx_models_is_builtin ON models(is_builtin);
 CREATE INDEX IF NOT EXISTS idx_models_managed_by ON models(managed_by);
 
+CREATE TABLE IF NOT EXISTS organization_nodes (
+    id VARCHAR(36) PRIMARY KEY,
+    tenant_id INTEGER NOT NULL,
+    parent_id VARCHAR(36),
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(32) NOT NULL CHECK(type IN ('company', 'department', 'group')),
+    depth INTEGER NOT NULL DEFAULT 0 CHECK(depth BETWEEN 0 AND 2),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_id) REFERENCES organization_nodes(id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_organization_nodes_tenant ON organization_nodes(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_organization_nodes_parent ON organization_nodes(tenant_id, parent_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_organization_nodes_root_company ON organization_nodes(tenant_id) WHERE type = 'company' AND parent_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_organization_nodes_name_parent ON organization_nodes(tenant_id, IFNULL(parent_id, ''), lower(name));
+
 CREATE TABLE IF NOT EXISTS knowledge_bases (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -72,6 +88,7 @@ CREATE TABLE IF NOT EXISTS knowledge_bases (
     asr_config TEXT,
     vector_store_id VARCHAR(36),
     creator_id VARCHAR(36),
+    organization_node_id VARCHAR(36),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     deleted_at DATETIME
@@ -82,6 +99,8 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_bases_tenant_vector_store
     ON knowledge_bases(tenant_id, vector_store_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_bases_tenant_creator
     ON knowledge_bases(tenant_id, creator_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_bases_organization_node
+    ON knowledge_bases(tenant_id, organization_node_id);
 
 CREATE TABLE IF NOT EXISTS knowledges (
     id VARCHAR(36) PRIMARY KEY,
@@ -458,6 +477,7 @@ CREATE TABLE IF NOT EXISTS custom_agents (
     is_builtin BOOLEAN NOT NULL DEFAULT 0,
     tenant_id INTEGER NOT NULL,
     created_by VARCHAR(36),
+    organization_node_id VARCHAR(36),
     runnable_by_viewer BOOLEAN NOT NULL DEFAULT 1,
     config TEXT NOT NULL DEFAULT '{}',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -469,6 +489,7 @@ CREATE TABLE IF NOT EXISTS custom_agents (
 CREATE INDEX IF NOT EXISTS idx_custom_agents_tenant_id ON custom_agents(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_custom_agents_is_builtin ON custom_agents(is_builtin);
 CREATE INDEX IF NOT EXISTS idx_custom_agents_deleted_at ON custom_agents(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_custom_agents_organization_node ON custom_agents(tenant_id, organization_node_id);
 
 CREATE TABLE IF NOT EXISTS organizations (
     id VARCHAR(36) PRIMARY KEY,

@@ -75,6 +75,8 @@ type CustomAgent struct {
 	TenantID uint64 `yaml:"tenant_id" json:"tenant_id" gorm:"primaryKey"`
 	// Created by user ID
 	CreatedBy string `yaml:"created_by" json:"created_by" gorm:"type:varchar(36)"`
+	// OrganizationNodeID is the optional tenant-local hierarchy assignment.
+	OrganizationNodeID *string `yaml:"organization_node_id" json:"organization_node_id,omitempty" gorm:"type:varchar(36);index"`
 	// RunnableByViewer controls whether users with TenantRoleViewer can
 	// run this agent IN AGENT MODE (i.e. with tools, MCP, sandboxed code
 	// execution, etc.). Plain RAG / Wiki QA sessions against the same

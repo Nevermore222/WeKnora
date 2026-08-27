@@ -79,6 +79,8 @@ type RouterParams struct {
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
 	SkillHandler                 *handler.SkillHandler
 	OrganizationHandler          *handler.OrganizationHandler
+	OrganizationNodeHandler      *handler.OrganizationNodeHandler
+	ClassificationHandler        *handler.ClassificationHandler
 	IMHandler                    *handler.IMHandler
 	EmbedChannelHandler          *handler.EmbedChannelHandler
 	EmbedChannelService          interfaces.EmbedChannelService
@@ -217,6 +219,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterMyInvitationRoutes(v1, params.TenantInvitationHandler)
 		RegisterKnowledgeBaseRoutes(v1, params.KBHandler, rbacGuards)
 		RegisterKnowledgeTagRoutes(v1, params.TagHandler, rbacGuards)
+		RegisterClassificationRoutes(v1, params.ClassificationHandler, rbacGuards)
 		RegisterKnowledgeRoutes(v1, params.KnowledgeHandler, rbacGuards)
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
 		RegisterChunkRoutes(v1, params.ChunkHandler, rbacGuards)
@@ -237,6 +240,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterUserFavoriteRoutes(v1, params.UserFavoriteHandler, rbacGuards)
 		RegisterSkillRoutes(v1, params.SkillHandler, rbacGuards)
 		RegisterOrganizationRoutes(v1, params.OrganizationHandler, rbacGuards)
+		RegisterOrganizationNodeRoutes(v1, params.OrganizationNodeHandler, rbacGuards)
 		RegisterIMChannelRoutes(v1, params.IMHandler, rbacGuards)
 		RegisterEmbedChannelRoutes(v1, params.EmbedChannelHandler, rbacGuards)
 		RegisterDataSourceRoutes(v1, params.DataSourceHandler, params.DataSourceCredentialsHandler, rbacGuards)
@@ -395,6 +399,7 @@ func RegisterKnowledgeBaseRoutes(r *gin.RouterGroup, handler *handler.KnowledgeB
 		kb.GET("/:id", g.Viewer(), g.KBAccessRead("id"), handler.GetKnowledgeBase)
 		// 更新知识库 — 创建者本人 OR Admin+ 且对 KB 有 write 权限
 		kb.PUT("/:id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.UpdateKnowledgeBase)
+		kb.PUT("/:id/classification-tags", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.UpdateClassificationTags)
 		// 删除知识库 — 创建者本人 OR Admin+ 且对 KB 有 write 权限
 		kb.DELETE("/:id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.DeleteKnowledgeBase)
 		// 置顶/取消置顶知识库 — 创建者本人 OR Admin+ 且对 KB 有 write 权限
@@ -416,6 +421,21 @@ func RegisterKnowledgeBaseRoutes(r *gin.RouterGroup, handler *handler.KnowledgeB
 		// 获取可移动目标知识库列表 — Viewer+ 且对 KB 有 read 权限
 		kb.GET("/:id/move-targets", g.Viewer(), g.KBAccessRead("id"), handler.ListMoveTargets)
 	}
+}
+
+// RegisterClassificationRoutes exposes tenant classification configuration.
+func RegisterClassificationRoutes(r *gin.RouterGroup, h *handler.ClassificationHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	v := r.Group("/classification")
+	v.GET("", g.Viewer(), h.List)
+	v.POST("/modules", g.Admin(), h.CreateModule)
+	v.PUT("/modules/:id", g.Admin(), h.UpdateModule)
+	v.DELETE("/modules/:id", g.Admin(), h.DeleteModule)
+	v.POST("/options", g.Admin(), h.CreateOption)
+	v.PUT("/options/:id", g.Admin(), h.UpdateOption)
+	v.DELETE("/options/:id", g.Admin(), h.DeleteOption)
 }
 
 // RegisterKnowledgeTagRoutes 注册知识库标签相关路由。
@@ -1060,6 +1080,16 @@ func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler,
 		// Read skill instructions and resource summaries — Viewer+
 		skills.GET("/:name", g.Viewer(), skillHandler.GetSkill)
 	}
+}
+
+func RegisterOrganizationNodeRoutes(r *gin.RouterGroup, h *handler.OrganizationNodeHandler, g *rbacGuards) {
+	nodes := r.Group("/organization-nodes")
+	nodes.GET("", g.Viewer(), h.ListTree)
+	nodes.GET("/:id/resources", g.Viewer(), h.Resources)
+	nodes.POST("", g.Admin(), h.Create)
+	nodes.PUT("/:id", g.Admin(), h.Update)
+	nodes.PUT("/:id/resources", g.Admin(), h.AssignResource)
+	nodes.DELETE("/:id", g.Admin(), h.Delete)
 }
 
 // RegisterOrganizationRoutes registers organization and sharing routes

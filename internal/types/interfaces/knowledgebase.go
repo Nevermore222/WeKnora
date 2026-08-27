@@ -73,6 +73,7 @@ type KnowledgeBaseService interface {
 	UpdateKnowledgeBase(ctx context.Context,
 		id string, name string, description string, config *types.KnowledgeBaseConfig,
 	) (*types.KnowledgeBase, error)
+	UpdateClassificationTags(ctx context.Context, id string, tags map[string][]string) (*types.KnowledgeBase, error)
 
 	// DeleteKnowledgeBase deletes a knowledge base
 	// Parameters:
