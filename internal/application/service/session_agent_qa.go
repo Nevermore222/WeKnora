@@ -15,6 +15,27 @@ import (
 	"github.com/Tencent/Xelora/internal/types"
 )
 
+// resolveAgentRerankModelID keeps an explicit agent binding as the highest
+// priority and otherwise uses the system administrator's global default. The
+// model service exposes global defaults to ordinary users as read-only models,
+// so this does not grant them model-editing permissions.
+func (s *sessionService) resolveAgentRerankModelID(ctx context.Context, configuredID string) (string, error) {
+	if configuredID != "" {
+		return configuredID, nil
+	}
+
+	models, err := s.modelService.ListModels(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve default rerank model: %w", err)
+	}
+	for _, model := range models {
+		if model != nil && model.Type == types.ModelTypeRerank && model.IsDefault {
+			return model.ID, nil
+		}
+	}
+	return "", nil
+}
+
 // AgentQA performs agent-based question answering with conversation history and streaming support
 // customAgent is optional - if provided, uses custom agent configuration instead of tenant defaults
 // summaryModelID is optional - if provided, overrides the model from customAgent config
@@ -100,19 +121,13 @@ func (s *sessionService) AgentQA(
 	}
 
 	if hasKnowledgeSearchTool {
-		// Rerank model is resolved purely from the agent config now.
-		// We used to fall back to ConversationConfig.RerankModelID at
-		// the tenant level, but that path encouraged "leave rerank
-		// blank on the agent and inherit silently" which made debugging
-		// retrieval quality a guessing game across tenant settings vs
-		// agent settings. Forcing the agent to declare its own rerank
-		// model puts the configuration where the user actually edits
-		// the agent. If a Wiki-only agent doesn't need reranking,
-		// agentRequiresRerankModel() below already lets it pass.
-		rerankModelID := req.CustomAgent.Config.RerankModelID
+		rerankModelID, err := s.resolveAgentRerankModelID(ctx, req.CustomAgent.Config.RerankModelID)
+		if err != nil {
+			return err
+		}
 		if rerankModelID == "" {
-			logger.Warnf(ctx, "No rerank model configured for custom agent %s, but knowledge_search tool is enabled", req.CustomAgent.ID)
-			return errors.New("rerank model is not configured: please set rerank_model_id on the agent")
+			logger.Warnf(ctx, "No rerank model configured for custom agent %s and no global default is available", req.CustomAgent.ID)
+			return errors.New("rerank model is not configured: set an agent rerank model or ask an administrator to configure the global default")
 		}
 
 		rerankModel, err = s.modelService.GetRerankModel(ctx, rerankModelID)

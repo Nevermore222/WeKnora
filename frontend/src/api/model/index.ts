@@ -106,6 +106,21 @@ export function getModel(id: string): Promise<ModelConfig> {
   });
 }
 
+// 设为当前工作空间该类型的默认模型
+export function setDefaultModel(id: string): Promise<ModelConfig> {
+  return new Promise((resolve, reject) => {
+    put(`/api/v1/models/${id}/default`, {})
+      .then((response: any) => {
+        if (response.success && response.data) {
+          resolve(response.data)
+        } else {
+          reject(new Error(response.message || t('modelSettings.toasts.setDefaultFailed')))
+        }
+      })
+      .catch(reject)
+  })
+}
+
 // 更新模型
 export function updateModel(id: string, data: Partial<ModelConfig>): Promise<ModelConfig> {
   return new Promise((resolve, reject) => {

@@ -8,9 +8,10 @@ services:
       - .env.knavis-internal
     environment:
       - XELORA_BRAND_PROFILE=${XELORA_BRAND_PROFILE:-internal}
+      - SSRF_WHITELIST_EXTRA=searxng,qdrant,milvus,weaviate,doris-fe,192.168.9.221,192.168.9.177
 
   frontend:
-    image: wechatopenai/xelora-ui:${XELORA_VERSION:-knavis-internal-local}
+    image: ${XELORA_FRONTEND_IMAGE:-wechatopenai/xelora-ui:knavis-internal-local}
     volumes:
       - ${CLIENT_RELEASES_HOST_PATH:-./dist/client-releases}:/usr/share/nginx/html/downloads:ro
 

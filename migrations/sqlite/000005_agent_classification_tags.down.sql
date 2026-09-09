@@ -1,0 +1,2 @@
+-- Remove system-wide classification tags from custom agents.
+ALTER TABLE custom_agents DROP COLUMN classification_tags;

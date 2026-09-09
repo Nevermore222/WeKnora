@@ -31,7 +31,7 @@ type stubListKBService struct {
 	kbs []*types.KnowledgeBase
 }
 
-func (s *stubListKBService) ListKnowledgeBases(context.Context) ([]*types.KnowledgeBase, error) {
+func (s *stubListKBService) ListVisibleKnowledgeBases(context.Context) ([]*types.KnowledgeBase, error) {
 	return s.kbs, nil
 }
 

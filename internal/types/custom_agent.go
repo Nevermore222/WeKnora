@@ -75,6 +75,11 @@ type CustomAgent struct {
 	TenantID uint64 `yaml:"tenant_id" json:"tenant_id" gorm:"primaryKey"`
 	// Created by user ID
 	CreatedBy string `yaml:"created_by" json:"created_by" gorm:"type:varchar(36)"`
+	// Visibility uses the shared resource visibility values from knowledgebase.go.
+	// Public agents are visible and runnable across workspaces but remain read-only.
+	Visibility string `yaml:"visibility" json:"visibility" gorm:"type:varchar(20);not null;default:'workspace';index"`
+	// ClassificationTags stores selected system classification leaf IDs by module.
+	ClassificationTags ClassificationTags `yaml:"classification_tags" json:"classification_tags,omitempty" gorm:"column:classification_tags;type:jsonb"`
 	// OrganizationNodeID is the optional tenant-local hierarchy assignment.
 	OrganizationNodeID *string `yaml:"organization_node_id" json:"organization_node_id,omitempty" gorm:"type:varchar(36);index"`
 	// RunnableByViewer controls whether users with TenantRoleViewer can
@@ -105,6 +110,8 @@ type CustomAgent struct {
 	UpdatedAt time.Time      `yaml:"updated_at" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `yaml:"deleted_at" json:"deleted_at" gorm:"index"`
 
+	// ReadOnly is computed for the current caller and never persisted.
+	ReadOnly bool `yaml:"-" json:"read_only,omitempty" gorm:"-"`
 	// CreatorName 由 list handler 在返回前批量回填，作用同 KnowledgeBase.CreatorName：
 	// 让前端列表卡片区分「我创建」与「同租户其他成员创建」。不落库，内建 agent / 老数据
 	// 仍可能为空。
@@ -122,6 +129,13 @@ type CustomAgentConfig struct {
 	// Empty / unknown values are treated as "custom" (no preset applied).
 	// Ignored for quick-answer mode.
 	AgentType string `yaml:"agent_type" json:"agent_type,omitempty"`
+	// WorkflowRole identifies an optional Xelora automation binding.  It is
+	// intentionally stored in the agent config JSON so one generic workflow can
+	// resolve the correct agent and knowledge base at runtime.
+	WorkflowRole string `yaml:"workflow_role" json:"workflow_role,omitempty"`
+	// MachineType and Language scope workflow bindings (for example ASP + CL).
+	MachineType string `yaml:"machine_type" json:"machine_type,omitempty"`
+	Language    string `yaml:"language" json:"language,omitempty"`
 	// System prompt for the agent (unified prompt, uses web_search_status placeholder for dynamic behavior)
 	SystemPrompt string `yaml:"system_prompt" json:"system_prompt"`
 	// SystemPromptID references a template ID in prompt_templates/ YAML files.
@@ -299,6 +313,12 @@ func (CustomAgent) TableName() string {
 func (a *CustomAgent) EnsureDefaults() {
 	if a == nil {
 		return
+	}
+	if a.Visibility == "" {
+		a.Visibility = ResourceVisibilityWorkspace
+	}
+	if a.ClassificationTags == nil {
+		a.ClassificationTags = ClassificationTags{}
 	}
 	if a.Config.Temperature < 0 {
 		a.Config.Temperature = 0.7

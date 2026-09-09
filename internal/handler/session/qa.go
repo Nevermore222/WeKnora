@@ -326,13 +326,18 @@ func (h *Handler) resolveAgent(ctx context.Context, c *gin.Context, agentID stri
 		}
 	}
 
-	// Fall back to own agent
+	// Fall back to own or system-public agent.
 	if customAgent == nil {
 		agent, err := h.customAgentService.GetAgentByID(ctx, agentID)
 		if err == nil {
 			customAgent = agent
-			logger.Infof(ctx, "Using own agent: ID=%s, Name=%s, AgentMode=%s",
-				customAgent.ID, customAgent.Name, customAgent.Config.AgentMode)
+			if agent.TenantID != 0 && agent.TenantID != currentTenantID && agent.Visibility == types.ResourceVisibilityPublic {
+				effectiveTenantID = agent.TenantID
+				logger.Infof(ctx, "Using system-public agent: ID=%s, sourceTenantID=%d", customAgent.ID, effectiveTenantID)
+			} else {
+				logger.Infof(ctx, "Using own agent: ID=%s, Name=%s, AgentMode=%s",
+					customAgent.ID, customAgent.Name, customAgent.Config.AgentMode)
+			}
 		} else {
 			logger.Warnf(ctx, "Failed to get custom agent, agent ID: %s, error: %v, using default config",
 				secutils.SanitizeForLog(agentID), err)

@@ -13,6 +13,17 @@ import (
 // "chat_template_kwargs".
 const ExtraConfigThinkingControl = "thinking_control"
 
+// parseBoolExtraConfig accepts the common boolean spellings used by model
+// settings while keeping an invalid or missing value disabled by default.
+func parseBoolExtraConfig(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
 // Wire-format request bodies used by providers that express extended-thinking
 // through a non-standard top-level field. They embed the standard OpenAI
 // request so all other fields are marshalled unchanged.

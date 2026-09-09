@@ -159,6 +159,7 @@ func (s *stubAgentShareForGuard) CountByOrganizations(context.Context, []string)
 type guardOpts struct {
 	agentID    string                  // ?agent_id query param
 	agentShare *stubAgentShareForGuard // nil means "no agent-share service"
+	userID     string                  // defaults to u-test
 }
 
 // runGuard fires a single request through the guard and returns the
@@ -186,6 +187,11 @@ func runGuard(
 	}
 	req := httptest.NewRequest("GET", url, nil)
 	ctx := context.WithValue(req.Context(), types.TenantIDContextKey, tenantID)
+	userID := opts.userID
+	if userID == "" {
+		userID = "u-test"
+	}
+	ctx = context.WithValue(ctx, types.UserIDContextKey, userID)
 	c.Request = req.WithContext(ctx)
 
 	kbsvc := &stubKBLookup{kbs: map[string]*types.KnowledgeBase{}}
@@ -221,20 +227,46 @@ func runGuard(
 func TestRequireKBAccess_OwnKB(t *testing.T) {
 	rec, c := runGuard(t, 100, "kb-1",
 		types.OrgRoleViewer,
-		&types.KnowledgeBase{ID: "kb-1", TenantID: 100},
+		&types.KnowledgeBase{ID: "kb-1", TenantID: 100, CreatorID: "u-test"},
 		nil,
 		guardOpts{},
 	)
 	require.False(t, c.IsAborted(), "should pass through")
-	require.Equal(t, 200, rec.Code) // gin's default; nothing wrote a status
+	require.Equal(t, 200, rec.Code)
 	access, ok := KBAccessFromContext(c)
 	require.True(t, ok)
 	require.Equal(t, uint64(100), access.EffectiveTenantID)
-	require.Equal(t, types.OrgRoleAdmin, access.Permission, "own KB grants admin")
-	// The request context's tenant should still be the caller's own.
+	require.Equal(t, types.OrgRoleAdmin, access.Permission, "creator may manage own KB")
 	got, ok := types.TenantIDFromContext(c.Request.Context())
 	require.True(t, ok)
 	require.Equal(t, uint64(100), got)
+}
+
+func TestRequireKBAccess_SameTenantNonCreatorReadOnly(t *testing.T) {
+	_, c := runGuard(t, 100, "kb-1", types.OrgRoleViewer,
+		&types.KnowledgeBase{ID: "kb-1", TenantID: 100, CreatorID: "owner"}, nil, guardOpts{})
+	require.False(t, c.IsAborted())
+	access, ok := KBAccessFromContext(c)
+	require.True(t, ok)
+	require.Equal(t, types.OrgRoleViewer, access.Permission)
+
+	_, writeCtx := runGuard(t, 100, "kb-1", types.OrgRoleEditor,
+		&types.KnowledgeBase{ID: "kb-1", TenantID: 100, CreatorID: "owner"}, nil, guardOpts{})
+	require.True(t, writeCtx.IsAborted())
+}
+
+func TestRequireKBAccess_PrivateAndPublicScopes(t *testing.T) {
+	_, privateCtx := runGuard(t, 100, "private", types.OrgRoleViewer,
+		&types.KnowledgeBase{ID: "private", TenantID: 100, CreatorID: "owner", Visibility: types.ResourceVisibilityPrivate}, nil, guardOpts{})
+	require.True(t, privateCtx.IsAborted())
+
+	_, publicCtx := runGuard(t, 100, "public", types.OrgRoleViewer,
+		&types.KnowledgeBase{ID: "public", TenantID: 200, CreatorID: "owner", Visibility: types.ResourceVisibilityPublic}, nil, guardOpts{})
+	require.False(t, publicCtx.IsAborted())
+	access, ok := KBAccessFromContext(publicCtx)
+	require.True(t, ok)
+	require.Equal(t, uint64(200), access.EffectiveTenantID)
+	require.Equal(t, types.OrgRoleViewer, access.Permission)
 }
 
 func TestRequireKBAccess_NotFound_Aborts(t *testing.T) {

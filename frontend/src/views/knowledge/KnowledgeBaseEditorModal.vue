@@ -143,6 +143,24 @@
                           :maxlength="50"
                         />
                       </div>
+                      <div class="form-item">
+                        <label class="form-label">{{ $t('knowledgeEditor.basic.descriptionLabel') }}</label>
+                        <t-textarea
+                          v-model="formData.description"
+                          :placeholder="$t('knowledgeEditor.basic.descriptionPlaceholder')"
+                          :maxlength="200"
+                          :autosize="{ minRows: 3, maxRows: 6 }"
+                        />
+                      </div>
+                      <div v-if="authStore.isSystemAdmin && mode === 'edit'" class="form-item">
+                        <label class="form-label">访问范围</label>
+                        <p class="form-tip">公开知识库对所有工作空间可见且只读；私密知识库仅创建者和系统管理员可访问。</p>
+                        <t-radio-group v-model="formData.visibility" variant="default-filled">
+                          <t-radio-button value="public">公开</t-radio-button>
+                          <t-radio-button value="private">私密</t-radio-button>
+                        </t-radio-group>
+                      </div>
+
                       <div v-if="classificationModules.length" class="form-item">
                         <label class="form-label">知识库分类标签</label>
                         <p class="form-tip">选择子分类后，知识库会自动归入它的全部上级分类。</p>
@@ -397,7 +415,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import KbCreateContextualGuide from '@/components/KbCreateContextualGuide.vue'
 import { KB_EDITOR_FOCUS_SECTION_EVENT, markContextualGuideDone } from '@/config/contextualGuides'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
-import { createKnowledgeBase, getKnowledgeBaseById, listKnowledgeFiles, updateKnowledgeBase, rebuildKBIndex } from '@/api/knowledge-base'
+import { createKnowledgeBase, getKnowledgeBaseById, listKnowledgeFiles, updateKnowledgeBase, updateKnowledgeBaseVisibility, rebuildKBIndex } from '@/api/knowledge-base'
 import { updateKBConfig, type KBModelConfigRequest } from '@/api/initialization'
 import { type ModelConfig } from '@/api/model'
 import { useChatResourcesStore } from '@/stores/chatResources'
@@ -757,6 +775,7 @@ const loadKBData = async () => {
       type: kbType,
       name: kb.name || '',
       description: kb.description || '',
+      visibility: kb.visibility === 'private' ? 'private' : 'public',
       faqConfig: {
         indexMode: kb.faq_config?.index_mode || 'question_only',
         questionIndexMode: kb.faq_config?.question_index_mode || 'separate'
@@ -1259,6 +1278,9 @@ const doSubmit = async () => {
         description: data.description,
         config: updateConfig
       })
+      if (authStore.isSystemAdmin) {
+        await updateKnowledgeBaseVisibility(props.kbId, formData.value.visibility)
+      }
 
       // 2. 更新完整配置（模型、分块、多模态、存储引擎、知识图谱等）
       const config: KBModelConfigRequest = {

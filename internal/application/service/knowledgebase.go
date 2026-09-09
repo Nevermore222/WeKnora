@@ -106,6 +106,11 @@ func (s *knowledgeBaseService) CreateKnowledgeBase(ctx context.Context,
 	if uid, ok := types.UserIDFromContext(ctx); ok && !types.IsSyntheticUserID(uid) {
 		kb.CreatorID = uid
 	}
+	if types.IsSystemAdminFromContext(ctx) {
+		kb.Visibility = types.ResourceVisibilityPublic
+	} else {
+		kb.Visibility = types.ResourceVisibilityWorkspace
+	}
 	kb.EnsureDefaults()
 	applyTenantDefaultStorageProvider(ctx, kb)
 
@@ -266,6 +271,55 @@ func (s *knowledgeBaseService) GetKnowledgeBasesByIDsOnly(ctx context.Context, i
 		}
 	}
 	return kbs, nil
+}
+
+// ListVisibleKnowledgeBases returns the knowledge-base catalog shown in the
+// main menu. It is intentionally separate from ListKnowledgeBases, whose
+// tenant-strict semantics are used by retrieval and shared-agent internals.
+func (s *knowledgeBaseService) ListVisibleKnowledgeBases(ctx context.Context) ([]*types.KnowledgeBase, error) {
+	tenantID := types.MustTenantIDFromContext(ctx)
+	userID, _ := types.UserIDFromContext(ctx)
+	var (
+		kbs []*types.KnowledgeBase
+		err error
+	)
+	if types.IsSystemAdminFromContext(ctx) {
+		kbs, err = s.repo.ListKnowledgeBases(ctx)
+	} else {
+		kbs, err = s.repo.ListVisibleKnowledgeBases(ctx, tenantID, userID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	visible := make([]*types.KnowledgeBase, 0, len(kbs))
+	byTenant := make(map[uint64][]*types.KnowledgeBase)
+	for _, kb := range kbs {
+		if kb.IsTemporary {
+			continue
+		}
+		kb.EnsureDefaults()
+		kb.ReadOnly = !types.IsSystemAdminFromContext(ctx) &&
+			(kb.TenantID != tenantID || kb.CreatorID != userID)
+		_ = s.FillKnowledgeBaseCounts(ctx, kb)
+		visible = append(visible, kb)
+		byTenant[kb.TenantID] = append(byTenant[kb.TenantID], kb)
+	}
+	if userID != "" {
+		for ownerTenantID, tenantKBs := range byTenant {
+			s.applyUserKBPins(ctx, ownerTenantID, userID, tenantKBs)
+		}
+		sort.SliceStable(visible, func(i, j int) bool {
+			if visible[i].IsPinned != visible[j].IsPinned {
+				return visible[i].IsPinned
+			}
+			if visible[i].IsPinned && visible[j].IsPinned && visible[i].PinnedAt != nil && visible[j].PinnedAt != nil &&
+				!visible[i].PinnedAt.Equal(*visible[j].PinnedAt) {
+				return visible[i].PinnedAt.After(*visible[j].PinnedAt)
+			}
+			return visible[i].CreatedAt.After(visible[j].CreatedAt)
+		})
+	}
+	return visible, nil
 }
 
 // ListKnowledgeBases returns all knowledge bases for a tenant
@@ -476,6 +530,25 @@ func (s *knowledgeBaseService) UpdateKnowledgeBase(ctx context.Context,
 	}
 
 	logger.Infof(ctx, "Knowledge base updated successfully, ID: %s, name: %s", kb.ID, kb.Name)
+	return kb, nil
+}
+
+func (s *knowledgeBaseService) UpdateVisibility(ctx context.Context, id string, visibility string) (*types.KnowledgeBase, error) {
+	if !types.IsSystemAdminFromContext(ctx) {
+		return nil, apperrors.NewForbiddenError("system administrator required")
+	}
+	if visibility != types.ResourceVisibilityPublic && visibility != types.ResourceVisibilityPrivate {
+		return nil, apperrors.NewBadRequestError("visibility must be public or private")
+	}
+	kb, err := s.repo.GetKnowledgeBaseByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	kb.Visibility = visibility
+	kb.UpdatedAt = time.Now()
+	if err := s.repo.UpdateKnowledgeBase(ctx, kb); err != nil {
+		return nil, err
+	}
 	return kb, nil
 }
 

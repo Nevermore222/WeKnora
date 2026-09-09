@@ -37,6 +37,12 @@ const (
 	FAQQuestionIndexModeSeparate FAQQuestionIndexMode = "separate"
 )
 
+const (
+	ResourceVisibilityWorkspace = "workspace"
+	ResourceVisibilityPublic    = "public"
+	ResourceVisibilityPrivate   = "private"
+)
+
 // KnowledgeBase represents a knowledge base entity
 type KnowledgeBase struct {
 	// Unique identifier of the knowledge base
@@ -57,6 +63,10 @@ type KnowledgeBase struct {
 	// Nullable for backward compatibility with rows created before the
 	// RBAC migration backfilled the column to the tenant Owner.
 	CreatorID string `yaml:"creator_id"              json:"creator_id"              gorm:"type:varchar(36);index"`
+	// Visibility controls access scope: workspace (own tenant), public (all
+	// authenticated workspaces, read-only outside the owner tenant), or private
+	// (creator and system administrators only).
+	Visibility string `yaml:"visibility"              json:"visibility"              gorm:"type:varchar(20);not null;default:'workspace';index"`
 	// OrganizationNodeID is the optional tenant-local hierarchy assignment.
 	// Assigning it never changes the KB ID, documents, vectors, or processing state.
 	OrganizationNodeID *string `yaml:"organization_node_id" json:"organization_node_id,omitempty" gorm:"type:varchar(36);index"`
@@ -124,6 +134,8 @@ type KnowledgeBase struct {
 	ProcessingCount int64 `yaml:"processing_count"        json:"processing_count"        gorm:"-"`
 	// ShareCount indicates the number of organizations this knowledge base is shared with (not stored in database)
 	ShareCount int64 `yaml:"share_count"             json:"share_count"             gorm:"-"`
+	// ReadOnly is computed for the current caller and never persisted.
+	ReadOnly bool `yaml:"-" json:"read_only,omitempty" gorm:"-"`
 	// CreatorName 是 CreatorID 对应用户的展示名（username / email 等），
 	// 仅在列表场景由 handler 批量回填，不落库；为空表示创建者无法解析（用户已删除、
 	// CreatorID 为空的老数据等）。前端用它在卡片来源徽章上做 mine vs tenant 的二分。
@@ -544,6 +556,9 @@ func (f *FAQConfig) Scan(value interface{}) error {
 func (kb *KnowledgeBase) EnsureDefaults() {
 	if kb == nil {
 		return
+	}
+	if kb.Visibility == "" {
+		kb.Visibility = ResourceVisibilityWorkspace
 	}
 	if kb.Type == "" {
 		kb.Type = KnowledgeBaseTypeDocument

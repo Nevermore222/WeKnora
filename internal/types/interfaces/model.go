@@ -3,10 +3,10 @@ package interfaces
 import (
 	"context"
 
+	"github.com/Tencent/Xelora/internal/models/asr"
 	"github.com/Tencent/Xelora/internal/models/chat"
 	"github.com/Tencent/Xelora/internal/models/embedding"
 	"github.com/Tencent/Xelora/internal/models/rerank"
-	"github.com/Tencent/Xelora/internal/models/asr"
 	"github.com/Tencent/Xelora/internal/models/vlm"
 	"github.com/Tencent/Xelora/internal/types"
 )
@@ -19,6 +19,8 @@ type ModelService interface {
 	GetModelByID(ctx context.Context, id string) (*types.Model, error)
 	// ListModels lists all models
 	ListModels(ctx context.Context) ([]*types.Model, error)
+	// SetDefaultModel marks a system-administrator-owned active model as the global default for its type.
+	SetDefaultModel(ctx context.Context, id string) (*types.Model, error)
 	// UpdateModel updates a model
 	UpdateModel(ctx context.Context, model *types.Model) error
 	// DeleteModel deletes a model
@@ -63,7 +65,10 @@ type ModelRepository interface {
 	Update(ctx context.Context, model *types.Model) error
 	// Delete deletes a model
 	Delete(ctx context.Context, tenantID uint64, id string) error
+	// SetDefault atomically marks one administrator-owned model as the global
+	// default for its type.
+	SetDefault(ctx context.Context, tenantID uint64, modelType types.ModelType, id string) error
 	// ClearDefaultByType clears the default flag for all models of a specific type
 	// optionally excluding a specific model ID.
-	ClearDefaultByType(ctx context.Context, tenantID uint, modelType types.ModelType, excludeID string) error
+	ClearDefaultByType(ctx context.Context, tenantID uint64, modelType types.ModelType, excludeID string) error
 }

@@ -95,6 +95,9 @@ func (r *fakeKBRepo) GetKnowledgeBaseByIDs(_ context.Context, _ []string) ([]*ty
 func (r *fakeKBRepo) ListKnowledgeBases(_ context.Context) ([]*types.KnowledgeBase, error) {
 	return nil, nil
 }
+func (r *fakeKBRepo) ListVisibleKnowledgeBases(_ context.Context, _ uint64, _ string) ([]*types.KnowledgeBase, error) {
+	return nil, nil
+}
 func (r *fakeKBRepo) ListKnowledgeBasesByTenantID(_ context.Context, _ uint64) ([]*types.KnowledgeBase, error) {
 	return nil, nil
 }

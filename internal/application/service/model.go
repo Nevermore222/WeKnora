@@ -20,6 +20,13 @@ import (
 // ErrModelNotFound is returned when a model cannot be found in the repository
 var ErrModelNotFound = errors.New("model not found")
 
+var (
+	ErrDefaultModelRequiresSystemAdmin = errors.New("system administrator permission is required")
+	ErrDefaultModelNotTenantOwned      = errors.New("only administrator-owned models can be set as default")
+	ErrModelNotTenantOwned             = errors.New("model is not owned by the current workspace")
+	ErrDefaultModelInactive            = errors.New("only active models can be set as default")
+)
+
 // modelService implements the model service interface
 type modelService struct {
 	repo          interfaces.ModelRepository
@@ -177,7 +184,7 @@ func (s *modelService) GetModelByID(ctx context.Context, id string) (*types.Mode
 
 	// Check model status
 	if model.Status == types.ModelStatusActive {
-		return model, nil
+		return modelForCaller(model, tenantID), nil
 	}
 
 	if model.Status == types.ModelStatusDownloading {
@@ -210,8 +217,52 @@ func (s *modelService) ListModels(ctx context.Context) ([]*types.Model, error) {
 		return nil, err
 	}
 
+	for i, model := range models {
+		models[i] = modelForCaller(model, tenantID)
+	}
 	logger.Infof(ctx, "Retrieved %d models successfully", len(models))
 	return models, nil
+}
+
+// modelForCaller presents a foreign global-default model as built-in. Runtime
+// callers still receive its capability fields, while response DTOs redact the
+// owning administrator's endpoint metadata and the UI treats it as read-only.
+func modelForCaller(model *types.Model, tenantID uint64) *types.Model {
+	if model == nil || model.TenantID == tenantID || !model.IsDefault {
+		return model
+	}
+	clone := *model
+	clone.IsBuiltin = true
+	return &clone
+}
+
+// SetDefaultModel marks one active model owned by the system administrator's
+// active workspace as the global default for its type. All workspaces can read
+// and use the selected model, but only a system administrator can change it.
+func (s *modelService) SetDefaultModel(ctx context.Context, id string) (*types.Model, error) {
+	if !types.IsSystemAdminFromContext(ctx) {
+		return nil, ErrDefaultModelRequiresSystemAdmin
+	}
+	tenantID := types.MustTenantIDFromContext(ctx)
+	model, err := s.repo.GetByID(ctx, tenantID, id)
+	if err != nil {
+		return nil, err
+	}
+	if model == nil {
+		return nil, ErrModelNotFound
+	}
+	if model.TenantID != tenantID || model.IsBuiltin {
+		return nil, ErrDefaultModelNotTenantOwned
+	}
+	if model.Status != types.ModelStatusActive {
+		return nil, ErrDefaultModelInactive
+	}
+	if err := s.repo.SetDefault(ctx, tenantID, model.Type, model.ID); err != nil {
+		return nil, err
+	}
+	model.IsDefault = true
+	logger.Infof(ctx, "Global default model updated: owner_tenant=%d type=%s model=%s", tenantID, model.Type, model.ID)
+	return model, nil
 }
 
 // UpdateModel updates an existing model in the repository
@@ -228,8 +279,13 @@ func (s *modelService) UpdateModel(ctx context.Context, model *types.Model) erro
 		})
 		return err
 	}
-	if existingModel != nil && existingModel.IsBuiltin {
-		logger.Warnf(ctx, "Attempted to update builtin model: %s", model.ID)
+	if existingModel == nil {
+		return ErrModelNotFound
+	}
+	if existingModel.TenantID != tenantID {
+		return ErrModelNotTenantOwned
+	}
+	if existingModel.IsBuiltin {
 		return errors.New("builtin models cannot be updated")
 	}
 
@@ -260,8 +316,8 @@ func (s *modelService) UpdateModelCredentials(
 	if err != nil {
 		return nil, err
 	}
-	if existing == nil {
-		return nil, ErrModelNotFound
+	if existing.TenantID != tenantID {
+		return nil, ErrModelNotTenantOwned
 	}
 	if existing.IsBuiltin {
 		return nil, errors.New("builtin models cannot have credentials modified")
@@ -293,8 +349,8 @@ func (s *modelService) ClearModelCredential(ctx context.Context, id, field strin
 	if err != nil {
 		return err
 	}
-	if existing == nil {
-		return ErrModelNotFound
+	if existing.TenantID != tenantID {
+		return ErrModelNotTenantOwned
 	}
 	if existing.IsBuiltin {
 		return errors.New("builtin models cannot have credentials modified")
@@ -341,8 +397,13 @@ func (s *modelService) DeleteModel(ctx context.Context, id string) error {
 		})
 		return err
 	}
-	if existingModel != nil && existingModel.IsBuiltin {
-		logger.Warnf(ctx, "Attempted to delete builtin model: %s", id)
+	if existingModel == nil {
+		return ErrModelNotFound
+	}
+	if existingModel.TenantID != tenantID {
+		return ErrModelNotTenantOwned
+	}
+	if existingModel.IsBuiltin {
 		return errors.New("builtin models cannot be deleted")
 	}
 

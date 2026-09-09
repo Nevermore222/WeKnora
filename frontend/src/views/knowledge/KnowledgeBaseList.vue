@@ -1,8 +1,5 @@
 <template>
   <div class="kb-list-container">
-    <ListSpaceSidebar v-if="!authStore.isLiteMode" v-model="spaceSelection" :count-all="allKnowledgeBases"
-      :count-mine="kbs.length" :count-by-org="effectiveSharedCountByOrg" :count-favorites="kbFavoritesCount"
-      :count-recents="kbRecentsCount" />
     <div class="kb-list-content">
       <div class="header" style="--wails-draggable: drag">
         <div class="header-title" style="--wails-draggable: drag">
@@ -33,22 +30,23 @@
           </div>
           <div class="classification-tree" role="tree" aria-label="知识库筛选分类">
             <div v-for="module in classificationModules" :key="module.id" class="classification-module" :class="{ active: selectedClassifications[module.id] }">
-              <button type="button" class="classification-tree-row classification-module-row" :aria-expanded="isClassificationModuleExpanded(module.id)" @click="toggleClassificationModule(module.id)">
+              <button type="button" role="treeitem" class="classification-tree-row classification-module-row" :aria-expanded="isClassificationModuleExpanded(module.id)" @click="toggleClassificationModule(module.id)">
                 <t-icon :name="isClassificationModuleExpanded(module.id) ? 'chevron-down' : 'chevron-right'" size="13px" />
                 <t-icon name="folder-open" size="15px" />
                 <strong>{{ module.name }}</strong>
                 <span class="classification-selected-label">{{ selectedClassificationLabel(module) }}</span>
               </button>
-              <div v-show="isClassificationModuleExpanded(module.id)" class="classification-tree-children">
-                <button type="button" class="classification-tree-row classification-all-row" :class="{ selected: !selectedClassifications[module.id] }" @click="selectClassification(module.id, '')">
+              <div v-show="isClassificationModuleExpanded(module.id)" class="classification-tree-children" role="group">
+                <button type="button" role="treeitem" class="classification-tree-row classification-all-row" :aria-selected="!selectedClassifications[module.id]" :class="{ selected: !selectedClassifications[module.id] }" @click="selectClassification(module.id, '')">
                   <span class="tree-indent"></span><span class="tree-leaf">·</span><span>全部{{ module.name }}</span>
                   <small>{{ classificationResourceCount }}</small>
+                  <t-icon v-if="!selectedClassifications[module.id]" class="tree-selected-icon" name="check" size="14px" aria-hidden="true" />
                 </button>
                 <ClassificationTreeOption v-for="option in module.options || []" :key="option.id" :option="option" :module-id="module.id" :selected-id="selectedClassifications[module.id] || ''" :expanded-ids="expandedClassificationOptions" @select="selectClassification" @toggle="toggleClassificationOption" />
               </div>
             </div>
           </div>
-          <t-button v-if="authStore.hasRole('admin')" variant="outline" size="small" class="classification-manage-btn" @click="handleManageClassification">
+          <t-button v-if="authStore.isSystemAdmin" variant="outline" size="small" class="classification-manage-btn" @click="handleManageClassification">
             <template #icon><t-icon name="setting-1" /></template>
             自定义筛选结构
           </t-button>
@@ -891,9 +889,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, watch, nextTick, defineComponent, h } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { MessagePlugin, Icon as TIcon } from 'tdesign-vue-next'
+import { MessagePlugin } from 'tdesign-vue-next'
 import { deleteKnowledgeBase, togglePinKnowledgeBase } from '@/api/knowledge-base'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { formatStringDate } from '@/utils/index'
@@ -905,8 +903,8 @@ import { listOrganizationSharedKnowledgeBases, type SharedKnowledgeBase, type Or
 import { mergeAllScopeKnowledgeBases, type OwnedKnowledgeBase, type SharedKnowledgeBaseLike } from './kbListMerge'
 import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
-import ListSpaceSidebar from '@/components/ListSpaceSidebar.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
+import ClassificationTreeOption from '@/components/ClassificationTreeOption.vue'
 import { listClassifications, createClassificationModule, createClassificationOption, updateClassificationModule, updateClassificationOption, deleteClassificationModule, deleteClassificationOption, type ClassificationModule, type ClassificationOption } from '@/api/classification'
 import { isContextualGuideDone, markContextualGuideDone } from '@/config/contextualGuides'
 import { useTenantModelReadiness } from '@/composables/useTenantModelReadiness'
@@ -971,6 +969,8 @@ interface KB {
   processing_count?: number;
   share_count?: number;
   is_pinned?: boolean;
+  read_only?: boolean;
+  visibility?: 'workspace' | 'public' | 'private';
   // creator_id is the owner-id matched against authStore.user.id when
   // gating the per-card more-menu (Settings / Delete). Empty for legacy
   // KBs created before PR 5; those fall back to the role gate.
@@ -1021,44 +1021,6 @@ const classificationManageModule = ref<ClassificationModule | null>(null)
 const expandedClassificationModules = ref<Set<string>>(new Set())
 const expandedClassificationOptions = ref<Set<string>>(new Set())
 
-const ClassificationTreeOption = defineComponent({
-  name: 'ClassificationTreeOption',
-  props: {
-    option: { type: Object as () => ClassificationOption, required: true },
-    moduleId: { type: String, required: true },
-    selectedId: { type: String, required: true },
-    expandedIds: { type: Object as () => Set<string>, required: true },
-  },
-  emits: ['select', 'toggle'],
-  setup(props, { emit }) {
-    return () => {
-      const hasChildren = !!props.option.children?.length
-      const isExpanded = props.expandedIds.has(props.option.id) || props.selectedId === props.option.id
-      return h('div', { class: 'classification-tree-node' }, [
-        h('button', {
-          type: 'button',
-          class: ['classification-tree-row', 'classification-option-row', { selected: props.selectedId === props.option.id }],
-          onClick: () => emit('select', props.moduleId, props.option.id),
-        }, [
-          h('span', { class: 'tree-indent' }),
-          h('span', {
-            class: 'tree-toggle',
-            onClick: (event: MouseEvent) => { if (hasChildren) { event.stopPropagation(); emit('toggle', props.option.id) } },
-          }, hasChildren ? [h(TIcon, { name: isExpanded ? 'chevron-down' : 'chevron-right', size: '12px' })] : undefined),
-          h(TIcon, { name: hasChildren ? 'folder-open' : 'file', size: '14px' }),
-          h('span', props.option.name),
-        ]),
-        hasChildren && isExpanded
-          ? h('div', { class: 'classification-tree-children nested' }, props.option.children!.map(child => h(ClassificationTreeOption, {
-            key: child.id, option: child, 'module-id': props.moduleId, 'selected-id': props.selectedId,
-            'expanded-ids': props.expandedIds, onSelect: (moduleId: string, id: string) => emit('select', moduleId, id),
-            onToggle: (id: string) => emit('toggle', id),
-          })))
-          : null,
-      ])
-    }
-  },
-})
 const loadClassifications = async () => {
   try { const res = await listClassifications('knowledge_base'); classificationModules.value = (res.data || []).filter(m => m.enabled); for (const m of classificationModules.value) selectedClassifications.value[m.id] ||= '' } catch { classificationModules.value = [] }
 }
@@ -1551,6 +1513,9 @@ watch(creatorFilter, () => {
 })
 
 onMounted(async () => {
+  // The legacy space sidebar is intentionally hidden on this page; always
+  // render the complete visible catalog, including system-public resources.
+  spaceSelection.value = 'all'
   await loadClassifications()
   fetchList().then(() => {
     // 检查路由参数中是否有需要高亮的知识库ID
@@ -1628,9 +1593,10 @@ const handleSettings = (kb: KB) => {
 // those as tenant-owned (Admin+ may manage) so existing KBs aren't
 // suddenly unmanageable for everyone.
 function canManageKBCard(kb: KB): boolean {
+  if (kb.read_only) return false
   const userId = authStore.user?.id || ''
-  if (kb.creator_id && userId && kb.creator_id === userId) return true
-  return authStore.hasRole('admin')
+  if (authStore.isSystemAdmin) return true
+  return !!(kb.creator_id && userId && kb.creator_id === userId)
 }
 
 // isMyKb 仅用于卡片右下角徽章在「我创建」与「同租户其他成员创建」之间切换。
@@ -2368,10 +2334,10 @@ const handleUploadFinishedEvent = (event: Event) => {
 .kb-classification-panel :deep(.classification-tree-row) {
   display: flex;
   width: 100%;
-  min-height: 32px;
+  min-height: 36px;
   align-items: center;
-  gap: 7px;
-  padding: 0 7px;
+  gap: 5px;
+  padding: 2px 7px;
   border: 0;
   border-radius: 5px;
   outline: none;
@@ -2388,6 +2354,9 @@ const handleUploadFinishedEvent = (event: Event) => {
   background: var(--td-bg-color-secondarycontainer);
   color: var(--td-text-color-primary);
 }
+.kb-classification-panel :deep(.classification-tree-row:active) {
+  background: var(--td-bg-color-component-active);
+}
 .kb-classification-panel :deep(.classification-tree-row:focus-visible) {
   box-shadow: 0 0 0 2px var(--td-brand-color-focus);
 }
@@ -2395,9 +2364,10 @@ const handleUploadFinishedEvent = (event: Event) => {
   background: var(--td-brand-color-light);
   color: var(--td-brand-color);
   font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--td-brand-color-focus);
 }
 .classification-module-row {
-  min-height: 36px !important;
+  min-height: 38px !important;
   color: var(--td-text-color-primary) !important;
   font-size: 13px !important;
 }
@@ -2423,15 +2393,15 @@ const handleUploadFinishedEvent = (event: Event) => {
   white-space: nowrap;
 }
 .classification-tree-children {
-  margin: 2px 0 0 12px;
-  padding: 2px 0 2px 12px;
+  margin: 2px 0 0 14px;
+  padding: 2px 0 2px 10px;
   border-left: 1px solid var(--td-component-stroke);
 }
 .classification-tree-children.nested {
   margin-left: 18px;
   padding-left: 8px;
 }
-.classification-option-row { min-height: 31px !important; }
+.classification-option-row { min-height: 34px !important; }
 .classification-option-row > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2444,9 +2414,13 @@ const handleUploadFinishedEvent = (event: Event) => {
 }
 .tree-indent { flex: 0 0 6px; }
 .tree-leaf {
-  width: 12px;
+  width: 24px;
   color: var(--td-text-color-placeholder);
   text-align: center;
+}
+.tree-selected-icon {
+  flex: 0 0 auto;
+  color: var(--td-brand-color);
 }
 .tree-toggle {
   display: inline-flex;

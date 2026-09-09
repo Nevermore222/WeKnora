@@ -319,6 +319,8 @@ func resolveKBAccessOnce(
 		return nil, errKBAccessUnauthorized
 	}
 	callerTenantRole := types.TenantRoleFromContext(ctx)
+	callerUserID, _ := types.UserIDFromContext(ctx)
+	isSystemAdmin := types.IsSystemAdminFromContext(ctx)
 
 	kb, err := kbService.GetKnowledgeBaseByID(ctx, kbID)
 	if err != nil {
@@ -331,16 +333,46 @@ func resolveKBAccessOnce(
 		return nil, errKBAccessNotFound
 	}
 
-	// 1. Own KB.
-	if kb.TenantID == tenantID {
+	// System administrators may read and write every KB across workspaces.
+	if isSystemAdmin {
 		return &KBAccess{
 			KnowledgeBase:     kb,
-			EffectiveTenantID: tenantID,
+			EffectiveTenantID: kb.TenantID,
 			Permission:        types.OrgRoleAdmin,
 		}, nil
 	}
 
-	// 2. Org-shared KB. Plan 3's 3-D cap is applied inside
+	// 1. Own-workspace KB. Private rows are creator-only; all other rows are
+	// readable by workspace members. Non-creators always receive Viewer so
+	// tenant Admin/Owner roles cannot mutate another user's resource.
+	if kb.TenantID == tenantID {
+		if kb.Visibility == types.ResourceVisibilityPrivate && kb.CreatorID != callerUserID {
+			return nil, errKBAccessForbidden
+		}
+		permission := types.OrgRoleViewer
+		if kb.CreatorID != "" && kb.CreatorID == callerUserID {
+			permission = types.OrgRoleAdmin
+		}
+		if !permission.HasPermission(requiredPermission) {
+			return nil, errKBAccessForbidden
+		}
+		return &KBAccess{
+			KnowledgeBase:     kb,
+			EffectiveTenantID: tenantID,
+			Permission:        permission,
+		}, nil
+	}
+
+	// 2. System-public KBs are readable across workspaces but never writable.
+	if kb.Visibility == types.ResourceVisibilityPublic && requiredPermission == types.OrgRoleViewer {
+		return &KBAccess{
+			KnowledgeBase:     kb,
+			EffectiveTenantID: kb.TenantID,
+			Permission:        types.OrgRoleViewer,
+		}, nil
+	}
+
+	// 3. Org-shared KB. Plan 3's 3-D cap is applied inside
 	//    CheckTenantKBPermission; we just check the result satisfies
 	//    the minimum requirement.
 	if kbShareService != nil {
@@ -359,7 +391,7 @@ func resolveKBAccessOnce(
 		}
 	}
 
-	// 3. Shared agent that carries this KB — only ever grants read.
+	// 4. Shared agent that carries this KB — only ever grants read.
 	if requiredPermission == types.OrgRoleViewer && agentShareService != nil {
 		if access := resolveSharedAgentAccess(ctx, c, tenantID, callerTenantRole, kb, agentShareService); access != nil {
 			return access, nil

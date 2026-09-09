@@ -17,18 +17,15 @@ type classificationService struct {
 func NewClassificationService(repo interfaces.ClassificationRepository) interfaces.ClassificationService {
 	return &classificationService{repo: repo}
 }
-func tenant(ctx context.Context) (uint64, error) {
-	id, ok := types.TenantIDFromContext(ctx)
-	if !ok || id == 0 {
-		return 0, errors.New("tenant context is required")
-	}
-	return id, nil
+
+const systemClassificationTenantID uint64 = 0
+
+func classificationTenantID() uint64 {
+	return systemClassificationTenantID
 }
+
 func (s *classificationService) List(ctx context.Context, resourceType string) ([]*types.ClassificationModule, error) {
-	tid, e := tenant(ctx)
-	if e != nil {
-		return nil, e
-	}
+	tid := classificationTenantID()
 	mods, e := s.repo.ListModules(ctx, tid, resourceType)
 	if e != nil {
 		return nil, e
@@ -84,10 +81,7 @@ func (s *classificationService) List(ctx context.Context, resourceType string) (
 	return mods, nil
 }
 func (s *classificationService) CreateModule(ctx context.Context, resourceType string, name string, sortOrder int) (*types.ClassificationModule, error) {
-	tid, e := tenant(ctx)
-	if e != nil {
-		return nil, e
-	}
+	tid := classificationTenantID()
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("module name is required")
@@ -96,10 +90,7 @@ func (s *classificationService) CreateModule(ctx context.Context, resourceType s
 	return v, s.repo.CreateModule(ctx, v)
 }
 func (s *classificationService) UpdateModule(ctx context.Context, resourceType string, id string, name *string, sortOrder *int, enabled *bool) (*types.ClassificationModule, error) {
-	tid, e := tenant(ctx)
-	if e != nil {
-		return nil, e
-	}
+	tid := classificationTenantID()
 	v, e := s.repo.GetModule(ctx, tid, id, resourceType)
 	if e != nil {
 		return nil, e
@@ -116,17 +107,11 @@ func (s *classificationService) UpdateModule(ctx context.Context, resourceType s
 	return v, s.repo.UpdateModule(ctx, v)
 }
 func (s *classificationService) DeleteModule(ctx context.Context, resourceType string, id string) error {
-	tid, e := tenant(ctx)
-	if e != nil {
-		return e
-	}
-	return s.repo.DeleteModule(ctx, tid, id, resourceType)
+	return s.repo.DeleteModule(ctx, classificationTenantID(), id, resourceType)
 }
 func (s *classificationService) CreateOption(ctx context.Context, resourceType string, moduleID string, parentID *string, name string, sortOrder int) (*types.ClassificationOption, error) {
-	tid, e := tenant(ctx)
-	if e != nil {
-		return nil, e
-	}
+	tid := classificationTenantID()
+	var e error
 	if _, e = s.repo.GetModule(ctx, tid, moduleID, resourceType); e != nil {
 		return nil, e
 	}
@@ -147,10 +132,7 @@ func (s *classificationService) CreateOption(ctx context.Context, resourceType s
 	return v, createErr
 }
 func (s *classificationService) UpdateOption(ctx context.Context, resourceType string, id string, name *string, sortOrder *int, enabled *bool) (*types.ClassificationOption, error) {
-	tid, e := tenant(ctx)
-	if e != nil {
-		return nil, e
-	}
+	tid := classificationTenantID()
 	v, e := s.repo.GetOption(ctx, tid, id)
 	if e != nil {
 		return nil, e
@@ -171,11 +153,7 @@ func (s *classificationService) UpdateOption(ctx context.Context, resourceType s
 	return v, s.repo.UpdateOption(ctx, v)
 }
 func (s *classificationService) DeleteOption(ctx context.Context, resourceType string, id string) error {
-	tid, e := tenant(ctx)
-	if e != nil {
-		return e
-	}
-	// Verify resource type before deletion
+	tid := classificationTenantID()
 	opt, e := s.repo.GetOption(ctx, tid, id)
 	if e != nil {
 		return e
@@ -186,10 +164,8 @@ func (s *classificationService) DeleteOption(ctx context.Context, resourceType s
 	return s.repo.DeleteOption(ctx, tid, id)
 }
 func (s *classificationService) ValidateSelections(ctx context.Context, resourceType string, selections map[string][]string) error {
-	tid, e := tenant(ctx)
-	if e != nil {
-		return e
-	}
+	tid := classificationTenantID()
+	var e error
 	for moduleID, ids := range selections {
 		if _, e = s.repo.GetModule(ctx, tid, moduleID, resourceType); e != nil {
 			return e

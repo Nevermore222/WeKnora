@@ -39,6 +39,10 @@ type CustomAgentService interface {
 	//   - Possible errors such as insufficient permissions, etc.
 	ListAgents(ctx context.Context) ([]*types.CustomAgent, error)
 
+	// ListVisibleAgents returns the main-menu agent catalog for the current
+	// caller, including read-only public agents from other workspaces.
+	ListVisibleAgents(ctx context.Context) ([]*types.CustomAgent, error)
+
 	// UpdateAgent updates agent information
 	// Parameters:
 	//   - ctx: Context information
@@ -47,6 +51,7 @@ type CustomAgentService interface {
 	//   - Updated agent object
 	//   - Possible errors such as not existing, insufficient permissions, cannot modify built-in, etc.
 	UpdateAgent(ctx context.Context, agent *types.CustomAgent) (*types.CustomAgent, error)
+	UpdateVisibility(ctx context.Context, id string, visibility string) (*types.CustomAgent, error)
 
 	// DeleteAgent deletes an agent
 	// Parameters:
@@ -100,6 +105,14 @@ type CustomAgentRepository interface {
 	//   - Agent object, if found
 	//   - Possible errors such as record not existing, database errors, etc.
 	GetAgentByID(ctx context.Context, id string, tenantID uint64) (*types.CustomAgent, error)
+
+	// ListVisibleAgents returns own-workspace readable agents plus public custom
+	// agents from other workspaces. Private agents are limited to their creator.
+	ListVisibleAgents(ctx context.Context, tenantID uint64, userID string) ([]*types.CustomAgent, error)
+
+	// GetAgentByIDOnly queries a custom agent without tenant scoping. Callers
+	// must enforce visibility before returning it.
+	GetAgentByIDOnly(ctx context.Context, id string) (*types.CustomAgent, error)
 
 	// ListAgentsByTenantID lists all agents for a specific tenant
 	// Parameters:

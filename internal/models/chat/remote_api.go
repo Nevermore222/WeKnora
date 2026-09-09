@@ -36,6 +36,9 @@ type RemoteAPIChat struct {
 	adapter providerAdapter
 	// thinkingOverride 来自 extra_config.thinking_control，非 nil 时覆盖 adapter.Thinking()。
 	thinkingOverride ThinkingStrategy
+	// forceRawHTTP allows a model-specific compatibility override for providers
+	// whose OpenAI-compatible SSE stream is rejected by the SDK parser.
+	forceRawHTTP bool
 }
 
 // NewRemoteAPIChat 创建远程 API 聊天实例
@@ -82,10 +85,12 @@ func NewRemoteAPIChat(chatConfig *ChatConfig) (*RemoteAPIChat, error) {
 	}
 
 	modelName := chatConfig.ModelName
+	forceRawHTTP := false
 	if chatConfig.ExtraConfig != nil {
 		if override := strings.TrimSpace(chatConfig.ExtraConfig["remote_model_name"]); override != "" {
 			modelName = override
 		}
+		forceRawHTTP = parseBoolExtraConfig(chatConfig.ExtraConfig["force_raw_http"])
 	}
 	if providerName == provider.ProviderXeloraCloud {
 		if chatConfig.AppID == "" {
@@ -108,6 +113,7 @@ func NewRemoteAPIChat(chatConfig *ChatConfig) (*RemoteAPIChat, error) {
 		customHeaders:    chatConfig.CustomHeaders,
 		adapter:          resolveProvider(providerName, modelName),
 		thinkingOverride: parseThinkingOverride(chatConfig.ExtraConfig),
+		forceRawHTTP:     forceRawHTTP,
 	}, nil
 }
 
@@ -149,7 +155,7 @@ func (c *RemoteAPIChat) buildOutbound(
 		return nil, "", false, err
 	}
 	endpoint = c.adapter.Endpoint(c.baseURL, c.modelID, isStream)
-	useRawHTTP = useRaw || c.adapter.ForceRawHTTP() || endpoint != ""
+	useRawHTTP = useRaw || c.adapter.ForceRawHTTP() || endpoint != "" || c.forceRawHTTP
 	return body, endpoint, useRawHTTP, nil
 }
 

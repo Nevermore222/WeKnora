@@ -28,7 +28,7 @@ func (r *modelRepository) Create(ctx context.Context, m *types.Model) error {
 func (r *modelRepository) GetByID(ctx context.Context, tenantID uint64, id string) (*types.Model, error) {
 	var m types.Model
 	if err := r.db.WithContext(ctx).Where("id = ?", id).Where(
-		"(tenant_id = ? OR is_builtin = true)", tenantID,
+		"(tenant_id = ? OR is_builtin = true OR is_default = true)", tenantID,
 	).First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -44,7 +44,7 @@ func (r *modelRepository) List(
 ) ([]*types.Model, error) {
 	var models []*types.Model
 	query := r.db.WithContext(ctx).Where(
-		"(tenant_id = ? OR is_builtin = true)", tenantID,
+		"(tenant_id = ? OR is_builtin = true OR is_default = true)", tenantID,
 	)
 
 	if modelType != "" {
@@ -77,11 +77,41 @@ func (r *modelRepository) Delete(ctx context.Context, tenantID uint64, id string
 	).Delete(&types.Model{}).Error
 }
 
+// SetDefault atomically sets one administrator-owned model as the global
+// default for its type. tenantID still constrains the target row, while the
+// clearing step spans all tenants because ordinary users consume this binding
+// across workspaces.
+func (r *modelRepository) SetDefault(
+	ctx context.Context,
+	tenantID uint64,
+	modelType types.ModelType,
+	id string,
+) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&types.Model{}).
+			Where("type = ? AND id <> ? AND is_default = ?", modelType, id, true).
+			Update("is_default", false).Error; err != nil {
+			return err
+		}
+
+		result := tx.Model(&types.Model{}).
+			Where("id = ? AND tenant_id = ? AND type = ?", id, tenantID, modelType).
+			Update("is_default", true)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+}
+
 // ClearDefaultByType clears the default flag for all models of a specific type
 // This is a batch operation that updates all matching records in one query
 func (r *modelRepository) ClearDefaultByType(
 	ctx context.Context,
-	tenantID uint,
+	tenantID uint64,
 	modelType types.ModelType,
 	excludeID string,
 ) error {

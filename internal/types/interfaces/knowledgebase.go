@@ -57,6 +57,9 @@ type KnowledgeBaseService interface {
 	//   - List of knowledge base objects
 	//   - Possible errors such as insufficient permissions, etc.
 	ListKnowledgeBases(ctx context.Context) ([]*types.KnowledgeBase, error)
+	// ListVisibleKnowledgeBases returns resources shown in the main menu for
+	// the current caller, including cross-workspace public resources.
+	ListVisibleKnowledgeBases(ctx context.Context) ([]*types.KnowledgeBase, error)
 	// ListKnowledgeBasesByTenantID lists all knowledge bases for a specific tenant (e.g. for shared agent context).
 	ListKnowledgeBasesByTenantID(ctx context.Context, tenantID uint64) ([]*types.KnowledgeBase, error)
 
@@ -74,6 +77,7 @@ type KnowledgeBaseService interface {
 		id string, name string, description string, config *types.KnowledgeBaseConfig,
 	) (*types.KnowledgeBase, error)
 	UpdateClassificationTags(ctx context.Context, id string, tags map[string][]string) (*types.KnowledgeBase, error)
+	UpdateVisibility(ctx context.Context, id string, visibility string) (*types.KnowledgeBase, error)
 
 	// DeleteKnowledgeBase deletes a knowledge base
 	// Parameters:
@@ -182,6 +186,10 @@ type KnowledgeBaseRepository interface {
 	//   - List of knowledge base objects
 	//   - Possible errors such as database errors, etc.
 	ListKnowledgeBases(ctx context.Context) ([]*types.KnowledgeBase, error)
+
+	// ListVisibleKnowledgeBases returns own-workspace readable rows plus public
+	// rows from other workspaces. Private rows are limited to their creator.
+	ListVisibleKnowledgeBases(ctx context.Context, tenantID uint64, userID string) ([]*types.KnowledgeBase, error)
 
 	// ListKnowledgeBasesByTenantID lists all knowledge bases for a specific tenant
 	// Parameters:

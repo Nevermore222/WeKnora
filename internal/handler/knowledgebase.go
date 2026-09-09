@@ -435,12 +435,30 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 		return nil, id, 0, "", apperrors.NewInternalServerError(err.Error())
 	}
 
-	// Check 1: Verify tenant ownership (owner has full access)
+	// Check 1: own-workspace access. Private KBs are creator/system-admin only;
+	// non-creators receive read-only permission even if they are tenant Admin.
+	callerUserID, _ := userID.(string)
+	if types.IsSystemAdminFromContext(ctx) {
+		return kb, id, kb.TenantID, types.OrgRoleAdmin, nil
+	}
 	if kb.TenantID == tenantID.(uint64) {
-		return kb, id, tenantID.(uint64), types.OrgRoleAdmin, nil
+		if kb.Visibility == types.ResourceVisibilityPrivate &&
+			kb.CreatorID != callerUserID && !types.IsSystemAdminFromContext(ctx) {
+			return nil, id, 0, "", apperrors.NewForbiddenError("No permission to access knowledge base")
+		}
+		permission := types.OrgRoleViewer
+		if types.IsSystemAdminFromContext(ctx) || (kb.CreatorID != "" && kb.CreatorID == callerUserID) {
+			permission = types.OrgRoleAdmin
+		}
+		return kb, id, tenantID.(uint64), permission, nil
 	}
 
-	// Check 2: If not owner, check organization shared access
+	// Check 2: system-public knowledge bases are cross-workspace read-only.
+	if kb.Visibility == types.ResourceVisibilityPublic {
+		return kb, id, kb.TenantID, types.OrgRoleViewer, nil
+	}
+
+	// Check 3: If not owner, check organization shared access
 	if h.kbShareService != nil {
 		// Check if caller's tenant has shared access through organization
 		permission, isShared, permErr := h.kbShareService.CheckTenantKBPermission(ctx, id, tenantID.(uint64), callerTenantRole)
@@ -455,7 +473,7 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 		}
 	}
 
-	// Check 3: Shared agent — allow if request has agent_id (and agent can access this KB) OR caller's tenant has any shared agent that can access this KB (e.g. opened from "通过智能体可见" list without agent_id)
+	// Check 4: Shared agent — allow if request has agent_id (and agent can access this KB) OR caller's tenant has any shared agent that can access this KB (e.g. opened from "通过智能体可见" list without agent_id)
 	if h.agentShareService != nil {
 		currentTenantID := tenantID.(uint64)
 		agentID := c.Query("agent_id")
@@ -636,8 +654,9 @@ func (h *KnowledgeBaseHandler) ListKnowledgeBases(c *gin.Context) {
 		return
 	}
 
-	// Get all knowledge bases for this tenant
-	kbs, err := h.service.ListKnowledgeBases(ctx)
+	// Get all knowledge bases visible from this workspace, including system-public
+	// resources from other workspaces.
+	kbs, err := h.service.ListVisibleKnowledgeBases(ctx)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, nil)
 		c.Error(apperrors.NewInternalServerError(err.Error()))
@@ -851,6 +870,26 @@ func (h *KnowledgeBaseHandler) UpdateKnowledgeBase(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    buildKBResponse(kb, h.resolveKBStoreView(ctx, kb, callerTenantID), nil),
+	})
+}
+
+func (h *KnowledgeBaseHandler) UpdateVisibility(c *gin.Context) {
+	var req struct {
+		Visibility string `json:"visibility" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(apperrors.NewBadRequestError("Invalid request parameters"))
+		return
+	}
+	kb, err := h.service.UpdateVisibility(c.Request.Context(), c.Param("id"), req.Visibility)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	callerTenantID := c.GetUint64(types.TenantIDContextKey.String())
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    buildKBResponse(kb, h.resolveKBStoreView(c.Request.Context(), kb, callerTenantID), nil),
 	})
 }
 

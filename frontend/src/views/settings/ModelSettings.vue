@@ -50,6 +50,9 @@
           <div class="model-card__body">
             <div class="model-card__header">
               <h3 class="model-card__title">{{ modelDisplayName(model) }}</h3>
+              <t-tag v-if="model.isDefault" size="small" theme="success" variant="light">
+                {{ $t('model.defaultTag') }}
+              </t-tag>
               <span v-if="model.isBuiltin" class="model-card__lock" :title="$t('modelSettings.builtinTag')"
                 :aria-label="$t('modelSettings.builtinTag')">
                 <t-icon name="lock-on" />
@@ -130,7 +133,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { AddIcon } from 'tdesign-icons-vue-next'
 import { useI18n } from 'vue-i18n'
 import ModelEditorDialog from '@/components/ModelEditorDialog.vue'
-import { listModels, createModel, updateModel as updateModelAPI, deleteModel as deleteModelAPI, type ModelConfig } from '@/api/model'
+import { listModels, createModel, updateModel as updateModelAPI, deleteModel as deleteModelAPI, setDefaultModel as setDefaultModelAPI, type ModelConfig } from '@/api/model'
 import { useAuthStore } from '@/stores/auth'
 import CapabilityDeniedDialog from '@/components/CapabilityDeniedDialog.vue'
 import { shouldShowExternalLink } from '@/utils/externalLinks'
@@ -178,6 +181,7 @@ function convertToLegacyFormat(model: ModelConfig) {
     dimension: model.parameters.embedding_parameters?.dimension,
     supportsDimensionOverride: model.parameters.embedding_parameters?.supports_dimension_override || false,
     isBuiltin: model.is_builtin || false,
+    isDefault: model.is_default || false,
     supportsVision: model.parameters.supports_vision || false,
     customHeaders: model.parameters.custom_headers
       ? Object.entries(model.parameters.custom_headers).map(([key, value]) => ({ key, value: String(value) }))
@@ -499,6 +503,13 @@ const getModelOptions = (type: ModelType, model: any) => {
     value: `edit-${type}-${model.id}`
   })
 
+  if (!model.isDefault) {
+    options.push({
+      content: t('modelSettings.actions.setDefault'),
+      value: `default-${type}-${model.id}`
+    })
+  }
+
   options.push({
     content: t('common.copy'),
     value: `copy-${type}-${model.id}`
@@ -513,8 +524,25 @@ const handleMenuAction = (data: { value: string }, type: ModelType, model: any) 
 
   if (value.indexOf('edit-') === 0) {
     editModel(type, model)
+  } else if (value.indexOf('default-') === 0) {
+    setDefaultModel(model.id)
   } else if (value.indexOf('copy-') === 0) {
     copyModel(type, model.id)
+  }
+}
+
+const setDefaultModel = async (modelId: string) => {
+  if (!authStore.hasCapability('can_bind_model')) {
+    capabilityDeniedVisible.value = true
+    return
+  }
+  try {
+    await setDefaultModelAPI(modelId)
+    MessagePlugin.success(t('modelSettings.toasts.setDefault'))
+    await loadModels()
+  } catch (error: any) {
+    console.error('设置默认模型失败:', error)
+    MessagePlugin.error(error.message || t('modelSettings.toasts.setDefaultFailed'))
   }
 }
 

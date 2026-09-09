@@ -231,6 +231,7 @@ func (s *sessionService) KnowledgeQA(
 // 2. First knowledge base with a Remote model (from knowledgeBaseIDs or derived from knowledgeIDs)
 // 3. Session's SummaryModelID (if not Remote)
 // 4. First knowledge base's SummaryModelID
+// 5. System-wide administrator-bound default KnowledgeQA model, then first available KnowledgeQA model
 func (s *sessionService) selectChatModelID(
 	ctx context.Context,
 	session *types.Session,
@@ -300,6 +301,12 @@ func (s *sessionService) selectChatModelID(
 		return "", fmt.Errorf("failed to list models: %w", err)
 	}
 	for _, model := range models {
+		if model != nil && model.Type == types.ModelTypeKnowledgeQA && model.IsDefault {
+			logger.Infof(ctx, "Using system-wide default KnowledgeQA model: %s", model.ID)
+			return model.ID, nil
+		}
+	}
+	for _, model := range models {
 		if model != nil && model.Type == types.ModelTypeKnowledgeQA {
 			logger.Infof(ctx, "Using first available KnowledgeQA model: %s", model.ID)
 			return model.ID, nil
@@ -356,6 +363,14 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 		kbIDs := make([]string, 0, len(allKBs))
 		ownSkipped := 0
 		for _, kb := range allKBs {
+			// A public agent running outside its source workspace may only carry
+			// public KBs. This prevents the agent from becoming a read bypass for
+			// private or workspace-only source resources.
+			if sessionTenantID != 0 && sessionTenantID != customAgent.TenantID &&
+				kb.Visibility != types.ResourceVisibilityPublic {
+				ownSkipped++
+				continue
+			}
 			if !accept(kb) {
 				ownSkipped++
 				continue
@@ -406,8 +421,22 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 		logger.Infof(ctx, "KBSelectionMode=all: loaded %d knowledge bases (own + shared)", len(kbIDs))
 		return kbIDs
 	case "selected":
-		logger.Infof(ctx, "KBSelectionMode=selected: using %d configured knowledge bases", len(customAgent.Config.KnowledgeBases))
-		return customAgent.Config.KnowledgeBases
+		logger.Infof(ctx, "KBSelectionMode=selected: validating %d configured knowledge bases", len(customAgent.Config.KnowledgeBases))
+		if sessionTenantID == 0 || sessionTenantID == customAgent.TenantID {
+			return customAgent.Config.KnowledgeBases
+		}
+		selected, err := s.knowledgeBaseService.GetKnowledgeBasesByIDsOnly(ctx, customAgent.Config.KnowledgeBases)
+		if err != nil {
+			logger.Warnf(ctx, "Failed to validate public agent knowledge bases: %v", err)
+			return nil
+		}
+		publicIDs := make([]string, 0, len(selected))
+		for _, kb := range selected {
+			if kb != nil && kb.TenantID == customAgent.TenantID && kb.Visibility == types.ResourceVisibilityPublic {
+				publicIDs = append(publicIDs, kb.ID)
+			}
+		}
+		return publicIDs
 	case "none":
 		logger.Infof(ctx, "KBSelectionMode=none: no knowledge bases configured")
 		return nil
@@ -719,17 +748,23 @@ func (s *sessionService) SearchKnowledge(ctx context.Context,
 		return nil, err
 	}
 
-	// Use rerank model from RetrievalConfig if set, otherwise auto-select the first available
+	// Use rerank model from RetrievalConfig if set, otherwise prefer the
+	// administrator-bound tenant default before falling back to the first model.
 	if rc != nil && rc.RerankModelID != "" {
 		chatManage.RerankModelID = rc.RerankModelID
 	} else {
 		for _, model := range models {
-			if model == nil {
-				continue
-			}
-			if model.Type == types.ModelTypeRerank {
+			if model != nil && model.Type == types.ModelTypeRerank && model.IsDefault {
 				chatManage.RerankModelID = model.ID
 				break
+			}
+		}
+		if chatManage.RerankModelID == "" {
+			for _, model := range models {
+				if model != nil && model.Type == types.ModelTypeRerank {
+					chatManage.RerankModelID = model.ID
+					break
+				}
 			}
 		}
 	}

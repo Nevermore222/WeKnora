@@ -437,7 +437,6 @@ type WikiPageListResponse struct {
 	TotalPages int         `json:"total_pages"`
 }
 
-
 // WikiGraphMode enumerates the graph query modes exposed to the API.
 const (
 	// WikiGraphModeOverview returns the top-N most-connected pages as an

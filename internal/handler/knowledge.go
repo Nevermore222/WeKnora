@@ -18,6 +18,7 @@ import (
 	"github.com/Tencent/Xelora/internal/application/service"
 	"github.com/Tencent/Xelora/internal/errors"
 	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/middleware"
 	"github.com/Tencent/Xelora/internal/tracing/langfuse"
 	"github.com/Tencent/Xelora/internal/types"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
@@ -78,6 +79,15 @@ func (h *KnowledgeHandler) validateKnowledgeBaseAccessWithKBID(c *gin.Context, k
 	if kbID == "" {
 		return nil, "", 0, "", errors.NewBadRequestError("Knowledge base ID cannot be empty")
 	}
+
+	// KBAccessRead already resolved the complete visibility/share matrix and
+	// rewrote the request context to the source tenant. Reuse that result so
+	// legacy handlers cannot reject a public cross-workspace KB a second time.
+	if access, ok := middleware.KBAccessFromContext(c); ok && access != nil &&
+		access.KnowledgeBase != nil && access.KnowledgeBase.ID == kbID {
+		return access.KnowledgeBase, kbID, access.EffectiveTenantID, access.Permission, nil
+	}
+
 	kb, err := h.kbService.GetKnowledgeBaseByID(ctx, kbID)
 	if err != nil {
 		// Same not-found-vs-real-error split as knowledgebase.go's
@@ -90,8 +100,19 @@ func (h *KnowledgeHandler) validateKnowledgeBaseAccessWithKBID(c *gin.Context, k
 		logger.ErrorWithFields(ctx, err, nil)
 		return nil, kbID, 0, "", errors.NewInternalServerError(err.Error())
 	}
+	callerUserID, _ := types.UserIDFromContext(ctx)
 	if kb.TenantID == tenantID {
-		return kb, kbID, tenantID, types.OrgRoleAdmin, nil
+		if kb.Visibility == types.ResourceVisibilityPrivate && kb.CreatorID != callerUserID && !types.IsSystemAdminFromContext(ctx) {
+			return nil, kbID, 0, "", errors.NewForbiddenError("Permission denied to access this knowledge base")
+		}
+		permission := types.OrgRoleViewer
+		if types.IsSystemAdminFromContext(ctx) || (kb.CreatorID != "" && kb.CreatorID == callerUserID) {
+			permission = types.OrgRoleAdmin
+		}
+		return kb, kbID, tenantID, permission, nil
+	}
+	if kb.Visibility == types.ResourceVisibilityPublic {
+		return kb, kbID, kb.TenantID, types.OrgRoleViewer, nil
 	}
 	if h.kbShareService != nil {
 		permission, isShared, permErr := h.kbShareService.CheckTenantKBPermission(ctx, kbID, tenantID, callerTenantRole)

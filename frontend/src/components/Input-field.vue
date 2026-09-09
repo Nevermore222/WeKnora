@@ -468,8 +468,10 @@ const isWebSearchEnabled = computed(() => settingsStore.isWebSearchEnabled);
 const selectedKbIds = computed(() => settingsStore.settings.selectedKnowledgeBases || []);
 const selectedFileIds = computed(() => settingsStore.settings.selectedFiles || []);
 
-// 已就绪的知识库（来自租户级缓存）
-const knowledgeBases = computed(() => chatResources.validKnowledgeBases);
+// 聊天候选必须覆盖服务端返回的全部可访问知识库；模型未就绪的知识库
+// 仍然可以被 @ 明确选择，后端会按其实际索引能力处理检索。
+const knowledgeBases = computed(() => chatResources.rawKnowledgeBases);
+
 const fileList = ref<Array<{ id: string; name: string }>>([]);
 
 // 选中的知识库：包含自己的 + 组织共享的 + 共享智能体下的（用于展示已选列表与 org 角标）
@@ -611,9 +613,7 @@ const inputPlaceholder = computed(() => {
 const loadKnowledgeBases = async (force = false) => {
   try {
     await chatResources.ensureKnowledgeBases(force);
-    const validKbs = knowledgeBases.value;
-
-    const validKbIds = new Set(validKbs.map((kb: any) => kb.id));
+    const validKbIds = new Set(knowledgeBases.value.map((kb: any) => kb.id));
     const sharedKbIds = new Set(
       (orgStore.sharedKnowledgeBases || []).map((s: any) => s.knowledge_base?.id).filter(Boolean)
     );
@@ -802,8 +802,8 @@ const writeLastChatModelID = (id: string) => {
 }
 
 // Initial chat-model selection priority: per-user last pick
-// (localStorage) > current store value (e.g. carried over from
-// settings page) > first available model. The tenant-level
+// (localStorage) > current store value (e.g. restored session) >
+// administrator-bound tenant default > first available model. The tenant-level
 // conversation-config used to feed summary_model_id/rerank_model_id
 // into the dropdown, but those fields were removed: per-user last pick
 // belongs in localStorage, agent-level model belongs on the agent.
@@ -843,6 +843,11 @@ const ensureModelSelection = () => {
   const lastPick = readLastChatModelID();
   if (lastPick) {
     selectedModelId.value = lastPick;
+    return;
+  }
+  const defaultModel = availableModels.value.find(model => model.is_default);
+  if (defaultModel?.id) {
+    selectedModelId.value = defaultModel.id;
     return;
   }
   if (availableModels.value.length > 0) {

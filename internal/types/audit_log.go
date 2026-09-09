@@ -52,7 +52,7 @@ const (
 	AuditActionInvitationExpired AuditAction = "rbac.invitation_expired"
 
 	// Client capability admin actions (Personal client user dual-gate).
-	AuditActionClientCapabilitiesUpdated  AuditAction = "client.capabilities_updated"
+	AuditActionClientCapabilitiesUpdated   AuditAction = "client.capabilities_updated"
 	AuditActionClientCapabilitiesTightened AuditAction = "client.capabilities_tightened"
 
 	// VectorStore lifecycle actions. Emitted by VectorStoreService.

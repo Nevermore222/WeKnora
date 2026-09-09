@@ -72,6 +72,24 @@ func (r *knowledgeBaseRepository) ListKnowledgeBases(ctx context.Context) ([]*ty
 	return kbs, nil
 }
 
+// ListVisibleKnowledgeBases lists every knowledge base readable from the
+// caller's active workspace. System administrators are handled by the service
+// and use ListKnowledgeBases when they need the unrestricted platform view.
+func (r *knowledgeBaseRepository) ListVisibleKnowledgeBases(
+	ctx context.Context, tenantID uint64, userID string,
+) ([]*types.KnowledgeBase, error) {
+	var kbs []*types.KnowledgeBase
+	query := r.db.WithContext(ctx).
+		Where("is_temporary = ?", false).
+		Where("visibility = ? OR (tenant_id = ? AND visibility <> ?) OR (tenant_id = ? AND creator_id = ?)",
+			types.ResourceVisibilityPublic, tenantID, types.ResourceVisibilityPrivate, tenantID, userID).
+		Order("created_at DESC")
+	if err := query.Find(&kbs).Error; err != nil {
+		return nil, err
+	}
+	return kbs, nil
+}
+
 // ListKnowledgeBasesByTenantID lists all knowledge bases by tenant id.
 //
 // Ordering used to also include `is_pinned DESC, pinned_at DESC` so the

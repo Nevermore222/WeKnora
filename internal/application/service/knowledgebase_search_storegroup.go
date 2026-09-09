@@ -179,9 +179,20 @@ func (s *knowledgeBaseService) authorizeKBAccess(
 	}
 
 	callerTenantRole := types.TenantRoleFromContext(ctx)
+	callerUserID, _ := types.UserIDFromContext(ctx)
+	isSystemAdmin := types.IsSystemAdminFromContext(ctx)
 
 	for _, kb := range kbs {
+		if isSystemAdmin {
+			continue
+		}
 		if kb.TenantID == requestTenantID {
+			if kb.Visibility == types.ResourceVisibilityPrivate && kb.CreatorID != callerUserID {
+				return apperrors.NewNotFoundError("knowledge base not found")
+			}
+			continue
+		}
+		if kb.Visibility == types.ResourceVisibilityPublic {
 			continue
 		}
 		hasPermission, permErr := s.kbShareService.HasTenantKBPermission(

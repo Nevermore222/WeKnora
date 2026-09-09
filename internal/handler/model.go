@@ -199,6 +199,37 @@ func (h *ModelHandler) ListModels(c *gin.Context) {
 	})
 }
 
+// SetDefaultModel marks a model as the system-wide default for its model type.
+func (h *ModelHandler) SetDefaultModel(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := secutils.SanitizeForLog(c.Param("id"))
+	if id == "" {
+		c.Error(errors.NewBadRequestError("Model ID cannot be empty"))
+		return
+	}
+
+	model, err := h.service.SetDefaultModel(ctx, id)
+	if err != nil {
+		switch err {
+		case service.ErrModelNotFound:
+			c.Error(errors.NewNotFoundError("Model not found"))
+		case service.ErrDefaultModelRequiresSystemAdmin:
+			c.Error(errors.NewForbiddenError(err.Error()))
+		case service.ErrDefaultModelNotTenantOwned, service.ErrDefaultModelInactive:
+			c.Error(errors.NewBadRequestError(err.Error()))
+		default:
+			logger.ErrorWithFields(ctx, err, map[string]interface{}{"model_id": id})
+			c.Error(errors.NewInternalServerError(err.Error()))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    dto.NewModelResponse(model),
+	})
+}
+
 // UpdateModelRequest defines the structure for model update requests
 // Contains fields that can be updated for an existing model
 type UpdateModelRequest struct {
@@ -302,6 +333,10 @@ func (h *ModelHandler) UpdateModel(c *gin.Context) {
 
 	logger.Infof(ctx, "Updating model, ID: %s, Name: %s", id, model.Name)
 	if err := h.service.UpdateModel(ctx, model); err != nil {
+		if err == service.ErrModelNotTenantOwned {
+			c.Error(errors.NewForbiddenError("model belongs to another workspace"))
+			return
+		}
 		logger.ErrorWithFields(ctx, err, nil)
 		c.Error(errors.NewInternalServerError(err.Error()))
 		return
@@ -341,6 +376,10 @@ func (h *ModelHandler) DeleteModel(c *gin.Context) {
 
 	logger.Infof(ctx, "Deleting model, ID: %s", id)
 	if err := h.service.DeleteModel(ctx, id); err != nil {
+		if err == service.ErrModelNotTenantOwned {
+			c.Error(errors.NewForbiddenError("model belongs to another workspace"))
+			return
+		}
 		if err == service.ErrModelNotFound {
 			logger.Warnf(ctx, "Model not found, ID: %s", id)
 			c.Error(errors.NewNotFoundError("Model not found"))

@@ -27,3 +27,8 @@ export VITE_BRAND_PROFILE="$BRAND_PROFILE"
 cd "$PROJECT_ROOT/frontend"
 npm ci
 npm run build
+
+if [ "$BRAND_PROFILE" = "internal" ] && ! grep -q '<title>Knavis</title>' dist/index.html; then
+	echo "Internal frontend build did not produce Knavis branding" >&2
+	exit 1
+fi

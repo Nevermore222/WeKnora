@@ -399,6 +399,7 @@ func RegisterKnowledgeBaseRoutes(r *gin.RouterGroup, handler *handler.KnowledgeB
 		kb.GET("/:id", g.Viewer(), g.KBAccessRead("id"), handler.GetKnowledgeBase)
 		// 更新知识库 — 创建者本人 OR Admin+ 且对 KB 有 write 权限
 		kb.PUT("/:id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.UpdateKnowledgeBase)
+		kb.PUT("/:id/visibility", g.SystemAdmin(), handler.UpdateVisibility)
 		kb.PUT("/:id/classification-tags", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.UpdateClassificationTags)
 		// 删除知识库 — 创建者本人 OR Admin+ 且对 KB 有 write 权限
 		kb.DELETE("/:id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.DeleteKnowledgeBase)
@@ -423,19 +424,20 @@ func RegisterKnowledgeBaseRoutes(r *gin.RouterGroup, handler *handler.KnowledgeB
 	}
 }
 
-// RegisterClassificationRoutes exposes tenant classification configuration.
+// RegisterClassificationRoutes exposes the system-wide resource classification catalog.
+// Every authenticated tenant member may read it; only system administrators may mutate it.
 func RegisterClassificationRoutes(r *gin.RouterGroup, h *handler.ClassificationHandler, g *rbacGuards) {
 	if h == nil {
 		return
 	}
 	v := r.Group("/classification")
 	v.GET("", g.Viewer(), h.List)
-	v.POST("/modules", g.Admin(), h.CreateModule)
-	v.PUT("/modules/:id", g.Admin(), h.UpdateModule)
-	v.DELETE("/modules/:id", g.Admin(), h.DeleteModule)
-	v.POST("/options", g.Admin(), h.CreateOption)
-	v.PUT("/options/:id", g.Admin(), h.UpdateOption)
-	v.DELETE("/options/:id", g.Admin(), h.DeleteOption)
+	v.POST("/modules", g.SystemAdmin(), h.CreateModule)
+	v.PUT("/modules/:id", g.SystemAdmin(), h.UpdateModule)
+	v.DELETE("/modules/:id", g.SystemAdmin(), h.DeleteModule)
+	v.POST("/options", g.SystemAdmin(), h.CreateOption)
+	v.PUT("/options/:id", g.SystemAdmin(), h.UpdateOption)
+	v.DELETE("/options/:id", g.SystemAdmin(), h.DeleteOption)
 }
 
 // RegisterKnowledgeTagRoutes 注册知识库标签相关路由。
@@ -692,6 +694,8 @@ func RegisterModelRoutes(
 		models.GET("", g.Viewer(), handler.ListModels)
 		// 获取单个模型 — Viewer+
 		models.GET("/:id", g.Viewer(), handler.GetModel)
+		// 设为系统全局默认模型 — SystemAdmin and can_bind_model
+		models.PUT("/:id/default", g.SystemAdmin(), g.CapabilityBindModel(), handler.SetDefaultModel)
 		// 更新模型 — Admin+ and can_bind_model
 		models.PUT("/:id", g.Admin(), g.CapabilityBindModel(), handler.UpdateModel)
 		// 删除模型 — Admin+ and can_bind_model
@@ -1038,7 +1042,8 @@ func RegisterCustomAgentRoutes(r *gin.RouterGroup, agentHandler *handler.CustomA
 		agents.GET("/:id", g.Viewer(), agentHandler.GetAgent)
 		// Update agent — creator OR Admin+
 		agents.PUT("/:id", g.OwnedAgentOrAdmin(), agentHandler.UpdateAgent)
-		// Delete agent — creator OR Admin+
+		agents.PUT("/:id/visibility", g.SystemAdmin(), agentHandler.UpdateVisibility)
+		// Delete agent — creator OR system administrator
 		agents.DELETE("/:id", g.OwnedAgentOrAdmin(), agentHandler.DeleteAgent)
 		// Copy agent — Contributor+ (copy is owned by the caller)
 		agents.POST("/:id/copy", g.Contributor(), g.CapabilityCreateAgent(), agentHandler.CopyAgent)

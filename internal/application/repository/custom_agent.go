@@ -39,6 +39,38 @@ func (r *customAgentRepository) GetAgentByID(ctx context.Context, id string, ten
 	return &agent, nil
 }
 
+// GetAgentByIDOnly gets a custom agent without tenant scoping. IDs for
+// user-created agents are UUIDs and globally unique; built-in IDs are excluded
+// from public-resource lookups because each tenant has its own built-in row.
+func (r *customAgentRepository) GetAgentByIDOnly(ctx context.Context, id string) (*types.CustomAgent, error) {
+	var agent types.CustomAgent
+	if err := r.db.WithContext(ctx).
+		Where("id = ? AND is_builtin = ?", id, false).
+		First(&agent).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCustomAgentNotFound
+		}
+		return nil, err
+	}
+	return &agent, nil
+}
+
+// ListVisibleAgents lists own-workspace readable agents plus system-public
+// custom agents from other workspaces. Private agents remain creator-only.
+func (r *customAgentRepository) ListVisibleAgents(
+	ctx context.Context, tenantID uint64, userID string,
+) ([]*types.CustomAgent, error) {
+	var agents []*types.CustomAgent
+	if err := r.db.WithContext(ctx).
+		Where("visibility = ? OR (tenant_id = ? AND visibility <> ?) OR (tenant_id = ? AND created_by = ?)",
+			types.ResourceVisibilityPublic, tenantID, types.ResourceVisibilityPrivate, tenantID, userID).
+		Order("created_at DESC").
+		Find(&agents).Error; err != nil {
+		return nil, err
+	}
+	return agents, nil
+}
+
 // ListAgentsByTenantID lists all agents for a specific tenant
 func (r *customAgentRepository) ListAgentsByTenantID(ctx context.Context, tenantID uint64) ([]*types.CustomAgent, error) {
 	var agents []*types.CustomAgent

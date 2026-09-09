@@ -12,14 +12,17 @@ type ClassificationTags map[string][]string
 
 func (t ClassificationTags) Value() (driver.Value, error) {
 	if t == nil {
-		return nil, nil
+		// custom_agents.classification_tags is NOT NULL. Persist an empty
+		// object for agents that have no selected classification tags instead
+		// of returning SQL NULL.
+		return []byte("{}"), nil
 	}
 	return json.Marshal(t)
 }
 
 func (t *ClassificationTags) Scan(src any) error {
 	if src == nil {
-		*t = nil
+		*t = ClassificationTags{}
 		return nil
 	}
 	var raw []byte
@@ -32,13 +35,20 @@ func (t *ClassificationTags) Scan(src any) error {
 		return errors.New("ClassificationTags.Scan: unsupported source type")
 	}
 	if len(raw) == 0 {
-		*t = nil
+		*t = ClassificationTags{}
 		return nil
 	}
-	return json.Unmarshal(raw, t)
+	if err := json.Unmarshal(raw, t); err != nil {
+		return err
+	}
+	if *t == nil {
+		*t = ClassificationTags{}
+	}
+	return nil
 }
 
-// ClassificationModule is a tenant-managed dimension used to classify knowledge bases.
+// ClassificationModule is a system-managed dimension used to classify public resources.
+// TenantID is kept for schema compatibility; system-wide modules use tenant_id = 0.
 type ClassificationModule struct {
 	ID           string                 `json:"id" gorm:"type:varchar(36);primaryKey"`
 	TenantID     uint64                 `json:"tenant_id" gorm:"not null;index"`

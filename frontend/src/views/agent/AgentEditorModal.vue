@@ -134,6 +134,20 @@
                       </div>
                     </div>
 
+                    <!-- 访问范围由系统管理员独立维护，避免覆盖完整智能体配置快照 -->
+                    <div v-if="authStore.isSystemAdmin && editorMode === 'edit' && !isBuiltinAgent" class="setting-row">
+                      <div class="setting-info">
+                        <label>访问范围</label>
+                        <p class="desc">公开智能体可被所有工作空间读取和运行；私密智能体仅限创建者和系统管理员。</p>
+                      </div>
+                      <div class="setting-control">
+                        <t-radio-group v-model="formData.visibility">
+                          <t-radio-button value="public">公开</t-radio-button>
+                          <t-radio-button value="private">私密</t-radio-button>
+                        </t-radio-group>
+                      </div>
+                    </div>
+
                     <!-- 描述 -->
                     <div class="setting-row">
                       <div class="setting-info">
@@ -144,6 +158,39 @@
                         <t-textarea v-model="formData.description"
                           :placeholder="$t('agent.editor.descriptionPlaceholder')"
                           :autosize="{ minRows: 2, maxRows: 4 }" :disabled="isBuiltinAgent" />
+                      </div>
+                    </div>
+
+                    <!-- 通用工作流绑定：只保存元数据，具体知识库仍由下方知识库设置维护 -->
+                    <div v-if="!isBuiltinAgent" class="setting-row setting-row--emphasize">
+                      <div class="setting-info">
+                        <label>工作流绑定</label>
+                        <p class="desc">为命令解析、检证用例二维表或检证用例代码智能体声明适用的机型和语言；留空表示不参与通用工作流。</p>
+                      </div>
+                      <div class="setting-control workflow-binding-controls">
+                        <t-select v-model="formData.config.workflow_role" :options="workflowRoleOptions"
+                          placeholder="不绑定工作流" clearable />
+                        <t-input v-model="formData.config.machine_type" placeholder="机型，例如 ASP" />
+                        <t-input v-model="formData.config.language" placeholder="语言，例如 CL" />
+                      </div>
+                    </div>
+
+                    <!-- 分类标签：选择叶子分类后，智能体会出现在对应树结构下 -->
+                    <div v-if="classificationModules.length && !isBuiltinAgent" class="setting-row">
+                      <div class="setting-info">
+                        <label>智能体分类标签</label>
+                        <p class="desc">选择子分类后，智能体会自动归入它的全部上级分类。</p>
+                      </div>
+                      <div class="setting-control agent-classification-controls">
+                        <t-select
+                          v-for="module in classificationModules"
+                          :key="module.id"
+                          :value="classificationTags[module.id]?.[0] || ''"
+                          :options="[{ label: `${module.name}：未分类`, value: '' }, ...flattenClassificationOptions(module.options)]"
+                          :placeholder="`${module.name}：请选择`"
+                          @change="(value: string) => setClassificationTag(module.id, value)"
+                          :disabled="formData.read_only"
+                        />
                       </div>
                     </div>
 
@@ -1472,6 +1519,7 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import {
   createAgent,
   updateAgent,
+  updateAgentVisibility,
   type CustomAgent,
   type PlaceholderDefinition,
   type AgentTypePreset,
@@ -1504,6 +1552,7 @@ import {
 } from '@/utils/tool-capabilities';
 import { buildSkillTestRunPayload, getSkillPrimaryScript, getSkillStudioStats } from '@/utils/skillStudio';
 import { shouldShowExternalLink } from '@/utils/externalLinks';
+import { listClassifications, type ClassificationModule, type ClassificationOption } from '@/api/classification';
 
 const imIntegrationDocUrl = 'https://github.com/Tencent/Xelora/blob/main/docs/IM%E9%9B%86%E6%88%90%E5%BC%80%E5%8F%91%E6%96%87%E6%A1%A3.md'
 
@@ -2005,8 +2054,13 @@ const navGroups = computed(() => {
 const defaultFormData = {
   name: '',
   description: '',
+  classification_tags: {} as Record<string, string[]>,
+  read_only: false,
   is_builtin: false,
   config: {
+    workflow_role: '',
+    machine_type: '',
+    language: '',
     // 基础设置
     agent_mode: 'smart-reasoning' as 'quick-answer' | 'smart-reasoning',
     system_prompt: '',
@@ -2077,6 +2131,31 @@ const defaultFormData = {
 };
 
 const formData = ref(JSON.parse(JSON.stringify(defaultFormData)));
+
+const workflowRoleOptions = [
+  { label: '不绑定工作流', value: '' },
+  { label: '命令参数解析', value: 'command_parameter_parse' },
+  { label: '命令概述解析', value: 'command_overview_parse' },
+  { label: '检证用例二维表', value: 'verification_case_table_parse' },
+  { label: '检证用例代码', value: 'verification_case_code_generate' },
+];
+
+const classificationModules = ref<ClassificationModule[]>([])
+const classificationTags = ref<Record<string, string[]>>({})
+const flattenClassificationOptions = (options: ClassificationOption[] = [], prefix: string[] = []): Array<{ label: string; value: string }> => options.flatMap(option => [{ label: [...prefix, option.name].join(' / '), value: option.id }, ...flattenClassificationOptions(option.children, [...prefix, option.name])])
+const loadClassificationModules = async () => {
+  try {
+    const response = await listClassifications('agent')
+    classificationModules.value = (response.data || []).filter(module => module.enabled)
+  } catch (error) {
+    console.error('Failed to load agent classifications', error)
+    classificationModules.value = []
+  }
+}
+const setClassificationTag = (moduleID: string, value: string) => {
+  classificationTags.value = { ...classificationTags.value, [moduleID]: value ? [value] : [] }
+  formData.value.classification_tags = classificationTags.value
+}
 
 const applyDefaultChatModelIfEmpty = () => {
   if (props.mode !== 'create' || !formData.value) return
@@ -2563,6 +2642,9 @@ watch(() => props.visible, async (val) => {
 
       // 补全可能缺失的字段
       agentData.config = { ...defaultFormData.config, ...agentData.config };
+      agentData.visibility = agentData.visibility === 'private' ? 'private' : 'public';
+      agentData.classification_tags = agentData.classification_tags || {};
+      classificationTags.value = { ...agentData.classification_tags };
 
       // 确保数组字段存在
       if (!agentData.config.suggested_prompts) agentData.config.suggested_prompts = [];
@@ -2633,6 +2715,7 @@ watch(() => props.visible, async (val) => {
         }
       }
       formData.value = newFormData;
+      classificationTags.value = {};
       // 新建智能体：知识库默认 "全部"，MCP / Skills 仍默认 "不使用"。
       kbSelectionMode.value = 'all';
       mcpSelectionMode.value = 'none';
@@ -3015,6 +3098,7 @@ const loadDependencies = async () => {
       chatResources.ensureKnowledgeBases(),
       chatResources.ensureWebSearchProviders(),
       editorResources.prefetchAgentEditorDeps(),
+      loadClassificationModules(),
     ]);
 
     if (chatResources.allModels.length > 0) {
@@ -3964,6 +4048,9 @@ const handleSave = async () => {
       emit('success', created);
     } else {
       await updateAgent(formData.value.id, formData.value);
+      if (authStore.isSystemAdmin && !formData.value.is_builtin) {
+        await updateAgentVisibility(formData.value.id, formData.value.visibility)
+      }
       MessagePlugin.success(t('agent.messages.updated'));
       emit('success');
     }
@@ -4423,7 +4510,16 @@ const handleSave = async () => {
     justify-content: flex-start;
   }
 
-  // 让 select 和 input 占满控件区域
+  &.agent-classification-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &.workflow-binding-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+
   :deep(.t-select),
   :deep(.t-input),
   :deep(.t-textarea) {

@@ -27,6 +27,45 @@ func newTestRemoteChat(t *testing.T) *RemoteAPIChat {
 	return chat
 }
 
+func TestBuildOutbound_ForceRawHTTPOverride(t *testing.T) {
+	messages := []Message{{Role: "user", Content: "hello"}}
+
+	t.Run("enabled", func(t *testing.T) {
+		chat, err := NewRemoteAPIChat(&ChatConfig{
+			Source:    types.ModelSourceRemote,
+			BaseURL:   "http://127.0.0.1:9999/v1",
+			ModelName: "local-qwen",
+			ModelID:   "local-qwen",
+			Provider:  "generic",
+			ExtraConfig: map[string]string{
+				"force_raw_http": "true",
+			},
+		})
+		require.NoError(t, err)
+
+		_, endpoint, useRawHTTP, err := chat.buildOutbound(messages, &ChatOptions{}, true)
+		require.NoError(t, err)
+		assert.Empty(t, endpoint)
+		assert.True(t, useRawHTTP)
+	})
+
+	t.Run("disabled by default", func(t *testing.T) {
+		chat, err := NewRemoteAPIChat(&ChatConfig{
+			Source:    types.ModelSourceRemote,
+			BaseURL:   "http://127.0.0.1:9999/v1",
+			ModelName: "local-qwen",
+			ModelID:   "local-qwen",
+			Provider:  "generic",
+		})
+		require.NoError(t, err)
+
+		_, endpoint, useRawHTTP, err := chat.buildOutbound(messages, &ChatOptions{}, true)
+		require.NoError(t, err)
+		assert.Empty(t, endpoint)
+		assert.False(t, useRawHTTP)
+	})
+}
+
 func TestBuildChatCompletionRequest_ParallelToolCalls(t *testing.T) {
 	chat := newTestRemoteChat(t)
 	messages := []Message{{Role: "user", Content: "hello"}}

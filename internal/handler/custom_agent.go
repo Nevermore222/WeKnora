@@ -43,18 +43,20 @@ func NewCustomAgentHandler(
 
 // CreateAgentRequest defines the request body for creating an agent
 type CreateAgentRequest struct {
-	Name        string                   `json:"name" binding:"required"`
-	Description string                   `json:"description"`
-	Avatar      string                   `json:"avatar"`
-	Config      types.CustomAgentConfig  `json:"config"`
+	Name               string                  `json:"name" binding:"required"`
+	Description        string                  `json:"description"`
+	Avatar             string                  `json:"avatar"`
+	Config             types.CustomAgentConfig `json:"config"`
+	ClassificationTags map[string][]string     `json:"classification_tags"`
 }
 
 // UpdateAgentRequest defines the request body for updating an agent
 type UpdateAgentRequest struct {
-	Name        string                  `json:"name"`
-	Description string                  `json:"description"`
-	Avatar      string                  `json:"avatar"`
-	Config      types.CustomAgentConfig `json:"config"`
+	Name               string                  `json:"name"`
+	Description        string                  `json:"description"`
+	Avatar             string                  `json:"avatar"`
+	Config             types.CustomAgentConfig `json:"config"`
+	ClassificationTags map[string][]string     `json:"classification_tags"`
 }
 
 // CreateAgent godoc
@@ -84,10 +86,11 @@ func (h *CustomAgentHandler) CreateAgent(c *gin.Context) {
 
 	// Build agent object
 	agent := &types.CustomAgent{
-		Name:        req.Name,
-		Description: req.Description,
-		Avatar:      req.Avatar,
-		Config:      req.Config,
+		Name:               req.Name,
+		Description:        req.Description,
+		Avatar:             req.Avatar,
+		Config:             req.Config,
+		ClassificationTags: types.ClassificationTags(req.ClassificationTags),
 	}
 
 	logger.Infof(ctx, "Creating custom agent, name: %s, agent_mode: %s",
@@ -170,8 +173,9 @@ func (h *CustomAgentHandler) GetAgent(c *gin.Context) {
 func (h *CustomAgentHandler) ListAgents(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Get all agents for this tenant
-	agents, err := h.service.ListAgents(ctx)
+	// Get agents visible from this workspace, including system-public custom
+	// agents from other workspaces.
+	agents, err := h.service.ListVisibleAgents(ctx)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, nil)
 		c.Error(errors.NewInternalServerError(err.Error()))
@@ -277,6 +281,22 @@ func enrichAgentCreatorNames(ctx context.Context, userSvc interfaces.UserService
 	}
 }
 
+func (h *CustomAgentHandler) UpdateVisibility(c *gin.Context) {
+	var req struct {
+		Visibility string `json:"visibility" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(errors.NewBadRequestError("Invalid request parameters"))
+		return
+	}
+	agent, err := h.service.UpdateVisibility(c.Request.Context(), c.Param("id"), req.Visibility)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": agent})
+}
+
 // UpdateAgent godoc
 // @Summary      更新智能体
 // @Description  更新智能体的名称、描述和配置
@@ -314,11 +334,12 @@ func (h *CustomAgentHandler) UpdateAgent(c *gin.Context) {
 
 	// Build agent object
 	agent := &types.CustomAgent{
-		ID:          id,
-		Name:        req.Name,
-		Description: req.Description,
-		Avatar:      req.Avatar,
-		Config:      req.Config,
+		ID:                 id,
+		Name:               req.Name,
+		Description:        req.Description,
+		Avatar:             req.Avatar,
+		Config:             req.Config,
+		ClassificationTags: types.ClassificationTags(req.ClassificationTags),
 	}
 
 	logger.Infof(ctx, "Updating custom agent, ID: %s, name: %s",

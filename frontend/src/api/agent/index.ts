@@ -14,6 +14,10 @@ export interface CustomAgentConfig {
   // 智能推理模式下的类型预设，用于一键应用"系统提示词 + 工具 + KB 兼容性"组合
   // 仅在 agent_mode === 'smart-reasoning' 时生效；quick-answer 模式忽略
   agent_type?: AgentType;
+  // Optional binding metadata consumed by generic command parse workflows.
+  workflow_role?: 'command_parameter_parse' | 'command_overview_parse' | 'verification_case_table_parse' | 'verification_case_code_generate' | '';
+  machine_type?: string;
+  language?: string;
   system_prompt?: string;           // 统一系统提示词（使用 {{web_search_status}} 占位符动态控制行为）
   system_prompt_id?: string;        // 引用的 prompt template ID（预设会填入此字段）
   context_template?: string;        // 上下文模板（普通模式）
@@ -103,6 +107,9 @@ export interface CustomAgent {
   created_by?: string;
   // creator_name 由后端 list 接口批量回填，仅用于列表卡片来源徽章。
   creator_name?: string;
+  visibility?: 'workspace' | 'public' | 'private';
+  classification_tags?: Record<string, string[]>;
+  read_only?: boolean;
   config: CustomAgentConfig;
   created_at?: string;
   updated_at?: string;
@@ -114,6 +121,7 @@ export interface CreateAgentRequest {
   description?: string;
   avatar?: string;
   config?: CustomAgentConfig;
+  classification_tags?: Record<string, string[]>;
 }
 
 // 更新智能体请求
@@ -122,6 +130,7 @@ export interface UpdateAgentRequest {
   description?: string;
   avatar?: string;
   config?: CustomAgentConfig;
+  classification_tags?: Record<string, string[]>;
 }
 
 // 内置智能体 ID（常用的保留常量，便于代码引用）
@@ -165,6 +174,10 @@ export function createAgent(data: CreateAgentRequest) {
 // 更新智能体
 export function updateAgent(id: string, data: UpdateAgentRequest) {
   return put<{ data: CustomAgent }>(`/api/v1/agents/${id}`, data);
+}
+
+export function updateAgentVisibility(id: string, visibility: 'public' | 'private') {
+  return put(`/api/v1/agents/${id}/visibility`, { visibility });
 }
 
 // 删除智能体

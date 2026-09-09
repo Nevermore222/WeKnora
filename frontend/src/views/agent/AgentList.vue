@@ -1,8 +1,5 @@
 <template>
   <div class="agent-list-container">
-    <ListSpaceSidebar v-if="!authStore.isLiteMode" v-model="spaceSelection" :count-all="allAgentsCount"
-      :count-mine="agents.length" :count-by-org="effectiveSharedCountByOrg" :count-favorites="agentFavoritesCount"
-      :count-recents="agentRecentsCount" />
     <div class="agent-list-content">
       <div class="header" style="--wails-draggable: drag">
         <div class="header-title" style="--wails-draggable: drag">
@@ -42,16 +39,16 @@
           <div class="classification-tree-head"><span>筛选分类</span><small>按层级定位资源</small></div>
           <div class="classification-tree" role="tree" aria-label="智能体筛选分类">
             <div v-for="module in classificationModules" :key="module.id" class="classification-module" :class="{ active: selectedClassifications[module.id] }">
-              <button type="button" class="classification-tree-row classification-module-row" :aria-expanded="isClassificationModuleExpanded(module.id)" @click="toggleClassificationModule(module.id)">
+              <button type="button" role="treeitem" class="classification-tree-row classification-module-row" :aria-expanded="isClassificationModuleExpanded(module.id)" @click="toggleClassificationModule(module.id)">
                 <t-icon :name="isClassificationModuleExpanded(module.id) ? 'chevron-down' : 'chevron-right'" size="13px" /><t-icon name="folder-open" size="15px" /><strong>{{ module.name }}</strong><span class="classification-selected-label">{{ selectedClassificationLabel(module) }}</span>
               </button>
-              <div v-show="isClassificationModuleExpanded(module.id)" class="classification-tree-children">
-                <button type="button" class="classification-tree-row classification-all-row" :class="{ selected: !selectedClassifications[module.id] }" @click="selectClassification(module.id, '')"><span class="tree-indent"></span><span class="tree-leaf">·</span><span>全部{{ module.name }}</span><small>{{ classificationResourceCount }}</small></button>
-                <AgentClassificationTreeOption v-for="option in module.options || []" :key="option.id" :option="option" :module-id="module.id" :selected-id="selectedClassifications[module.id] || ''" :expanded-ids="expandedClassificationOptions" @select="selectClassification" @toggle="toggleClassificationOption" />
+              <div v-show="isClassificationModuleExpanded(module.id)" class="classification-tree-children" role="group">
+                <button type="button" role="treeitem" class="classification-tree-row classification-all-row" :aria-selected="!selectedClassifications[module.id]" :class="{ selected: !selectedClassifications[module.id] }" @click="selectClassification(module.id, '')"><span class="tree-indent"></span><span class="tree-leaf">·</span><span>全部{{ module.name }}</span><small>{{ classificationResourceCount }}</small><t-icon v-if="!selectedClassifications[module.id]" class="tree-selected-icon" name="check" size="14px" aria-hidden="true" /></button>
+                <ClassificationTreeOption v-for="option in module.options || []" :key="option.id" :option="option" :module-id="module.id" :selected-id="selectedClassifications[module.id] || ''" :expanded-ids="expandedClassificationOptions" @select="selectClassification" @toggle="toggleClassificationOption" />
               </div>
             </div>
           </div>
-          <t-button v-if="authStore.hasRole('admin')" variant="outline" size="small" class="classification-manage-btn" @click="handleManageClassification"><template #icon><t-icon name="setting-1" /></template>自定义筛选结构</t-button>
+          <t-button v-if="authStore.isSystemAdmin" variant="outline" size="small" class="classification-manage-btn" @click="handleManageClassification"><template #icon><t-icon name="setting-1" /></template>自定义筛选结构</t-button>
           <div class="classification-path"><span class="path-label">当前路径</span><template v-if="activeClassificationPath.length"><template v-for="(item, index) in activeClassificationPath" :key="item"><t-icon v-if="index" name="chevron-right" size="12px" class="path-separator" /><span class="path-tag">{{ item }}</span></template><button type="button" class="path-clear" @click="clearClassificationFilters">清除</button></template><span v-else class="path-tag">全部智能体</span></div>
           <t-input v-model="agentSearchQuery" size="small" clearable class="classification-search" placeholder="搜索智能体名称、描述或标签"><template #prefix-icon><t-icon name="search" /></template></t-input>
         </section>
@@ -843,9 +840,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, nextTick, defineComponent, h } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { MessagePlugin, Icon as TIcon } from 'tdesign-vue-next'
+import { MessagePlugin } from 'tdesign-vue-next'
 import { deleteAgent, copyAgent, type CustomAgent } from '@/api/agent'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { formatStringDate } from '@/utils/index'
@@ -864,8 +861,8 @@ import { markContextualGuideDone } from '@/config/contextualGuides'
 import { useTenantModelReadiness } from '@/composables/useTenantModelReadiness'
 import { useUIStore } from '@/stores/ui'
 import AgentAvatar from '@/components/AgentAvatar.vue'
-import ListSpaceSidebar from '@/components/ListSpaceSidebar.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
+import ClassificationTreeOption from '@/components/ClassificationTreeOption.vue'
 import { useAuthStore } from '@/stores/auth'
 import CapabilityDeniedDialog from '@/components/CapabilityDeniedDialog.vue'
 import { useListUrlState } from '@/composables/useListUrlState'
@@ -881,6 +878,8 @@ const chatResources = useChatResourcesStore()
 const { loaded: modelsReadyLoaded, isReadyForAgent } = useTenantModelReadiness()
 
 interface AgentWithUI extends CustomAgent {
+  read_only?: boolean
+  visibility?: 'workspace' | 'public' | 'private'
   showMore?: boolean
   /** 当前租户在对话下拉中停用（仅影响本租户） */
   disabled_by_me?: boolean
@@ -897,7 +896,7 @@ type DisplayAgent = (AgentWithUI & { isMine: true }) | (CustomAgent & { isMine: 
 // State synced to `?scope=` so links are shareable. The "mine" value is
 // retained for back-compat with existing links; its display label is
 // rebranded to the active tenant name inside ListSpaceSidebar.
-const defaultScope: 'all' | 'mine' = authStore.hasRole('contributor') ? 'mine' : 'all'
+const defaultScope: 'all' | 'mine' = 'all'
 const { scope: spaceSelection, creator: creatorFilter } = useListUrlState({
   defaultScope,
   defaultCreator: 'all',
@@ -1040,10 +1039,27 @@ const saveClassificationOption = async (option: ClassificationOption & { depth: 
 const removeClassificationOption = async (id: string) => { await deleteClassificationOption(id, 'agent'); await refreshManagedClassifications() }
 const removeClassificationModule = async (id: string) => { await deleteClassificationModule(id, 'agent'); classificationManageModule.value = null; await refreshManagedClassifications() }
 function agentClassificationEntries(agent: any): Array<{ dimension: string; value: string }> { const raw = agent?.classification_tags; if (raw && typeof raw === 'object' && !Array.isArray(raw)) return Object.entries(raw).flatMap(([dimension, ids]) => (ids as string[]).map(value => ({ dimension, value }))); const tags = agent?.business_tags ?? agent?.tags ?? []; return Array.isArray(tags) ? tags.map((value: any) => ({ dimension: 'legacy', value: String(value?.value ?? value?.name ?? value) })) : [] }
-function matchesAgentClassifications(agent: any) { const entries = agentClassificationEntries(agent); return classificationModules.value.every(module => { const selected = selectedClassifications.value[module.id]; if (!selected) return true; const path = flattenClassificationOptions(module.options).find(o => o.value === selected)?.label || ''; return entries.some(entry => entry.dimension === module.id && (entry.value === selected || entry.value === path || entry.value.includes(path))) }) && (!agentSearchQuery.value.trim() || [agent?.name, agent?.description, ...entries.map(e => e.value)].filter(Boolean).join(' ').toLowerCase().includes(agentSearchQuery.value.trim().toLowerCase())) }
+function matchesAgentClassifications(agent: any) {
+  const entries = agentClassificationEntries(agent)
+  const classificationMatches = classificationModules.value.every(module => {
+    const selected = selectedClassifications.value[module.id]
+    if (!selected) return true
+    const selectedPath = new Set(flattenClassificationOptions(module.options).find(o => o.value === selected)?.label.split(' / ') || [])
+    return entries.some(entry => entry.dimension === module.id && (
+      entry.value === selected ||
+      selectedPath.has(entry.value) ||
+      flattenClassificationOptions(module.options).find(o => o.value === entry.value)?.label.startsWith([...selectedPath].join(' / '))
+    ))
+  })
+  if (!classificationMatches) return false
+  const query = agentSearchQuery.value.trim().toLowerCase()
+  if (!query) return true
+  return [agent?.name, agent?.description, ...entries.map(entry => entry.value)]
+    .filter(Boolean)
+    .some(value => String(value).toLowerCase().includes(query))
+}
 const filterAgentsByClassification = <T,>(items: T[], getAgent: (item: T) => any = item => item) => items.filter(item => matchesAgentClassifications(getAgent(item)))
 
-const AgentClassificationTreeOption = defineComponent({ name: 'AgentClassificationTreeOption', props: { option: { type: Object as () => ClassificationOption, required: true }, moduleId: { type: String, required: true }, selectedId: { type: String, required: true }, expandedIds: { type: Object as () => Set<string>, required: true } }, emits: ['select', 'toggle'], setup(props, { emit }) { return () => { const hasChildren = !!props.option.children?.length; const open = props.expandedIds.has(props.option.id) || props.selectedId === props.option.id; return h('div', { class: 'classification-tree-node' }, [h('button', { type: 'button', class: ['classification-tree-row', 'classification-option-row', { selected: props.selectedId === props.option.id }], onClick: () => emit('select', props.moduleId, props.option.id) }, [h('span', { class: 'tree-indent' }), h('span', { class: 'tree-toggle', onClick: (event: MouseEvent) => { if (hasChildren) { event.stopPropagation(); emit('toggle', props.option.id) } } }, hasChildren ? [h(TIcon, { name: open ? 'chevron-down' : 'chevron-right', size: '12px' })] : undefined), h(TIcon, { name: hasChildren ? 'folder-open' : 'file', size: '14px' }), h('span', props.option.name)]), hasChildren && open ? h('div', { class: 'classification-tree-children nested' }, props.option.children!.map(child => h(AgentClassificationTreeOption, { key: child.id, option: child, 'module-id': props.moduleId, 'selected-id': props.selectedId, 'expanded-ids': props.expandedIds, onSelect: (moduleId: string, id: string) => emit('select', moduleId, id), onToggle: (id: string) => emit('toggle', id) }))) : null]) } } })
 const filteredAgents = computed<DisplayAgent[]>(() => {
   if (spaceSelection.value === 'favorites') return filterAgentsByClassification(favoritesAgentList.value)
   if (spaceSelection.value === 'recents') return filterAgentsByClassification(recentsAgentList.value)
@@ -1253,6 +1269,8 @@ watch(creatorFilter, () => {
 })
 
 onMounted(() => {
+  // The legacy space sidebar is hidden here; keep the main catalog complete.
+  spaceSelection.value = 'all'
   loadClassifications()
   fetchList()
   window.addEventListener('openAgentEditor', handleOpenAgentEditor as EventListener)
@@ -1366,10 +1384,11 @@ const handleEdit = (agent: AgentWithUI) => {
 // mutation; this gate just hides buttons the user has no authority
 // to use.
 function canManageAgent(agent: AgentWithUI): boolean {
+  if (agent.read_only) return false
   const userId = authStore.user?.id || ''
+  if (authStore.isSystemAdmin) return true
   const creatorId = (agent as any).created_by || ''
-  if (creatorId && userId && creatorId === userId) return true
-  return authStore.hasRole('admin')
+  return !!(creatorId && userId && creatorId === userId)
 }
 
 // isMyAgent 仅用于卡片来源徽章在「我创建」与「同租户其他成员创建」之间切换。
@@ -1733,10 +1752,10 @@ defineExpose({
 .agent-classification-panel :deep(.classification-tree-row) {
   display: flex;
   width: 100%;
-  min-height: 32px;
+  min-height: 36px;
   align-items: center;
-  gap: 7px;
-  padding: 0 7px;
+  gap: 5px;
+  padding: 2px 7px;
   border: 0;
   border-radius: 5px;
   outline: none;
@@ -1753,6 +1772,9 @@ defineExpose({
   background: var(--td-bg-color-secondarycontainer);
   color: var(--td-text-color-primary);
 }
+.agent-classification-panel :deep(.classification-tree-row:active) {
+  background: var(--td-bg-color-component-active);
+}
 .agent-classification-panel :deep(.classification-tree-row:focus-visible) {
   box-shadow: 0 0 0 2px var(--td-brand-color-focus);
 }
@@ -1760,9 +1782,10 @@ defineExpose({
   background: var(--td-brand-color-light);
   color: var(--td-brand-color);
   font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--td-brand-color-focus);
 }
 .classification-module-row {
-  min-height: 36px !important;
+  min-height: 38px !important;
   color: var(--td-text-color-primary) !important;
   font-size: 13px !important;
 }
@@ -1790,8 +1813,8 @@ defineExpose({
   white-space: nowrap;
 }
 .classification-tree-children {
-  margin: 2px 0 0 12px;
-  padding: 2px 0 2px 12px;
+  margin: 2px 0 0 14px;
+  padding: 2px 0 2px 10px;
   border-left: 1px solid var(--td-component-stroke);
 }
 .classification-tree-children.nested {
@@ -1799,7 +1822,7 @@ defineExpose({
   padding-left: 8px;
 }
 .classification-option-row {
-  min-height: 31px !important;
+  min-height: 34px !important;
 }
 .classification-option-row > span:last-child {
   overflow: hidden;
@@ -1815,9 +1838,13 @@ defineExpose({
   flex: 0 0 6px;
 }
 .tree-leaf {
-  width: 12px;
+  width: 24px;
   color: var(--td-text-color-placeholder);
   text-align: center;
+}
+.tree-selected-icon {
+  flex: 0 0 auto;
+  color: var(--td-brand-color);
 }
 .tree-toggle {
   display: inline-flex;

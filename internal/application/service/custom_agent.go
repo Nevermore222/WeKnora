@@ -17,10 +17,11 @@ import (
 
 // Custom agent related errors
 var (
-	ErrAgentNotFound       = errors.New("agent not found")
-	ErrCannotModifyBuiltin = errors.New("cannot modify built-in agent basic info")
-	ErrCannotDeleteBuiltin = errors.New("cannot delete built-in agent")
-	ErrAgentNameRequired   = errors.New("agent name is required")
+	ErrAgentNotFound         = errors.New("agent not found")
+	ErrCannotModifyBuiltin   = errors.New("cannot modify built-in agent basic info")
+	ErrCannotDeleteBuiltin   = errors.New("cannot delete built-in agent")
+	ErrAgentNameRequired     = errors.New("agent name is required")
+	ErrAgentPermissionDenied = errors.New("agent permission denied")
 )
 
 // customAgentService implements the CustomAgentService interface
@@ -75,6 +76,16 @@ func (s *customAgentService) CreateAgent(ctx context.Context, agent *types.Custo
 	// tenant-owned (Admin+ only).
 	if uid, ok := types.UserIDFromContext(ctx); ok && !types.IsSyntheticUserID(uid) {
 		agent.CreatedBy = uid
+	}
+	if agent.Visibility == "" {
+		if types.IsSystemAdminFromContext(ctx) {
+			agent.Visibility = types.ResourceVisibilityPublic
+		} else {
+			agent.Visibility = types.ResourceVisibilityWorkspace
+		}
+	}
+	if agent.ClassificationTags == nil {
+		agent.ClassificationTags = types.ClassificationTags{}
 	}
 
 	// Set timestamps
@@ -134,8 +145,17 @@ func (s *customAgentService) GetAgentByID(ctx context.Context, id string) (*type
 		}
 	}
 
-	// Query from database
+	// Query from the active workspace first, then allow a public custom agent
+	// from another workspace as a read-only resource.
 	agent, err := s.repo.GetAgentByID(ctx, id, tenantID)
+	if err != nil && errors.Is(err, repository.ErrCustomAgentNotFound) {
+		candidate, lookupErr := s.repo.GetAgentByIDOnly(ctx, id)
+		if lookupErr == nil && (candidate.Visibility == types.ResourceVisibilityPublic || types.IsSystemAdminFromContext(ctx)) {
+			candidate.EnsureDefaults()
+			candidate.ReadOnly = !types.IsSystemAdminFromContext(ctx)
+			return candidate, nil
+		}
+	}
 	if err != nil {
 		if errors.Is(err, repository.ErrCustomAgentNotFound) {
 			return nil, ErrAgentNotFound
@@ -146,6 +166,13 @@ func (s *customAgentService) GetAgentByID(ctx context.Context, id string) (*type
 		return nil, err
 	}
 
+	agent.EnsureDefaults()
+	userID, _ := types.UserIDFromContext(ctx)
+	if agent.Visibility == types.ResourceVisibilityPrivate &&
+		!types.IsSystemAdminFromContext(ctx) && agent.CreatedBy != userID {
+		return nil, ErrAgentNotFound
+	}
+	agent.ReadOnly = !types.IsSystemAdminFromContext(ctx) && agent.CreatedBy != userID
 	return agent, nil
 }
 
@@ -163,6 +190,47 @@ func (s *customAgentService) GetAgentByIDAndTenant(ctx context.Context, id strin
 		return nil, err
 	}
 	return agent, nil
+}
+
+// ListVisibleAgents returns agents shown in the main menu. Built-in agents
+// remain workspace-local; public custom agents from other workspaces are
+// appended as read-only resources.
+func (s *customAgentService) ListVisibleAgents(ctx context.Context) ([]*types.CustomAgent, error) {
+	tenantID, ok := types.TenantIDFromContext(ctx)
+	if !ok {
+		return nil, ErrInvalidTenantID
+	}
+	userID, _ := types.UserIDFromContext(ctx)
+	allAgents, err := s.repo.ListVisibleAgents(ctx, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	for _, agent := range allAgents {
+		agent.EnsureDefaults()
+		agent.ReadOnly = !types.IsSystemAdminFromContext(ctx) &&
+			(agent.TenantID != tenantID || agent.CreatedBy != userID)
+	}
+
+	builtinInDB := make(map[string]*types.CustomAgent)
+	for _, agent := range allAgents {
+		if agent.TenantID == tenantID && types.IsBuiltinAgentID(agent.ID) {
+			builtinInDB[agent.ID] = agent
+		}
+	}
+	result := make([]*types.CustomAgent, 0, len(allAgents)+len(types.GetBuiltinAgentIDs()))
+	for _, builtinID := range types.GetBuiltinAgentIDs() {
+		if agent := builtinInDB[builtinID]; agent != nil {
+			result = append(result, agent)
+		} else if agent := types.GetBuiltinAgentWithContext(ctx, builtinID, tenantID); agent != nil {
+			result = append(result, agent)
+		}
+	}
+	for _, agent := range allAgents {
+		if !types.IsBuiltinAgentID(agent.ID) {
+			result = append(result, agent)
+		}
+	}
+	return result, nil
 }
 
 // ListAgents lists all agents for the current tenant (including built-in agents)
@@ -239,8 +307,15 @@ func (s *customAgentService) UpdateAgent(ctx context.Context, agent *types.Custo
 		return s.updateBuiltinAgent(ctx, agent, tenantID)
 	}
 
-	// Get existing agent
-	existingAgent, err := s.repo.GetAgentByID(ctx, agent.ID, tenantID)
+	// Get existing agent. System administrators may manage a public agent from
+	// another workspace; all other callers remain tenant-scoped here.
+	var existingAgent *types.CustomAgent
+	var err error
+	if types.IsSystemAdminFromContext(ctx) {
+		existingAgent, err = s.repo.GetAgentByIDOnly(ctx, agent.ID)
+	} else {
+		existingAgent, err = s.repo.GetAgentByID(ctx, agent.ID, tenantID)
+	}
 	if err != nil {
 		if errors.Is(err, repository.ErrCustomAgentNotFound) {
 			return nil, ErrAgentNotFound
@@ -263,6 +338,9 @@ func (s *customAgentService) UpdateAgent(ctx context.Context, agent *types.Custo
 	existingAgent.Description = agent.Description
 	existingAgent.Avatar = agent.Avatar
 	existingAgent.Config = agent.Config
+	if agent.ClassificationTags != nil {
+		existingAgent.ClassificationTags = agent.ClassificationTags
+	}
 	existingAgent.UpdatedAt = time.Now()
 
 	// Ensure defaults
@@ -342,6 +420,25 @@ func (s *customAgentService) updateBuiltinAgent(ctx context.Context, agent *type
 	return newAgent, nil
 }
 
+func (s *customAgentService) UpdateVisibility(ctx context.Context, id string, visibility string) (*types.CustomAgent, error) {
+	if !types.IsSystemAdminFromContext(ctx) {
+		return nil, ErrAgentPermissionDenied
+	}
+	if visibility != types.ResourceVisibilityPublic && visibility != types.ResourceVisibilityPrivate {
+		return nil, errors.New("visibility must be public or private")
+	}
+	agent, err := s.repo.GetAgentByIDOnly(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	agent.Visibility = visibility
+	agent.UpdatedAt = time.Now()
+	if err := s.repo.UpdateAgent(ctx, agent); err != nil {
+		return nil, err
+	}
+	return agent, nil
+}
+
 // DeleteAgent deletes an agent
 func (s *customAgentService) DeleteAgent(ctx context.Context, id string) error {
 	if id == "" {
@@ -360,8 +457,15 @@ func (s *customAgentService) DeleteAgent(ctx context.Context, id string) error {
 		return ErrInvalidTenantID
 	}
 
-	// Get existing agent to verify ownership
-	existingAgent, err := s.repo.GetAgentByID(ctx, id, tenantID)
+	// Get existing agent to verify ownership. A system administrator may
+	// delete a public custom agent from another workspace.
+	var existingAgent *types.CustomAgent
+	var err error
+	if types.IsSystemAdminFromContext(ctx) {
+		existingAgent, err = s.repo.GetAgentByIDOnly(ctx, id)
+	} else {
+		existingAgent, err = s.repo.GetAgentByID(ctx, id, tenantID)
+	}
 	if err != nil {
 		if errors.Is(err, repository.ErrCustomAgentNotFound) {
 			return ErrAgentNotFound
@@ -376,7 +480,7 @@ func (s *customAgentService) DeleteAgent(ctx context.Context, id string) error {
 
 	logger.Infof(ctx, "Deleting custom agent, ID: %s", id)
 
-	if err := s.repo.DeleteAgent(ctx, id, tenantID); err != nil {
+	if err := s.repo.DeleteAgent(ctx, id, existingAgent.TenantID); err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"agent_id": id,
 		})
@@ -408,15 +512,16 @@ func (s *customAgentService) CopyAgent(ctx context.Context, id string) (*types.C
 
 	// Create a new agent with copied data
 	newAgent := &types.CustomAgent{
-		ID:          uuid.New().String(),
-		Name:        sourceAgent.Name + " (副本)",
-		Description: sourceAgent.Description,
-		Avatar:      sourceAgent.Avatar,
-		IsBuiltin:   false, // Copied agents are never built-in
-		TenantID:    tenantID,
-		Config:      sourceAgent.Config,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		ID:                 uuid.New().String(),
+		Name:               sourceAgent.Name + " (副本)",
+		Description:        sourceAgent.Description,
+		Avatar:             sourceAgent.Avatar,
+		IsBuiltin:          false, // Copied agents are never built-in
+		TenantID:           tenantID,
+		Config:             sourceAgent.Config,
+		ClassificationTags: cloneClassificationTags(sourceAgent.ClassificationTags),
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
 	}
 	// The clone is owned by whoever ran the copy, not the original
 	// creator — same reasoning as CopyKnowledgeBase. Skip synthetic
@@ -440,6 +545,17 @@ func (s *customAgentService) CopyAgent(ctx context.Context, id string) (*types.C
 
 	logger.Infof(ctx, "Agent copied successfully, source ID: %s, new ID: %s", id, newAgent.ID)
 	return newAgent, nil
+}
+
+func cloneClassificationTags(tags types.ClassificationTags) types.ClassificationTags {
+	if tags == nil {
+		return types.ClassificationTags{}
+	}
+	clone := make(types.ClassificationTags, len(tags))
+	for moduleID, optionIDs := range tags {
+		clone[moduleID] = append([]string(nil), optionIDs...)
+	}
+	return clone
 }
 
 // GetSuggestedQuestions returns suggested questions for the agent based on its

@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS knowledge_bases (
     wiki_config TEXT,
     indexing_strategy TEXT,
     creator_id VARCHAR(36),
+    visibility VARCHAR(20) NOT NULL DEFAULT 'workspace',
+    organization_node_id VARCHAR(36),
+    classification_tags TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     deleted_at DATETIME

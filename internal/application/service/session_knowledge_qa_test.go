@@ -49,6 +49,7 @@ func (m *captureChatModel) GetModelID() string   { return "capture" }
 
 type stubModelService struct {
 	chatModel chat.Chat
+	models    []*types.Model
 }
 
 func (s *stubModelService) CreateModel(context.Context, *types.Model) error {
@@ -60,9 +61,12 @@ func (s *stubModelService) GetModelByID(context.Context, string) (*types.Model, 
 }
 
 func (s *stubModelService) ListModels(context.Context) ([]*types.Model, error) {
-	return nil, nil
+	return s.models, nil
 }
 
+func (s *stubModelService) SetDefaultModel(context.Context, string) (*types.Model, error) {
+	return nil, nil
+}
 func (s *stubModelService) UpdateModel(context.Context, *types.Model) error {
 	return nil
 }
@@ -103,6 +107,48 @@ func (s *stubModelService) GetVLMModel(context.Context, string) (vlm.VLM, error)
 
 func (s *stubModelService) GetASRModel(context.Context, string) (asr.ASR, error) {
 	return nil, nil
+}
+
+func TestResolveAgentRerankModelIDPrefersExplicitBinding(t *testing.T) {
+	svc := &sessionService{modelService: &stubModelService{models: []*types.Model{
+		{ID: "default-rerank", Type: types.ModelTypeRerank, IsDefault: true},
+	}}}
+
+	got, err := svc.resolveAgentRerankModelID(context.Background(), "agent-rerank")
+	require.NoError(t, err)
+	assert.Equal(t, "agent-rerank", got)
+}
+
+func TestResolveAgentRerankModelIDUsesGlobalDefault(t *testing.T) {
+	svc := &sessionService{modelService: &stubModelService{models: []*types.Model{
+		{ID: "chat-default", Type: types.ModelTypeKnowledgeQA, IsDefault: true},
+		{ID: "default-rerank", Type: types.ModelTypeRerank, IsDefault: true},
+	}}}
+
+	got, err := svc.resolveAgentRerankModelID(context.Background(), "")
+	require.NoError(t, err)
+	assert.Equal(t, "default-rerank", got)
+}
+
+func TestResolveAgentRerankModelIDReturnsEmptyWithoutDefault(t *testing.T) {
+	svc := &sessionService{modelService: &stubModelService{models: []*types.Model{
+		{ID: "available-rerank", Type: types.ModelTypeRerank},
+	}}}
+
+	got, err := svc.resolveAgentRerankModelID(context.Background(), "")
+	require.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+func TestSelectChatModelID_PrefersTenantDefault(t *testing.T) {
+	svc := &sessionService{modelService: &stubModelService{models: []*types.Model{
+		{ID: "chat-first", Type: types.ModelTypeKnowledgeQA},
+		{ID: "chat-default", Type: types.ModelTypeKnowledgeQA, IsDefault: true},
+	}}}
+
+	got, err := svc.selectChatModelID(modelDefaultTestContext(1, false), &types.Session{}, nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "chat-default", got)
 }
 
 func TestHandleModelFallback_IncludesHistoryMessages(t *testing.T) {

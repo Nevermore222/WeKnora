@@ -62,7 +62,7 @@ func (h *ModelCredentialsHandler) Put(c *gin.Context) {
 
 	updated, err := h.svc.UpdateModelCredentials(ctx, id, req.APIKey, req.AppSecret)
 	if err != nil {
-		if err == service.ErrModelNotFound {
+		if err == service.ErrModelNotFound || err == service.ErrModelNotTenantOwned {
 			c.Error(errors.NewNotFoundError("Model not found"))
 			return
 		}

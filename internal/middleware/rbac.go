@@ -141,6 +141,37 @@ func RequireSystemAdmin(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
+// RequireOwnershipOrSystemAdmin allows only the original creator or a system
+// administrator. Unlike tenant-role guards, this is always enforced: owning or
+// administering the active workspace must not grant mutation rights over
+// another user's resource.
+func RequireOwnershipOrSystemAdmin(lookup CreatorLookup) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := c.Request.Context()
+		if types.IsSystemAdminFromContext(ctx) {
+			c.Next()
+			return
+		}
+		uid, _ := types.UserIDFromContext(ctx)
+		creator, err := lookup(c)
+		switch {
+		case errors.Is(err, ErrResourceNotFound):
+			c.Next()
+			return
+		case err != nil:
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Service Unavailable: cannot verify resource ownership"})
+			c.Abort()
+			return
+		case creator != "" && creator == uid:
+			c.Next()
+			return
+		default:
+			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden: resource is read-only"})
+			c.Abort()
+		}
+	}
+}
+
 // RequireOwnershipOrRole guards endpoints whose access is allowed for
 // either (a) callers whose role is at least min, or (b) the original
 // creator of the resource being touched.
