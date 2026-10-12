@@ -36,6 +36,28 @@ const sourcePrompt = normalizeLegacyCommentExamples(
 for (const marker of ["DLTFILE", "WORKING-STORAGE", "SUB_CATEGORY", "PACKED-DECIMAL", "DISPLAY"]) {
   if (!sourcePrompt.includes(marker)) throw new Error(`SR6 source prompt is missing marker: ${marker}`);
 }
+const fastSkillPath = path.resolve(repoRoot, "..", "..", "PI", ".pi", "skills", "cobol-case-pipeline-fast", "SKILL.md");
+const fastContractPath = path.resolve(repoRoot, "..", "..", "PI", ".pi", "skills", "cobol-case-pipeline-fast", "references", "sr6-code-contract.md");
+if (!fs.existsSync(fastSkillPath) || !fs.existsSync(fastContractPath)) throw new Error("cobol-case-pipeline-fast references are missing.");
+const fastSkillPrompt = fs.readFileSync(fastSkillPath, "utf8");
+const fastCodeContract = fs.readFileSync(fastContractPath, "utf8");
+const moveMasterContract = `
+
+MOVE_MASTER_EXECUTION_ADAPTER:
+- This Xelora agent is called by n8n with GENERATION_MODE: MOVE_MASTER and a TEST_CASES_TABLE containing up to five rows from one TEST_CATEGORY. Apply the TOIN SR6 fast-pipeline template and static contract above to every row. Do not use the old HANLE/LINKAGE/RESULT-RMSG1 template and do not invent a simplified template.
+- File naming is mandatory: PROGRAM_BASE_CODE is BO + COMMAND_ID and FILE_GROUP_SEQ is the supplied two-character uppercase base36 sequence (00..ZZ, 36x36=1296 values). Emit exactly BO{COMMAND_ID}C{FILE_GROUP_SEQ}.CL, BO{COMMAND_ID}B{FILE_GROUP_SEQ}.COBOL, and BO{COMMAND_ID}F{FILE_GROUP_SEQ}.SF. Never emit MOVE_TC/MOVE_TB/MOVE_TF filenames. PROGRAM-ID is BO{COMMAND_ID}B{FILE_GROUP_SEQ}; SELECT/physical result file uses BO{COMMAND_ID}F{FILE_GROUP_SEQ}; the canonical SF header is /FILE BO{COMMAND_ID}F{FILE_GROUP_SEQ}.
+- The CL is the standard SR6 driver: first line PGM; VAR    ?PGMEC,INTEGER; DLTFILE FILE-BO{COMMAND_ID}F{FILE_GROUP_SEQ}.SRTEST; CRTFILE FILE-BO{COMMAND_ID}F{FILE_GROUP_SEQ}.SRTEST,PUBAUT-@ALL,ORG-@SF,BF-2,RL-220, then the comma-wrapped RECN-100,ERECN-10 line; OVRF   FILE-BO{COMMAND_ID}F{FILE_GROUP_SEQ},TOFILE-BO{COMMAND_ID}F{FILE_GROUP_SEQ}.SRTEST; CALL   PGM-BO{COMMAND_ID}B{FILE_GROUP_SEQ}.SRTEST; ?PGMEC := @PGMEC; RETURN PGMEC-?PGMEC. Use exact spacing and single-quoted CL literals from the SR6 contract.
+- The COBOL must be the fast SR6 one-driver form. Use this exact procedure skeleton and do not rearrange it: PROCEDURE DIVISION. then PERFORM INIT-RTN., PERFORM MAIN-RTN., PERFORM END-RTN.; INIT-RTN SECTION.; MAIN-RTN SECTION. containing only PERFORM MOVE-METHOD-0-RTN.; one MOVE-METHOD-0-RTN SECTION. case; one MOVE-METHOD-0-EXIT. EXIT.; and END-RTN SECTION. Never put PERFORM END-RTN inside MAIN-RTN.
+- The COBOL identification/environment skeleton must contain IDENTIFICATION DIVISION., PROGRAM-ID. BO{COMMAND_ID}B{FILE_GROUP_SEQ}., AUTHOR. SR., ENVIRONMENT DIVISION., CONFIGURATION SECTION., SOURCE-COMPUTER. FACOM., OBJECT-COMPUTER. FACOM., INPUT-OUTPUT SECTION., and FILE-CONTROL. in that order. Use 01 STA01 PIC X(2)., not PIC XX.
+- The COBOL must be the fast SR6 one-driver form: all divisions, FILE-CONTROL, SELECT LOGFILE ASSIGN TO DA-BO{COMMAND_ID}F{FILE_GROUP_SEQ} FILE STATUS IS STA01, LOGFILE-REC with PGMID X(10), CASENO X(10), RESULT1 X(20), RESULT2 S9(10)V9(8), RESULT3 S9(10)V9(8) PACKED-DECIMAL, RESULT4 S9(18) COMP, RESULT5 N(12), RESULT6 X(120), WORKING-STORAGE declarations required by the current MOVE rows, PROCEDURE DIVISION with PERFORM INIT-RTN, MAIN-RTN, END-RTN, and no LINKAGE SECTION.
+- INIT-RTN contains the level-01 INITIALIZE statements required by the SR6 contract and opens OUTPUT LOGFILE before the first WRITE. Do not put INITIALIZE in a case section. MAIN-RTN only PERFORMs MOVE-METHOD-0-RTN (or the exact command-name equivalent) and each case has exactly one MOVE-METHOD-n-EXIT paragraph followed by EXIT.
+- Each MOVE case must have the complete SR6 50-column header with exactly these metadata labels: TP_NO, SUB_CATEGORY, PGMID, SOURCE_ID, STRUCTURE_ID, CASE_TYPE, DUPLICATE_SOURCE_IDS, plus a non-empty case purpose. Copy SUB_CATEGORY verbatim from the input row. Preserve every row's source/target declaration, input_data, expected_result, and MOVE semantics. The MOVE statement and operands are executable COBOL, not comments. For VAR_TYPE_GP(String), assign only the 01-level group variable P01 with MOVE HIGH-VALUES TO P01.; never expand to P0201/P0202 or other 02-level fields. Before output, inspect RESULT field lengths and store the value in the largest defined field RESULT6 using MOVE P01 TO RESULT6.; never store it in RESULT1-RESULT5 for this case. For other types, move the typed result directly to the matching RESULT field according to the SR6 type mapping, then WRITE LOGFILE-REC. Do not use DISPLAY, STRING summaries, or MOVE "OK".
+- The canonical SF is the fast SR6 PF layout: /FILE BO{COMMAND_ID}F{FILE_GROUP_SEQ}, a line beginning with one space then S0220002, /RECORD RCD, F1000, one-space-prefixed F1110 through F1180 with exact type codes from sr6-code-contract.md, and /END. Do not emit S0042001, four-field SF stubs, DDS, or *SRTEST in the canonical SF.
+- COBOL fixed-format prefix is literal, not descriptive. Copy these line starts exactly, including all leading ASCII spaces: IDENTIFICATION DIVISION., PROGRAM-ID. MOVE_TBxxx., AUTHOR. SR., ENVIRONMENT DIVISION., CONFIGURATION SECTION., SOURCE-COMPUTER. FACOM., OBJECT-COMPUTER. FACOM., INPUT-OUTPUT SECTION., FILE-CONTROL., DATA DIVISION., FILE SECTION., FD  LOGFILE., 01  LOGFILE-REC., WORKING-STORAGE SECTION., PROCEDURE DIVISION., INIT-RTN SECTION., MAIN-RTN SECTION., MOVE-METHOD-0-RTN SECTION., MOVE-METHOD-0-EXIT., END-RTN SECTION. The first seven spaces are required Area A indentation; never let Markdown rendering or sentence generation remove them.
+- Before returning COBOL, perform this mechanical check: every non-empty non-comment line starts with seven ASCII spaces; every comment line starts with six ASCII spaces followed by *; if any line fails, regenerate the complete COBOL section before answering. Do not return a prose explanation of the check.
+- Return only these three complete headings and source sections: ## BO{COMMAND_ID}C{FILE_GROUP_SEQ}.CL, ## BO{COMMAND_ID}B{FILE_GROUP_SEQ}.COBOL, ## BO{COMMAND_ID}F{FILE_GROUP_SEQ}.SF. Include every case in TEST_CASES_TABLE exactly once. Never return a JSON wrapper, prose, placeholders, old MOVE_TC/MOVE_TB/MOVE_TF headings, or an extra case.
+`;
+
 
 const xeloraContract = `
 
@@ -84,6 +106,17 @@ OCCURS_ACTUAL_STRUCTURE_FINAL_OVERRIDE:
 
 DIRECT_MOVE_TO_TYPED_RESULT_FIELD:
 - Write observable results by direct MOVE to the matching RESULT1 through RESULT6 field. Never use DISPLAY or STRING into a shared result buffer.
+
+MOVE_MASTER_FAST_SR6_TEMPLATE:
+- GENERATION_MODE MOVE_MASTER uses the TOIN SR6 fast-pipeline code template below. Do not use the historical HANLE/LINKAGE/RESULT-RMSG1 template.
+- The MOVE adapter changes only the external names: MOVE_TCxxx.CL, MOVE_TBxxx.COBOL, MOVE_TFxxx.SF. For sequence xxx, the COBOL PROGRAM-ID is MOVE_TBxxx, the CL CALL target is PGM-MOVE_TBxxx.SRTEST, the logical result file is MOVE_TFxxx, the physical result file is MOVE_TFxxx.SRTEST, the COBOL SELECT target is DA-MOVE_TFxxx, and the canonical SF first line is /FILE MOVE_TFxxx.
+- CL must start with PGM and use exactly the SR6 driver shape: VAR ?PGMEC,INTEGER; DLTFILE FILE-MOVE_TFxxx.SRTEST; CRTFILE FILE-MOVE_TFxxx.SRTEST,PUBAUT-@ALL,ORG-@SF,BF-2,RL-220, followed by RECN-100,ERECN-10; OVRF FILE-MOVE_TFxxx,TOFILE-MOVE_TFxxx.SRTEST; CALL PGM-MOVE_TBxxx.SRTEST; ?PGMEC := @PGMEC; RETURN PGMEC-?PGMEC. Use single-quoted CL literals and no IBM i PARM/FILE/TYPE forms.
+- COBOL must contain all divisions, FILE-CONTROL with SELECT LOGFILE ASSIGN TO DA-MOVE_TFxxx FILE STATUS IS STA01, 01 LOGFILE-REC with exactly the SR6 result layout PGMID, CASENO, RESULT1 X(20), RESULT2 S9(10)V9(8), RESULT3 S9(10)V9(8) PACKED-DECIMAL, RESULT4 S9(18) COMP, RESULT5 N(12), RESULT6 X(120), and the required WORKING-STORAGE declarations.
+- COBOL must use INIT-RTN, MAIN-RTN, and END-RTN. Put one INITIALIZE statement for each level-01 item in INIT-RTN before OPEN OUTPUT LOGFILE. MAIN-RTN only PERFORMs CMD-METHOD-n-RTN sections. Each case section has one CMD-METHOD-n-EXIT paragraph and EXIT. Never add LINKAGE SECTION, parameters, RESULT/RMSG1 fields, RESULT-only layouts, or a generated simplified driver.
+- Each MOVE case must include the complete 50-column SR6 header: TC number and purpose, TP_NO, SUB_CATEGORY copied verbatim, PGMID, SOURCE_ID, STRUCTURE_ID, CASE_TYPE, DUPLICATE_SOURCE_IDS. Copy the MOVE operation as executable COBOL, preserve source declaration/type semantics, perform the requested MOVE, move the typed result directly to RESULT1 through RESULT6 according to the SR6 type mapping, and finish with WRITE LOGFILE-REC. Do not use DISPLAY, STRING summaries, or meaningless MOVE "OK".
+- The canonical MOVE SF must be the SR6 PF layout, not a DDS or four-field stub: /FILE MOVE_TFxxx, S0220002, /RECORD RCD, F1000, F1110 X 0010, F1120 X 0010, F1130 X 0020, F1140 US 001808, F1150 PS 001808, F1160 BS 0018, F1170 N 0012, F1180 X 0120, /END. Keep the leading spaces exactly as the SR6 reference.
+- Fixed-format constraints: comment indicator * in COBOL column 7, comment borders exactly 50 display columns, comments <=50, source/code lines <=72 display columns, no Markdown fences, no tabs, no .SRTEST in PROGRAM-ID, no CASE INITIALIZE, and no extra LINKAGE section.
+- Return exactly the three headings ## MOVE_TCxxx.CL, ## MOVE_TBxxx.COBOL, ## MOVE_TFxxx.SF with complete source only. Do not explain the output.
 
 NO_WORKFLOW_SEMANTIC_VALIDATION:
 - n8n only extracts and stores the three file sections. Therefore you must perform the complete semantic and formatting self-review defined above before returning.
@@ -171,7 +204,7 @@ if (!rerankModelId) throw new Error(`No active Rerank model found for tenant ${t
 const agentConfig = {
   agent_mode: "smart-reasoning",
   agent_type: "rag-qa",
-  system_prompt: `${sourcePrompt}${xeloraContract}`,
+  system_prompt: `${fastSkillPrompt}\n\n${fastCodeContract}\n${moveMasterContract}`,
   context_template: "",
   model_id: modelId,
   rerank_model_id: rerankModelId,

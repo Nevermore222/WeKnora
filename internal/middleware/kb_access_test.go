@@ -470,9 +470,9 @@ func TestRequireKBAccess_AgentShare_SpecificAgent_ModeNone(t *testing.T) {
 }
 
 func TestRequireKBAccess_AgentShare_SpecificAgent_TenantMismatch(t *testing.T) {
-	// Agent belongs to tenant 999 but KB belongs to tenant 200 → reject
-	// (this is the kb.TenantID != agent.TenantID guard in the handler;
-	// preserves cross-tenant isolation when shares get reshuffled).
+	// Agent belongs to tenant 999 but KB belongs to tenant 200 and there is
+	// no org-share for the caller. Isolation still holds: naming a shared
+	// agent must not open an unshared cross-tenant KB.
 	agent := &stubAgentShareForGuard{
 		agents: map[string]*types.CustomAgent{
 			"agent-A": {
@@ -491,6 +491,76 @@ func TestRequireKBAccess_AgentShare_SpecificAgent_TenantMismatch(t *testing.T) {
 		guardOpts{agentShare: agent, agentID: "agent-A"},
 	)
 	require.True(t, c.IsAborted())
+}
+
+func TestRequireKBAccess_AgentShare_SpecificAgent_CrossTenantSharedKB_Viewer(t *testing.T) {
+	share := &stubKBShareForGuard{
+		permission: map[string]types.OrgMemberRole{"kb-shared": types.OrgRoleViewer},
+		shared:     map[string]bool{"kb-shared": true},
+		source:     map[string]uint64{"kb-shared": 200},
+	}
+	agent := &stubAgentShareForGuard{
+		agents: map[string]*types.CustomAgent{
+			"agent-A": {
+				ID:       "agent-A",
+				TenantID: 999,
+				Config: types.CustomAgentConfig{
+					KBSelectionMode: "selected",
+					KnowledgeBases:  []string{"kb-shared"},
+				},
+			},
+		},
+	}
+	_, c := runGuard(t, 100, "kb-shared",
+		types.OrgRoleViewer,
+		&types.KnowledgeBase{ID: "kb-shared", TenantID: 200, Visibility: types.ResourceVisibilityWorkspace},
+		share,
+		guardOpts{agentShare: agent, agentID: "agent-A"},
+	)
+	require.False(t, c.IsAborted())
+	access, ok := KBAccessFromContext(c)
+	require.True(t, ok)
+	require.Equal(t, uint64(200), access.EffectiveTenantID)
+	require.Equal(t, types.OrgRoleViewer, access.Permission)
+}
+
+func TestRequireKBAccess_AgentShare_SpecificAgent_CrossTenantUnsharedKB_Aborts(t *testing.T) {
+	agent := &stubAgentShareForGuard{
+		agents: map[string]*types.CustomAgent{
+			"agent-A": {
+				ID:       "agent-A",
+				TenantID: 999,
+				Config: types.CustomAgentConfig{
+					KBSelectionMode: "selected",
+					KnowledgeBases:  []string{"kb-unshared"},
+				},
+			},
+		},
+	}
+	_, c := runGuard(t, 100, "kb-unshared",
+		types.OrgRoleViewer,
+		&types.KnowledgeBase{ID: "kb-unshared", TenantID: 200, Visibility: types.ResourceVisibilityWorkspace},
+		nil,
+		guardOpts{agentShare: agent, agentID: "agent-A"},
+	)
+	require.True(t, c.IsAborted())
+}
+
+func TestRequireKBAccess_SharedKB_ViewerCanReadButNotWrite(t *testing.T) {
+	share := &stubKBShareForGuard{
+		permission: map[string]types.OrgMemberRole{"kb-shared": types.OrgRoleViewer},
+		shared:     map[string]bool{"kb-shared": true},
+		source:     map[string]uint64{"kb-shared": 200},
+	}
+	kb := &types.KnowledgeBase{ID: "kb-shared", TenantID: 200, Visibility: types.ResourceVisibilityWorkspace}
+	_, readCtx := runGuard(t, 100, "kb-shared", types.OrgRoleViewer, kb, share, guardOpts{})
+	require.False(t, readCtx.IsAborted())
+	access, ok := KBAccessFromContext(readCtx)
+	require.True(t, ok)
+	require.Equal(t, types.OrgRoleViewer, access.Permission)
+
+	_, writeCtx := runGuard(t, 100, "kb-shared", types.OrgRoleEditor, kb, share, guardOpts{})
+	require.True(t, writeCtx.IsAborted())
 }
 
 // ---------- EnableRBAC=false rollout window ----------

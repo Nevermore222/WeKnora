@@ -4,7 +4,16 @@ This repository uses `AGENTS.md` as the default coding-agent context file.
 All future agents working in this repo should read this file first and follow
 the linked planning and progress documents before making substantial changes.
 
-## Required Reading
+## Remote Runtime Connection
+
+For Xelora environment setup, service inspection, and execution-log queries, use the Windows Docker host `192.168.9.177` with SSH user `softroad`:
+
+```bash
+ssh softroad@192.168.9.177
+```
+
+This host provides the Xelora runtime (`Xelora-app`, `Xelora-frontend`, `Xelora-postgres`, `Xelora-docreader`, `Xelora-opensandbox`, and `Xelora-redis`). SSH opens `cmd.exe` by default, so use Windows commands such as `dir`, `type`, `tasklist`, and `docker`; invoke `powershell.exe -NoProfile -Command ...` when PowerShell is needed. Do not store passwords or private keys in the repository. Keep `192.168.8.247` separate as the n8n/workflow host.
+
 
 Before planning, coding, or reviewing runtime-related work, read these files in order:
 

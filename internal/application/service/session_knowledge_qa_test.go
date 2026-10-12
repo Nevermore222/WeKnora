@@ -11,6 +11,7 @@ import (
 	"github.com/Tencent/Xelora/internal/models/rerank"
 	"github.com/Tencent/Xelora/internal/models/vlm"
 	"github.com/Tencent/Xelora/internal/types"
+	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -191,4 +192,124 @@ func TestHandleModelFallback_IncludesHistoryMessages(t *testing.T) {
 	assert.Equal(t, "Xelora 是一个知识库问答系统。", chatModel.lastMessages[1].Content)
 	assert.Equal(t, "user", chatModel.lastMessages[2].Role)
 	assert.Contains(t, chatModel.lastMessages[2].Content, "现在还能继续讲吗？")
+}
+
+func TestFilterSharedAgentKnowledgeBases_AllowsCrossTenantSharedWorkspaceKB(t *testing.T) {
+	agent := &types.CustomAgent{TenantID: 10000}
+	configured := []string{"kb-cross-tenant"}
+	loaded := []*types.KnowledgeBase{{
+		ID:         "kb-cross-tenant",
+		TenantID:   10000,
+		Visibility: types.ResourceVisibilityWorkspace,
+	}}
+	shared := []*types.SharedKnowledgeBaseInfo{{
+		KnowledgeBase:  loaded[0],
+		Permission:     types.OrgRoleViewer,
+		SourceTenantID: 10000,
+	}}
+
+	got := filterSharedAgentKnowledgeBases(agent, 10007, "wangl", configured, loaded, shared)
+
+	require.Equal(t, configured, got)
+}
+
+func TestFilterSharedAgentKnowledgeBases_RejectsUnsharedCrossTenantKB(t *testing.T) {
+	agent := &types.CustomAgent{TenantID: 10000}
+	configured := []string{"kb-unshared"}
+	loaded := []*types.KnowledgeBase{{
+		ID:         "kb-unshared",
+		TenantID:   10009,
+		Visibility: types.ResourceVisibilityWorkspace,
+	}}
+
+	got := filterSharedAgentKnowledgeBases(agent, 10007, "wangl", configured, loaded, nil)
+
+	require.Empty(t, got)
+}
+
+func TestFilterSharedAgentKnowledgeBases_AllowsCallerWorkspaceKB(t *testing.T) {
+	agent := &types.CustomAgent{TenantID: 10000}
+	configured := []string{"kb-caller-workspace"}
+	loaded := []*types.KnowledgeBase{{
+		ID:         "kb-caller-workspace",
+		TenantID:   10007,
+		Visibility: types.ResourceVisibilityWorkspace,
+	}}
+
+	got := filterSharedAgentKnowledgeBases(agent, 10007, "wangl", configured, loaded, nil)
+
+	require.Equal(t, configured, got)
+}
+
+func TestFilterSharedAgentKnowledgeBases_RejectsUnsharedAgentWorkspaceKB(t *testing.T) {
+	agent := &types.CustomAgent{TenantID: 10000}
+	configured := []string{"kb-agent-workspace"}
+	loaded := []*types.KnowledgeBase{{
+		ID:         "kb-agent-workspace",
+		TenantID:   10000,
+		Visibility: types.ResourceVisibilityWorkspace,
+	}}
+
+	got := filterSharedAgentKnowledgeBases(agent, 10007, "wangl", configured, loaded, nil)
+
+	require.Empty(t, got)
+}
+
+type stubSearchTargetKBService struct {
+	interfaces.KnowledgeBaseService
+	kbs []*types.KnowledgeBase
+}
+
+func (s *stubSearchTargetKBService) GetKnowledgeBasesByIDsOnly(_ context.Context, _ []string) ([]*types.KnowledgeBase, error) {
+	return s.kbs, nil
+}
+
+type recordingKBShareService struct {
+	fakeKBShareService
+	lastCallerTenantID uint64
+}
+
+func (s *recordingKBShareService) HasTenantKBPermission(_ context.Context, kbID string, callerTenantID uint64, _ types.TenantRole, _ types.OrgMemberRole) (bool, error) {
+	s.lastCallerTenantID = callerTenantID
+	return s.allowedKBs[kbID], nil
+}
+
+func TestBuildSearchTargetsForAccess_UsesCallerTenantForSharedWorkspaceKB(t *testing.T) {
+	share := &recordingKBShareService{fakeKBShareService: fakeKBShareService{allowedKBs: map[string]bool{"kb-cross-tenant": true}}}
+	svc := &sessionService{
+		knowledgeBaseService: &stubSearchTargetKBService{kbs: []*types.KnowledgeBase{{
+			ID:         "kb-cross-tenant",
+			TenantID:   10009,
+			Visibility: types.ResourceVisibilityWorkspace,
+		}}},
+		kbShareService: share,
+	}
+	ctx := context.WithValue(context.Background(), types.UserIDContextKey, "wangl")
+
+	got, err := svc.buildSearchTargetsForAccess(ctx, 10000, 10007, []string{"kb-cross-tenant"}, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, uint64(10007), share.lastCallerTenantID)
+	require.Len(t, got, 1)
+	require.Equal(t, "kb-cross-tenant", got[0].KnowledgeBaseID)
+	require.Equal(t, uint64(10009), got[0].TenantID)
+}
+
+func TestBuildSearchTargetsForAccess_UsesCallerTenantForCallerWorkspaceKB(t *testing.T) {
+	share := &recordingKBShareService{fakeKBShareService: fakeKBShareService{allowedKBs: map[string]bool{}}}
+	svc := &sessionService{
+		knowledgeBaseService: &stubSearchTargetKBService{kbs: []*types.KnowledgeBase{{
+			ID:         "kb-caller-workspace",
+			TenantID:   10007,
+			Visibility: types.ResourceVisibilityWorkspace,
+		}}},
+		kbShareService: share,
+	}
+	ctx := context.WithValue(context.Background(), types.UserIDContextKey, "wangl")
+
+	got, err := svc.buildSearchTargetsForAccess(ctx, 10000, 10007, []string{"kb-caller-workspace"}, nil)
+
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, uint64(10007), got[0].TenantID)
 }

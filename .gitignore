@@ -77,6 +77,10 @@ miniprogram/project.private.config.json
 /scripts/n8n/
 **/*n8n*
 **/*N8N*
+!/scripts/n8n/
+!/scripts/n8n/build-xelora-generic-command-parse-workflow.mjs
+!/scripts/n8n/validate-xelora-generic-command-parse-workflow.mjs
+scripts/n8n/backups/
 **/*cl-verification*
 **/*CL-verification*
 **/*-cl-*

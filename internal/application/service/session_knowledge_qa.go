@@ -84,7 +84,7 @@ func (s *sessionService) KnowledgeQA(
 	retrievalTenantID := s.resolveRetrievalTenantID(ctx, req)
 
 	// Build unified search targets (computed once, used throughout pipeline)
-	searchTargets, err := s.buildSearchTargets(ctx, retrievalTenantID, knowledgeBaseIDs, knowledgeIDs)
+	searchTargets, err := s.buildSearchTargetsForAccess(ctx, retrievalTenantID, req.Session.TenantID, knowledgeBaseIDs, knowledgeIDs)
 	if err != nil {
 		logger.Warnf(ctx, "Failed to build search targets: %v", err)
 	}
@@ -430,13 +430,15 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 			logger.Warnf(ctx, "Failed to validate public agent knowledge bases: %v", err)
 			return nil
 		}
-		publicIDs := make([]string, 0, len(selected))
-		for _, kb := range selected {
-			if kb != nil && kb.TenantID == customAgent.TenantID && kb.Visibility == types.ResourceVisibilityPublic {
-				publicIDs = append(publicIDs, kb.ID)
+		var shared []*types.SharedKnowledgeBaseInfo
+		if s.kbShareService != nil {
+			shared, err = s.kbShareService.ListSharedKnowledgeBases(ctx, sessionTenantID, types.TenantRoleFromContext(ctx))
+			if err != nil {
+				logger.Warnf(ctx, "Failed to list shared knowledge bases for agent scope: %v", err)
 			}
 		}
-		return publicIDs
+		userID, _ := types.UserIDFromContext(ctx)
+		return filterSharedAgentKnowledgeBases(customAgent, sessionTenantID, userID, customAgent.Config.KnowledgeBases, selected, shared)
 	case "none":
 		logger.Infof(ctx, "KBSelectionMode=none: no knowledge bases configured")
 		return nil
@@ -449,6 +451,60 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 	}
 }
 
+// filterSharedAgentKnowledgeBases returns the agent's configured KBs that the
+// current caller is actually allowed to read. A shared agent may reference a
+// KB owned by another tenant when that KB has been explicitly shared with the
+// caller's tenant; such a KB remains read-only but must not be discarded just
+// because its source tenant differs from the agent's tenant.
+func filterSharedAgentKnowledgeBases(
+	agent *types.CustomAgent,
+	sessionTenantID uint64,
+	sessionUserID string,
+	configuredIDs []string,
+	loaded []*types.KnowledgeBase,
+	shared []*types.SharedKnowledgeBaseInfo,
+) []string {
+	if agent == nil || len(configuredIDs) == 0 {
+		return nil
+	}
+	loadedByID := make(map[string]*types.KnowledgeBase, len(loaded))
+	for _, kb := range loaded {
+		if kb != nil {
+			loadedByID[kb.ID] = kb
+		}
+	}
+	sharedByID := make(map[string]bool, len(shared))
+	for _, info := range shared {
+		if info == nil || info.KnowledgeBase == nil {
+			continue
+		}
+		if info.Permission.HasPermission(types.OrgRoleViewer) {
+			sharedByID[info.KnowledgeBase.ID] = true
+		}
+	}
+
+	result := make([]string, 0, len(configuredIDs))
+	seen := make(map[string]bool, len(configuredIDs))
+	for _, id := range configuredIDs {
+		if id == "" || seen[id] {
+			continue
+		}
+		kb := loadedByID[id]
+		if kb == nil {
+			continue
+		}
+		allowed := kb.Visibility == types.ResourceVisibilityPublic || sharedByID[id]
+		if kb.TenantID == sessionTenantID {
+			allowed = kb.Visibility != types.ResourceVisibilityPrivate || (sessionUserID != "" && kb.CreatorID == sessionUserID)
+		}
+		if allowed {
+			result = append(result, id)
+			seen[id] = true
+		}
+	}
+	return result
+}
+
 // buildSearchTargets computes the unified search targets from knowledgeBaseIDs and knowledgeIDs.
 // tenantID is the retrieval scope: session.TenantID or effective tenant from shared agent (set by handler).
 // This is called once at the request entry point to avoid repeated queries later in the pipeline.
@@ -458,6 +514,20 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 func (s *sessionService) buildSearchTargets(
 	ctx context.Context,
 	tenantID uint64,
+	knowledgeBaseIDs []string,
+	knowledgeIDs []string,
+) (types.SearchTargets, error) {
+	return s.buildSearchTargetsForAccess(ctx, tenantID, tenantID, knowledgeBaseIDs, knowledgeIDs)
+}
+
+// buildSearchTargetsForAccess separates the retrieval tenant from the caller
+// tenant. Shared-agent requests retrieve using the agent's source tenant for
+// storage/model scope, but permission checks must use the actual caller tenant
+// so a legitimately shared cross-tenant KB remains searchable read-only.
+func (s *sessionService) buildSearchTargetsForAccess(
+	ctx context.Context,
+	tenantID uint64,
+	accessTenantID uint64,
 	knowledgeBaseIDs []string,
 	knowledgeIDs []string,
 ) (types.SearchTargets, error) {
@@ -485,10 +555,10 @@ func (s *sessionService) buildSearchTargets(
 			kb := kbByID[kbID]
 			if kb == nil {
 				kbTenantMap[kbID] = tenantID
-			} else if kb.TenantID == tenantID {
-				kbTenantMap[kbID] = tenantID
+			} else if kb.TenantID == tenantID || kb.TenantID == accessTenantID || kb.Visibility == types.ResourceVisibilityPublic {
+				kbTenantMap[kbID] = kb.TenantID
 			} else if s.kbShareService != nil && userID != "" {
-				hasAccess, _ := s.kbShareService.HasTenantKBPermission(ctx, kbID, tenantID, callerTenantRole, types.OrgRoleViewer)
+				hasAccess, _ := s.kbShareService.HasTenantKBPermission(ctx, kbID, accessTenantID, callerTenantRole, types.OrgRoleViewer)
 				if hasAccess {
 					kbTenantMap[kbID] = kb.TenantID
 				} else {

@@ -1,0 +1,26 @@
+[
+  {
+    "action": "created",
+    "name": "AS400-CLP命令参数解析智能体",
+    "id": "1e2235d5-c7bd-4d7c-b9be-5fc2c3f710d7",
+    "kb": "2b165a43-1c9b-493d-b248-c1e505163efd",
+    "model": "b0cc7678-a8a7-4296-9a0b-9ba6b8ddc589",
+    "promptLength": 2406
+  },
+  {
+    "action": "created",
+    "name": "AS400-CLP命令概述解析智能体",
+    "id": "1a678a63-403c-462c-a788-dd5e7cef64a1",
+    "kb": "2b165a43-1c9b-493d-b248-c1e505163efd",
+    "model": "b0cc7678-a8a7-4296-9a0b-9ba6b8ddc589",
+    "promptLength": 2740
+  },
+  {
+    "action": "created",
+    "name": "AS400-CLP全量检证用例二维表生成智能体",
+    "id": "d431bac0-0638-4d36-9aad-822fb6b86841",
+    "kb": "2b165a43-1c9b-493d-b248-c1e505163efd",
+    "model": "cd3394b4-99d6-4f10-9c5b-12f773add8f7",
+    "promptLength": 3329
+  }
+]
