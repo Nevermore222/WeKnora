@@ -15,6 +15,7 @@ import (
 	"github.com/Tencent/Xelora/internal/errors"
 	apperrors "github.com/Tencent/Xelora/internal/errors"
 	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/middleware"
 	"github.com/Tencent/Xelora/internal/tracing/langfuse"
 	"github.com/Tencent/Xelora/internal/types"
 	"github.com/Tencent/Xelora/internal/types/interfaces"
@@ -134,7 +135,7 @@ func (h *KnowledgeBaseHandler) buildKBListResponse(
 		switch {
 		case !kb.HasVectorStore():
 			view = defaultView
-		case kb.TenantID != callerTenantID:
+		case kb.TenantID != callerTenantID && !types.IsSystemAdminFromContext(ctx):
 			view = types.SharedStoreDisplay()
 		default:
 			v, ok := storeViews[*kb.VectorStoreID]
@@ -209,6 +210,9 @@ func (h *KnowledgeBaseHandler) batchResolveKBStoreViews(
 	if h.vectorStoreService == nil {
 		return nil
 	}
+	if types.IsSystemAdminFromContext(ctx) {
+		return h.batchResolveKBStoreViewsByTenant(ctx, kbs)
+	}
 	storeIDs := make([]string, 0, len(kbs))
 	seen := make(map[string]bool, len(kbs))
 	for _, kb := range kbs {
@@ -235,6 +239,46 @@ func (h *KnowledgeBaseHandler) batchResolveKBStoreViews(
 	return views
 }
 
+func (h *KnowledgeBaseHandler) batchResolveKBStoreViewsByTenant(
+	ctx context.Context, kbs []*types.KnowledgeBase,
+) map[string]types.StoreDisplay {
+	storeIDsByTenant := make(map[uint64][]string)
+	seenByTenant := make(map[uint64]map[string]bool)
+	for _, kb := range kbs {
+		if !kb.HasVectorStore() {
+			continue
+		}
+		if seenByTenant[kb.TenantID] == nil {
+			seenByTenant[kb.TenantID] = make(map[string]bool)
+		}
+		storeID := *kb.VectorStoreID
+		if seenByTenant[kb.TenantID][storeID] {
+			continue
+		}
+		seenByTenant[kb.TenantID][storeID] = true
+		storeIDsByTenant[kb.TenantID] = append(storeIDsByTenant[kb.TenantID], storeID)
+	}
+
+	views := make(map[string]types.StoreDisplay)
+	for tenantID, storeIDs := range storeIDsByTenant {
+		tenantViews, err := h.vectorStoreService.BatchResolveStoreView(ctx, tenantID, storeIDs)
+		if err != nil {
+			logger.WarnWithFields(ctx, logger.Fields{
+				"tenant_id":   tenantID,
+				"store_count": len(storeIDs),
+			}, "[kb.list] batch store view resolve failed for resource tenant")
+			continue
+		}
+		for storeID, view := range tenantViews {
+			views[storeID] = view
+		}
+	}
+	if len(views) == 0 {
+		return nil
+	}
+	return views
+}
+
 // resolveKBStoreView returns the store display payload to embed in the KB
 // response. It applies two policies on top of the service-level resolver:
 //
@@ -252,7 +296,7 @@ func (h *KnowledgeBaseHandler) resolveKBStoreView(
 	if !kb.HasVectorStore() {
 		return h.envDefaultStoreView(ctx)
 	}
-	if kb.TenantID != callerTenantID {
+	if kb.TenantID != callerTenantID && !types.IsSystemAdminFromContext(ctx) {
 		return types.SharedStoreDisplay()
 	}
 	if h.vectorStoreService == nil {
@@ -439,6 +483,9 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 	// non-creators receive read-only permission even if they are tenant Admin.
 	callerUserID, _ := userID.(string)
 	if types.IsSystemAdminFromContext(ctx) {
+		c.Set(types.TenantIDContextKey.String(), kb.TenantID)
+		effectiveCtx := context.WithValue(ctx, types.TenantIDContextKey, kb.TenantID)
+		c.Request = c.Request.WithContext(effectiveCtx)
 		return kb, id, kb.TenantID, types.OrgRoleAdmin, nil
 	}
 	if kb.TenantID == tenantID.(uint64) {
@@ -474,7 +521,11 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 	}
 
 	// Check 4: Shared agent — allow if request has agent_id (and agent can access this KB) OR caller's tenant has any shared agent that can access this KB (e.g. opened from "通过智能体可见" list without agent_id)
-	if h.agentShareService != nil {
+	// Private knowledge bases are excluded: agent scope resolution and retrieval
+	// both drop them, so allowing them here would open a KB the agent cannot
+	// search. middleware.AgentMayCarryKB keeps this rule identical to the route
+	// guard's.
+	if h.agentShareService != nil && middleware.AgentMayCarryKB(ctx, kb) {
 		currentTenantID := tenantID.(uint64)
 		agentID := c.Query("agent_id")
 		if agentID != "" {
@@ -1010,6 +1061,15 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 		c.Error(apperrors.NewUnauthorizedError("Unauthorized"))
 		return
 	}
+	callerTenantID, ok := types.CallerTenantIDFromContext(ctx)
+	if !ok || callerTenantID == 0 {
+		callerTenantID, ok = tenantID.(uint64)
+		if !ok || callerTenantID == 0 {
+			c.Error(apperrors.NewUnauthorizedError("Unauthorized"))
+			return
+		}
+	}
+	isSystemAdmin := types.IsSystemAdminFromContext(ctx)
 
 	// Validate source knowledge base exists and belongs to caller's tenant (prevent cross-tenant clone)
 	sourceKB, err := h.service.GetKnowledgeBaseByID(ctx, req.SourceID)
@@ -1022,13 +1082,14 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 		c.Error(errors.NewInternalServerError(err.Error()))
 		return
 	}
-	if sourceKB.TenantID != tenantID.(uint64) {
+	if sourceKB.TenantID != callerTenantID && !isSystemAdmin {
 		logger.Warnf(ctx,
 			"Copy rejected: source knowledge base belongs to another tenant, source_id: %s, caller_tenant: %d, kb_tenant: %d",
-			secutils.SanitizeForLog(req.SourceID), tenantID.(uint64), sourceKB.TenantID)
+			secutils.SanitizeForLog(req.SourceID), callerTenantID, sourceKB.TenantID)
 		c.Error(errors.NewForbiddenError("No permission to copy this knowledge base"))
 		return
 	}
+	targetTenantID := callerTenantID
 
 	// If target_id provided, validate target belongs to caller's tenant
 	// and run the pre-flight defenses synchronously so a mismatched
@@ -1046,12 +1107,13 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 			c.Error(errors.NewInternalServerError(err.Error()))
 			return
 		}
-		if targetKB.TenantID != tenantID.(uint64) {
+		if targetKB.TenantID != callerTenantID && !isSystemAdmin {
 			logger.Warnf(ctx, "Copy rejected: target knowledge base belongs to another tenant, target_id: %s",
 				secutils.SanitizeForLog(req.TargetID))
 			c.Error(errors.NewForbiddenError("No permission to copy to this knowledge base"))
 			return
 		}
+		targetTenantID = targetKB.TenantID
 		// Pre-flight defense 1: embedding model must match.
 		// Without this check the async clone would run with incompatible
 		// vector spaces and produce semantically broken results.
@@ -1077,7 +1139,8 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 		// backends and the pins must NOT be used to reject (false positive).
 		// When a tenant config exists, pins are honored, so reject a genuine
 		// cross-backend clone before enqueueing.
-		if tenant, _ := ctx.Value(types.TenantInfoContextKey).(*types.Tenant); tenant != nil && tenant.StorageEngineConfig != nil {
+		if tenant, _ := ctx.Value(types.TenantInfoContextKey).(*types.Tenant); (!isSystemAdmin || sourceKB.TenantID == targetKB.TenantID) &&
+			tenant != nil && tenant.StorageEngineConfig != nil {
 			tenantDefault := tenant.StorageEngineConfig.DefaultProvider
 			srcProvider := sourceKB.EffectiveStorageProvider(tenantDefault)
 			dstProvider := targetKB.EffectiveStorageProvider(tenantDefault)
@@ -1093,15 +1156,17 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 	// Generate task ID if not provided
 	taskID := req.TaskID
 	if taskID == "" {
-		taskID = utils.GenerateTaskID("kb_clone", tenantID.(uint64), req.SourceID)
+		taskID = utils.GenerateTaskID("kb_clone", callerTenantID, req.SourceID)
 	}
 
 	// Create KB clone payload
 	payload := types.KBClonePayload{
-		TenantID: tenantID.(uint64),
-		TaskID:   taskID,
-		SourceID: req.SourceID,
-		TargetID: req.TargetID,
+		SourceTenantID: sourceKB.TenantID,
+		TargetTenantID: targetTenantID,
+		TenantID:       sourceKB.TenantID,
+		TaskID:         taskID,
+		SourceID:       req.SourceID,
+		TargetID:       req.TargetID,
 	}
 	langfuse.InjectTracing(ctx, &payload)
 
@@ -1293,13 +1358,19 @@ func (h *KnowledgeBaseHandler) ListMoveTargets(c *gin.Context) {
 		c.Error(errors.NewInternalServerError(err.Error()))
 		return
 	}
-	if sourceKB.TenantID != tenantID.(uint64) {
+	isSystemAdmin := types.IsSystemAdminFromContext(ctx)
+	if sourceKB.TenantID != tenantID.(uint64) && !isSystemAdmin {
 		c.Error(errors.NewForbiddenError("No permission to access this knowledge base"))
 		return
 	}
 
 	// Get all knowledge bases
-	allKBs, err := h.service.ListKnowledgeBases(ctx)
+	var allKBs []*types.KnowledgeBase
+	if isSystemAdmin {
+		allKBs, err = h.service.ListVisibleKnowledgeBases(ctx)
+	} else {
+		allKBs, err = h.service.ListKnowledgeBases(ctx)
+	}
 	if err != nil {
 		c.Error(errors.NewInternalServerError(err.Error()))
 		return

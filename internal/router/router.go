@@ -22,6 +22,7 @@ import (
 	"github.com/Tencent/Xelora/internal/handler"
 	"github.com/Tencent/Xelora/internal/handler/session"
 	"github.com/Tencent/Xelora/internal/logger"
+	"github.com/Tencent/Xelora/internal/mcpserver"
 	"github.com/Tencent/Xelora/internal/middleware"
 	"github.com/Tencent/Xelora/internal/tracing/langfuse"
 	"github.com/Tencent/Xelora/internal/types"
@@ -67,6 +68,9 @@ type RouterParams struct {
 	InitializationHandler        *handler.InitializationHandler
 	SystemHandler                *handler.SystemHandler
 	MCPServiceHandler            *handler.MCPServiceHandler
+	MCPEndpointHandler           *handler.MCPEndpointHandler
+	MCPEndpointService           interfaces.MCPEndpointService
+	MCPServer                    *mcpserver.Server
 	MCPCredentialsHandler        *handler.MCPCredentialsHandler
 	MCPOAuthHandler              *handler.MCPOAuthHandler
 	WebSearchHandler             *handler.WebSearchHandler
@@ -159,6 +163,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 
 	// Web embed 公开路由（使用 publish token 鉴权，不走全局 Auth）
 	RegisterEmbedPublicRoutes(r, params.EmbedChannelHandler, params.EmbedChannelService, params.TenantService, params.RedisClient, params.FileService)
+	RegisterMCPServerRoutes(r, params.MCPServer, params.MCPEndpointService, params.TenantService)
 
 	// Desktop clients use this public, data-free endpoint to negotiate the API
 	// contract before a user signs in.
@@ -233,6 +238,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterSystemRoutes(v1, params.SystemHandler, rbacGuards)
 		RegisterSystemAdminRoutes(v1, params.SystemHandler, params.AuditLogHandler, rbacGuards)
 		RegisterMCPServiceRoutes(v1, params.MCPServiceHandler, params.MCPCredentialsHandler, params.MCPOAuthHandler, rbacGuards)
+		RegisterMCPEndpointRoutes(v1, params.MCPEndpointHandler, rbacGuards)
 		RegisterWebSearchRoutes(v1, params.WebSearchHandler, rbacGuards)
 		RegisterWebSearchProviderRoutes(v1, params.WebSearchProviderHandler, params.WebSearchCredentialsHandler, rbacGuards)
 		RegisterVectorStoreRoutes(v1, params.VectorStoreHandler, rbacGuards)

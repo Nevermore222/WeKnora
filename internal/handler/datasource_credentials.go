@@ -48,7 +48,8 @@ func (h *DataSourceCredentialsHandler) ownDataSource(c *gin.Context) (*types.Dat
 		return nil, false
 	}
 	kb, err := h.kbService.GetKnowledgeBaseByID(ctx, ds.KnowledgeBaseID)
-	if err != nil || kb == nil || kb.TenantID != tenantID {
+	if err != nil || kb == nil ||
+		(kb.TenantID != tenantID && !types.IsSystemAdminFromContext(ctx)) {
 		c.Error(errors.NewNotFoundError("data source not found"))
 		return nil, false
 	}

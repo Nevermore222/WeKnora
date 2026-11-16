@@ -100,6 +100,12 @@ func (h *KnowledgeHandler) validateKnowledgeBaseAccessWithKBID(c *gin.Context, k
 		logger.ErrorWithFields(ctx, err, nil)
 		return nil, kbID, 0, "", errors.NewInternalServerError(err.Error())
 	}
+	if types.IsSystemAdminFromContext(ctx) {
+		c.Set(types.TenantIDContextKey.String(), kb.TenantID)
+		effectiveCtx := context.WithValue(ctx, types.TenantIDContextKey, kb.TenantID)
+		c.Request = c.Request.WithContext(effectiveCtx)
+		return kb, kbID, kb.TenantID, types.OrgRoleAdmin, nil
+	}
 	callerUserID, _ := types.UserIDFromContext(ctx)
 	if kb.TenantID == tenantID {
 		if kb.Visibility == types.ResourceVisibilityPrivate && kb.CreatorID != callerUserID && !types.IsSystemAdminFromContext(ctx) {
@@ -153,10 +159,39 @@ func (h *KnowledgeHandler) resolveKnowledgeAndValidateKBAccess(c *gin.Context, k
 	if err != nil {
 		return nil, ctx, errors.NewNotFoundError("Knowledge not found")
 	}
+	if types.IsSystemAdminFromContext(ctx) {
+		effectiveCtx := context.WithValue(ctx, types.TenantIDContextKey, knowledge.TenantID)
+		c.Set(types.TenantIDContextKey.String(), knowledge.TenantID)
+		c.Request = c.Request.WithContext(effectiveCtx)
+		return knowledge, effectiveCtx, nil
+	}
+
+	// RequireKBAccess already resolved the full visibility/share matrix for this
+	// document's KB and rewrote the request tenant. Reuse that decision so this
+	// handler cannot re-deny what the route guard allowed - the narrower
+	// re-check below has no public branch and would reject organization-shared
+	// and agent-carried documents. Mirrors validateKnowledgeBaseAccessWithKBID.
+	if access, ok := middleware.KBAccessFromContext(c); ok && access != nil &&
+		access.KnowledgeBase != nil && access.KnowledgeBase.ID == knowledge.KnowledgeBaseID &&
+		access.Permission.HasPermission(requiredPermission) {
+		return knowledge, withEffectiveTenant(c, ctx, access.EffectiveTenantID), nil
+	}
 
 	// Owner: knowledge belongs to caller's tenant
 	if knowledge.TenantID == tenantID {
 		return knowledge, context.WithValue(ctx, types.TenantIDContextKey, tenantID), nil
+	}
+
+	// System-public KBs are readable across workspaces and never writable. The
+	// KB list query, the route guard, the KB detail handler and chat retrieval
+	// all honour visibility=public; without this branch a document inside a
+	// public KB 403s for every caller except its creator, which shows up as
+	// "the knowledge base is visible but the file cannot be previewed".
+	if requiredPermission == types.OrgRoleViewer && h.kbService != nil {
+		if kb, kbErr := h.kbService.GetKnowledgeBaseByID(ctx, knowledge.KnowledgeBaseID); kbErr == nil &&
+			kb != nil && kb.Visibility == types.ResourceVisibilityPublic {
+			return knowledge, withEffectiveTenant(c, ctx, kb.TenantID), nil
+		}
 	}
 
 	// Shared KB: check organization permission
@@ -169,6 +204,15 @@ func (h *KnowledgeHandler) resolveKnowledgeAndValidateKBAccess(c *gin.Context, k
 	}
 	// Shared agent: request passes agent_id, or user has any shared agent that can access this KB
 	if h.agentShareService != nil && requiredPermission == types.OrgRoleViewer {
+		// Private knowledge bases stay creator-only here too, matching the route
+		// guard and the agent scope retrieval actually uses. Without this the file
+		// opens in the UI while the agent can never search its KB.
+		if h.kbService != nil {
+			if kb, kbErr := h.kbService.GetKnowledgeBaseByID(ctx, knowledge.KnowledgeBaseID); kbErr == nil &&
+				!middleware.AgentMayCarryKB(ctx, kb) {
+				return nil, ctx, errors.NewForbiddenError("Permission denied to access this knowledge")
+			}
+		}
 		agentID := c.Query("agent_id")
 		if agentID != "" {
 			agent, err := h.agentShareService.GetSharedAgentForTenant(ctx, tenantID, callerTenantRole, agentID)
@@ -203,6 +247,17 @@ func (h *KnowledgeHandler) resolveKnowledgeAndValidateKBAccess(c *gin.Context, k
 	_ = userID
 	_ = userExists
 	return nil, ctx, errors.NewForbiddenError("Permission denied to access this knowledge")
+}
+
+// withEffectiveTenant points both tenant locations at the resource's owning
+// tenant: the request context (read by services) and the Gin key (read by
+// handlers via c.GetUint64). Updating only one of the two is what made
+// cross-workspace reads fail downstream of a successful guard.
+func withEffectiveTenant(c *gin.Context, ctx context.Context, tenantID uint64) context.Context {
+	effectiveCtx := context.WithValue(ctx, types.TenantIDContextKey, tenantID)
+	c.Set(types.TenantIDContextKey.String(), tenantID)
+	c.Request = c.Request.WithContext(effectiveCtx)
+	return effectiveCtx
 }
 
 // handleDuplicateKnowledgeError handles cases where duplicate knowledge is detected
@@ -1963,6 +2018,39 @@ func (h *KnowledgeHandler) SearchKnowledge(c *gin.Context) {
 		return
 	}
 
+	if types.IsSystemAdminFromContext(ctx) {
+		kbs, err := h.kbService.ListVisibleKnowledgeBases(ctx)
+		if err != nil {
+			logger.ErrorWithFields(ctx, err, nil)
+			c.Error(errors.NewInternalServerError("Failed to list knowledge bases").WithDetails(err.Error()))
+			return
+		}
+		scopes := make([]types.KnowledgeSearchScope, 0, len(kbs))
+		for _, kb := range kbs {
+			if kb == nil || kb.Type != types.KnowledgeBaseTypeDocument || kb.IsTemporary {
+				continue
+			}
+			scopes = append(scopes, types.KnowledgeSearchScope{
+				TenantID: kb.TenantID,
+				KBID:     kb.ID,
+			})
+		}
+		knowledges, hasMore, err := h.kgService.SearchKnowledgeForScopes(
+			ctx, scopes, keyword, offset, limit, fileTypes,
+		)
+		if err != nil {
+			logger.ErrorWithFields(ctx, err, nil)
+			c.Error(errors.NewInternalServerError("Failed to search knowledge").WithDetails(err.Error()))
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success":  true,
+			"data":     knowledges,
+			"has_more": hasMore,
+		})
+		return
+	}
+
 	// Default: own + shared KBs
 	knowledges, hasMore, err := h.kgService.SearchKnowledge(ctx, keyword, offset, limit, fileTypes)
 	if err != nil {
@@ -2030,6 +2118,12 @@ func (h *KnowledgeHandler) MoveKnowledge(c *gin.Context) {
 		c.Error(errors.NewUnauthorizedError("Unauthorized"))
 		return
 	}
+	callerTenantID, ok := tenantID.(uint64)
+	if !ok || callerTenantID == 0 {
+		c.Error(errors.NewUnauthorizedError("Unauthorized"))
+		return
+	}
+	isSystemAdmin := types.IsSystemAdminFromContext(ctx)
 
 	// Validate source KB
 	sourceKB, err := h.kbService.GetKnowledgeBaseByID(ctx, req.SourceKBID)
@@ -2041,7 +2135,7 @@ func (h *KnowledgeHandler) MoveKnowledge(c *gin.Context) {
 		c.Error(errors.NewInternalServerError(err.Error()))
 		return
 	}
-	if sourceKB.TenantID != tenantID.(uint64) {
+	if sourceKB.TenantID != callerTenantID && !isSystemAdmin {
 		c.Error(errors.NewForbiddenError("No permission to access source knowledge base"))
 		return
 	}
@@ -2056,7 +2150,7 @@ func (h *KnowledgeHandler) MoveKnowledge(c *gin.Context) {
 		c.Error(errors.NewInternalServerError(err.Error()))
 		return
 	}
-	if targetKB.TenantID != tenantID.(uint64) {
+	if targetKB.TenantID != callerTenantID && !isSystemAdmin {
 		c.Error(errors.NewForbiddenError("No permission to access target knowledge base"))
 		return
 	}
@@ -2086,8 +2180,9 @@ func (h *KnowledgeHandler) MoveKnowledge(c *gin.Context) {
 	}
 
 	// Validate all knowledge IDs belong to source KB and are in completed status
+	sourceCtx := context.WithValue(ctx, types.TenantIDContextKey, sourceKB.TenantID)
 	for _, kID := range req.KnowledgeIDs {
-		knowledge, err := h.kgService.GetKnowledgeByID(ctx, kID)
+		knowledge, err := h.kgService.GetKnowledgeByID(sourceCtx, kID)
 		if err != nil {
 			c.Error(errors.NewBadRequestError(fmt.Sprintf("Knowledge item %s not found", kID)))
 			return
@@ -2103,16 +2198,18 @@ func (h *KnowledgeHandler) MoveKnowledge(c *gin.Context) {
 	}
 
 	// Generate task ID
-	taskID := utils.GenerateTaskID("kg_move", tenantID.(uint64), req.SourceKBID)
+	taskID := utils.GenerateTaskID("kg_move", callerTenantID, req.SourceKBID)
 
 	// Create move payload
 	payload := types.KnowledgeMovePayload{
-		TenantID:     tenantID.(uint64),
-		TaskID:       taskID,
-		KnowledgeIDs: req.KnowledgeIDs,
-		SourceKBID:   req.SourceKBID,
-		TargetKBID:   req.TargetKBID,
-		Mode:         req.Mode,
+		SourceTenantID: sourceKB.TenantID,
+		TargetTenantID: targetKB.TenantID,
+		TenantID:       sourceKB.TenantID,
+		TaskID:         taskID,
+		KnowledgeIDs:   req.KnowledgeIDs,
+		SourceKBID:     req.SourceKBID,
+		TargetKBID:     req.TargetKBID,
+		Mode:           req.Mode,
 	}
 	langfuse.InjectTracing(ctx, &payload)
 

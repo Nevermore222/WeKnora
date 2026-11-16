@@ -164,6 +164,7 @@ func EmbedAuth(
 		}
 
 		c.Set(types.TenantIDContextKey.String(), ch.TenantID)
+		c.Set(types.CallerTenantIDContextKey.String(), ch.TenantID)
 		c.Set(types.TenantInfoContextKey.String(), tenant)
 		c.Set(types.UserContextKey.String(), user)
 		c.Set(types.UserIDContextKey.String(), user.ID)
@@ -173,6 +174,7 @@ func EmbedAuth(
 
 		ctx := c.Request.Context()
 		ctx = context.WithValue(ctx, types.TenantIDContextKey, ch.TenantID)
+		ctx = context.WithValue(ctx, types.CallerTenantIDContextKey, ch.TenantID)
 		ctx = context.WithValue(ctx, types.TenantInfoContextKey, tenant)
 		ctx = context.WithValue(ctx, types.UserContextKey, user)
 		ctx = context.WithValue(ctx, types.UserIDContextKey, user.ID)

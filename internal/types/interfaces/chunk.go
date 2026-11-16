@@ -68,6 +68,13 @@ type ChunkRepository interface {
 	ListImageInfoByKnowledgeIDs(ctx context.Context, tenantID uint64, knowledgeIDs []string) ([]ChunkImageInfo, error)
 	// MoveChunksByKnowledgeID updates knowledge_base_id for all chunks of a knowledge item
 	MoveChunksByKnowledgeID(ctx context.Context, tenantID uint64, knowledgeID string, targetKBID string) error
+	// MoveChunksToKnowledgeBase updates both tenant_id and knowledge_base_id for
+	// all chunks of a knowledge item. Used by cross-tenant system-admin moves.
+	MoveChunksToKnowledgeBase(
+		ctx context.Context,
+		sourceTenantID, targetTenantID uint64,
+		knowledgeID, targetKBID string,
+	) error
 	// DeleteChunksByTagID deletes all chunks with the specified tag ID
 	// Returns the IDs of deleted chunks for index cleanup
 	DeleteChunksByTagID(ctx context.Context, tenantID uint64, kbID string, tagID string, excludeIDs []string) ([]string, error)

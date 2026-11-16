@@ -26,9 +26,18 @@ func CapabilityRegistry() []CapabilityDef {
 }
 
 // UserHasCapability reports whether u is allowed the given capability id.
-// Nil user and unknown ids deny.
+// System administrators have every registered capability. Nil users and
+// unknown ids deny.
 func UserHasCapability(u *User, id string) bool {
 	if u == nil {
+		return false
+	}
+	if u.IsSystemAdmin {
+		for _, capability := range CapabilityRegistry() {
+			if capability.ID == id {
+				return true
+			}
+		}
 		return false
 	}
 	switch id {

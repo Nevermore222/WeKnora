@@ -1164,6 +1164,7 @@ export default {
     "parserEngine": "パーサー エンジン",
     "storageEngine": "ストレージ エンジン",
     "mcpService": "MCP サービス",
+    "mcpEndpoint": "ナレッジ MCP 公開",
     "versionInfo": "バージョン情報",
     "tenantInfo": "テナント情報",
     "apiInfo": "API 情報",
@@ -4357,6 +4358,11 @@ export default {
     "today": "今日",
     "yesterday": "昨日",
     "daysAgo": "{days} 日前"
+  },
+  "mcpEndpointSettings": {
+    "tutorial": { "title": "一般的な使い方", "description": "ナレッジベースを外部アプリケーションの読み取り専用ソースとして利用します。クライアントによって設定画面の名前は異なりますが、接続情報は同じです。", "configTitle": "共通設定例", "copyConfig": "設定をコピー", "configExample": "{\n  \"mcpServers\": {\n    \"knavis-knowledge\": {\n      \"url\": \"https://your-knavis.example.com/mcp/<endpoint-id>\",\n      \"headers\": {\n        \"Authorization\": \"Bearer <your-mcp-token>\"\n      }\n    }\n  }\n}", "security": "アクセストークンは一度だけ表示されます。安全な場所に保存し、リポジトリにコミットしたり不要な相手に共有したりしないでください。トークンを更新すると古いトークンは直ちに無効になります。", "steps": { "create": { "title": "エンドポイントを公開", "description": "「エンドポイントを公開」をクリックし、公開するナレッジベースと読み取り専用ツールを選択します。" }, "copy": { "title": "接続情報をコピー", "description": "エンドポイント URL をコピーします。トークンの作成・更新後は、一度だけ表示されるトークンをすぐにコピーしてください。" }, "configure": { "title": "MCP クライアントを設定", "description": "Cursor、Claude Desktop、Cherry Studio などの MCP クライアントに URL と Bearer トークンを入力します。" }, "use": { "title": "検索を開始", "description": "接続後、外部アプリケーションから設定した範囲内のナレッジ検索とエージェント回答を利用できます。" } } },
+    "title": "ナレッジ MCP 公開", "description": "Xelora のナレッジベースを外部アプリケーション向け MCP サービスとして公開します。",
+    "publishedEndpoints": "公開済み MCP エンドポイント", "publishedEndpointsDesc": "エンドポイントごとにナレッジ範囲とアクセストークンを設定できます。", "create": "エンドポイントを公開", "createTitle": "ナレッジ MCP を公開", "editTitle": "ナレッジ MCP を編集", "empty": "公開済みの MCP エンドポイントはありません", "unnamed": "名前なしエンドポイント", "enabled": "有効", "disabled": "無効", "name": "名前", "namePlaceholder": "例: 開発ナレッジ", "descriptionLabel": "説明", "descriptionPlaceholder": "外部アプリからの利用方法", "enabledLabel": "エンドポイントを有効化", "enabledDesc": "無効にすると外部アプリから呼び出せません。", "knowledgeBases": "ナレッジベース範囲", "knowledgeBasesDesc": "空欄の場合、現在のワークスペースで見えるナレッジベースを使用します。", "knowledgeBasesPlaceholder": "ナレッジベースを選択", "allKnowledgeBasesOption": "すべての可視ナレッジベースを許可", "allKnowledgeBases": "すべての可視ナレッジベース", "scopedKnowledgeBases": "{count} 件を選択", "defaultAgent": "既定エージェント", "defaultAgentDesc": "ask ツールで使用するエージェント（任意）", "defaultAgentPlaceholder": "エージェント回答なし", "tools": "公開ツール", "toolsDesc": "既定では読み取り専用ツールのみ有効です。", "writeTool": "書き込み", "toolsCount": "{count} 個のツール", "rateLimit": "1 分あたりの上限", "rateLimitDesc": "0 はサーバー既定値を使用します。", "tokenHint": "トークン: {hint}", "tokenShownOnce": "MCP アクセストークン（一度だけ表示）", "tokenCopyHint": "この画面を離れる前にコピーしてください。", "copyToken": "トークンをコピー", "rotateToken": "トークンを更新", "rotateConfirm": "古いトークンは直ちに無効になります。続行しますか？", "deleteConfirm": "MCP エンドポイント「{name}」を削除しますか？", "groups": { "retrieve": "ナレッジ検索", "chat": "エージェント回答", "wiki": "Wiki", "ingest": "コンテンツ書き込み" }, "nameRequired": "エンドポイント名を入力してください", "toolRequired": "MCP ツールを 1 つ以上選択してください", "loadFailed": "MCP エンドポイントの読み込みに失敗しました", "saveFailed": "MCP エンドポイントの保存に失敗しました", "created": "MCP エンドポイントを公開しました", "updated": "MCP エンドポイントを更新しました", "rotated": "MCP トークンを更新しました", "rotateFailed": "MCP トークンの更新に失敗しました", "deleted": "MCP エンドポイントを削除しました", "deleteFailed": "MCP エンドポイントの削除に失敗しました", "copied": "コピーしました", "copyFailed": "コピーに失敗しました"
   },
   "mcpServiceDialog": {
     "addTitle": "MCP サービスを追加します",

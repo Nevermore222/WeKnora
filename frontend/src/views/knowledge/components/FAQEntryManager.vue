@@ -1031,6 +1031,7 @@ const isViaShare = computed(() => !!currentSharedKb.value)
 // different tenant context will be 403'd on write. Otherwise: KB creator
 // (any role) or tenant Admin+ in the home tenant.
 const canEdit = computed(() => {
+  if (authStore.isSystemAdmin) return true
   if (isViaShare.value) return orgStore.canEditKB(props.kbId, false)
   if (isOwner.value) return true
   if (authStore.hasRole('admin')) return true
@@ -1041,6 +1042,7 @@ const canEdit = computed(() => {
 // shared KBs only an 'admin' share grant qualifies — editor/viewer (and
 // even being the creator viewed via share) never grant delete/settings.
 const canManage = computed(() => {
+  if (authStore.isSystemAdmin) return true
   if (isViaShare.value) return orgStore.canManageKB(props.kbId, false)
   if (isOwner.value) return true
   if (authStore.hasRole('admin')) return true

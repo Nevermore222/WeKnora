@@ -6,6 +6,9 @@ type ContextKey string
 const (
 	// TenantIDContextKey is the context key for tenant ID
 	TenantIDContextKey ContextKey = "TenantID"
+	// CallerTenantIDContextKey preserves the authenticated caller's active
+	// tenant when TenantIDContextKey is rewritten to a resource tenant.
+	CallerTenantIDContextKey ContextKey = "CallerTenantID"
 	// TenantInfoContextKey is the context key for tenant information
 	TenantInfoContextKey ContextKey = "TenantInfo"
 	// RequestIDContextKey is the context key for request ID
@@ -33,6 +36,8 @@ const (
 	LangfuseTraceContextKey ContextKey = "LangfuseTrace"
 	// SystemAdminContextKey is the context key indicating whether the user is a system administrator
 	SystemAdminContextKey ContextKey = "SystemAdmin"
+	// MCPEndpointContextKey carries the authenticated built-in MCP endpoint.
+	MCPEndpointContextKey ContextKey = "MCPEndpoint"
 )
 
 // String returns the string representation of the context key

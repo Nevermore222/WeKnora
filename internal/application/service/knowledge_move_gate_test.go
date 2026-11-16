@@ -31,11 +31,11 @@ func TestMoveKnowledgeReuseVectors_CrossStoreRejected(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			src := &types.KnowledgeBase{ID: "kb-src", VectorStoreID: tt.srcStore}
-			dst := &types.KnowledgeBase{ID: "kb-dst", VectorStoreID: tt.dstStore}
+			src := &types.KnowledgeBase{ID: "kb-src", TenantID: 1, VectorStoreID: tt.srcStore}
+			dst := &types.KnowledgeBase{ID: "kb-dst", TenantID: 1, VectorStoreID: tt.dstStore}
 			kn := &types.Knowledge{ID: "k1", EmbeddingModelID: "m1"}
 
-			err := s.moveKnowledgeReuseVectors(ctx, kn, src, dst)
+			err := s.moveKnowledgeReuseVectors(ctx, ctx, kn, src, dst)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "different vector stores")
 		})

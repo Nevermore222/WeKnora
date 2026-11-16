@@ -173,6 +173,11 @@
                   <div v-if="currentSection === 'mcp'" class="section">
                     <McpSettings />
                   </div>
+
+                  <!-- 对外发布知识库 MCP 服务 -->
+                  <div v-if="currentSection === 'mcp-endpoint'" class="section">
+                    <McpEndpointSettings />
+                  </div>
                 </template>
               </div>
             </div>
@@ -198,6 +203,7 @@ import GeneralSettings from './GeneralSettings.vue'
 import ModelSettings from './ModelSettings.vue'
 import OllamaSettings from './OllamaSettings.vue'
 import McpSettings from './McpSettings.vue'
+import McpEndpointSettings from './McpEndpointSettings.vue'
 import WebSearchSettings from './WebSearchSettings.vue'
 import ChatHistorySettings from './ChatHistorySettings.vue'
 import VectorStoreSettings from './VectorStoreSettings.vue'
@@ -264,6 +270,7 @@ const SECTION_MIN_ROLE: Record<string, RoleKey> = {
   parser: 'admin',
   storage: 'admin',
   mcp: 'admin',
+  'mcp-endpoint': 'admin',
   system: 'viewer',
   userprofile: 'viewer',
   tenant: 'viewer',
@@ -302,6 +309,7 @@ const navItems = computed(() => {
     { key: 'parser', icon: 'file-search', label: t('settings.parserEngine') },
     { key: 'storage', icon: 'cloud', label: t('settings.storageEngine') },
     { key: 'mcp', icon: 'tools', label: t('settings.mcpService') },
+    { key: 'mcp-endpoint', icon: 'share', label: t('settings.mcpEndpoint') },
     { key: 'system', icon: 'info-circle', label: t('settings.versionInfo') },
     { key: 'system-global', icon: 'server', label: t('settings.system') },
     { key: 'user-permissions', icon: 'usergroup', label: t('settings.userPermissions.title') },
@@ -352,7 +360,7 @@ const navGroups = computed<NavGroup[]>(() => {
     {
       key: 'data_extensions',
       label: t('settings.navGroups.dataExtensions'),
-      items: pickItems(['vectorstore', 'parser', 'storage', 'websearch', 'mcp']),
+      items: pickItems(['vectorstore', 'parser', 'storage', 'websearch', 'mcp', 'mcp-endpoint']),
     },
     {
       key: 'platform',

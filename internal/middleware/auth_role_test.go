@@ -24,9 +24,10 @@ type fakeMemberService struct {
 		TenantID uint64
 		Role     types.TenantRole
 	}
-	failGet     error
-	failHasAny  error
-	failAdd     error
+	failGet    error
+	failHasAny error
+	failAdd    error
+	getCalls   int
 	// 阻止 auto-promote 把 hasAny 翻面：默认 AddMember 成功也会写入 members map。
 }
 
@@ -90,6 +91,7 @@ func (f *fakeMemberService) EnsureOwner(
 func (f *fakeMemberService) GetMembership(
 	ctx context.Context, userID string, tenantID uint64,
 ) (*types.TenantMember, error) {
+	f.getCalls++
 	if f.failGet != nil {
 		return nil, f.failGet
 	}
@@ -163,6 +165,27 @@ func TestResolveTenantRole_CrossTenantSuperuserGetsAdmin_NoAutoPromote(t *testin
 	}
 	if len(svc.addCalls) != 0 {
 		t.Fatalf("cross-tenant superuser must not trigger auto-promote, got %+v", svc.addCalls)
+	}
+}
+
+func TestResolveTenantRole_SystemAdminGetsOwnerWithoutMembershipIO(t *testing.T) {
+	svc := newFakeMemberService()
+	user := &types.User{
+		ID:                  "root",
+		TenantID:            1,
+		IsSystemAdmin:       true,
+		CanAccessAllTenants: false,
+	}
+
+	got, ok := resolveTenantRole(context.Background(), svc, user, 99, true, cfgWithRBAC(true))
+	if !ok || got != types.TenantRoleOwner {
+		t.Fatalf("system admin should get Owner, got (%v, %v)", got, ok)
+	}
+	if svc.getCalls != 0 {
+		t.Fatalf("system admin must not query tenant_members, got %d calls", svc.getCalls)
+	}
+	if len(svc.addCalls) != 0 {
+		t.Fatalf("system admin must not create tenant_members rows, got %+v", svc.addCalls)
 	}
 }
 

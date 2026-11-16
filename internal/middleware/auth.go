@@ -40,7 +40,7 @@ var noAuthAPI = map[string][]string{
 	// redirects the browser here without a Xelora bearer token. The request
 	// is authenticated by the opaque, single-use `state` parameter instead.
 	"/api/v1/mcp-oauth/callback": {"GET"},
-	"/api/v1/auth/refresh":            {"POST"},
+	"/api/v1/auth/refresh":       {"POST"},
 	// IM platforms (Feishu, Slack, etc.) commonly issue a HEAD request
 	// before GET to validate Content-Type / Content-Length when rendering
 	// image previews — both verbs must be allowed for image links to work.
@@ -88,6 +88,15 @@ func Auth(
 			token := strings.TrimPrefix(authHeader, "Bearer ")
 			user, jwtTenantID, err := userService.ValidateToken(c.Request.Context(), token)
 			if err == nil && user != nil {
+				// Publish the trusted JWT identity before tenant switching or
+				// role resolution. Explicit sub-identities (API key, embed,
+				// MCP) set SystemAdminContextKey to false later in their own
+				// authentication branches.
+				authCtx := context.WithValue(c.Request.Context(), types.UserContextKey, user)
+				authCtx = context.WithValue(authCtx, types.UserIDContextKey, user.ID)
+				authCtx = context.WithValue(authCtx, types.SystemAdminContextKey, user.IsSystemAdmin)
+				c.Request = c.Request.WithContext(authCtx)
+
 				// JWT Token认证成功
 				// 默认 target = JWT 里的 tenant_id（来自登录或 /auth/switch-tenant），
 				// 兼容 ValidateToken 的 fallback：claim 缺失时 jwtTenantID == user.TenantID。
@@ -171,6 +180,7 @@ func Auth(
 					"[auth] resolved role=%s for user=%s in tenant=%d (jwt_tenant=%d, header=%q, cross_switch=%v)",
 					role, user.ID, targetTenantID, jwtTenantID, tenantHeader, crossTenantSwitch)
 				c.Set(types.TenantIDContextKey.String(), targetTenantID)
+				c.Set(types.CallerTenantIDContextKey.String(), targetTenantID)
 				c.Set(types.TenantInfoContextKey.String(), tenant)
 				c.Set(types.UserContextKey.String(), user)
 				c.Set(types.UserIDContextKey.String(), user.ID)
@@ -178,6 +188,7 @@ func Auth(
 				c.Set(types.SystemAdminContextKey.String(), user.IsSystemAdmin)
 				ctx := c.Request.Context()
 				ctx = context.WithValue(ctx, types.TenantIDContextKey, targetTenantID)
+				ctx = context.WithValue(ctx, types.CallerTenantIDContextKey, targetTenantID)
 				ctx = context.WithValue(ctx, types.TenantInfoContextKey, tenant)
 				ctx = context.WithValue(ctx, types.UserContextKey, user)
 				ctx = context.WithValue(ctx, types.UserIDContextKey, user.ID)
@@ -223,12 +234,12 @@ func Auth(
 
 			// 存储租户和用户信息到上下文
 			c.Set(types.TenantIDContextKey.String(), tenantID)
+			c.Set(types.CallerTenantIDContextKey.String(), tenantID)
 			c.Set(types.TenantInfoContextKey.String(), t)
 
-			ctx := context.WithValue(
-				context.WithValue(c.Request.Context(), types.TenantIDContextKey, tenantID),
-				types.TenantInfoContextKey, t,
-			)
+			ctx := context.WithValue(c.Request.Context(), types.TenantIDContextKey, tenantID)
+			ctx = context.WithValue(ctx, types.CallerTenantIDContextKey, tenantID)
+			ctx = context.WithValue(ctx, types.TenantInfoContextKey, t)
 
 			// 通过 TenantID 关联查询用户；找不到时构造系统虚拟用户，
 			// 确保所有依赖 UserContextKey 的下游 handler 正常工作。
@@ -312,6 +323,19 @@ func resolveTenantRole(
 	crossTenantSwitch bool,
 	cfg *config.Config,
 ) (types.TenantRole, bool) {
+	if user == nil {
+		return "", false
+	}
+	// System administrators are platform-level identities. They receive a
+	// transient Owner role in every tenant and must never require or create
+	// a tenant_members row.
+	if user.IsSystemAdmin {
+		logger.Infof(ctx,
+			"[auth] resolveTenantRole system-admin -> Owner: user=%s tenant=%d",
+			user.ID, targetTenantID)
+		return types.TenantRoleOwner, true
+	}
+
 	// 1. 正常成员关系
 	member, err := memberService.GetMembership(ctx, user.ID, targetTenantID)
 	if err == nil && member != nil && member.Status == types.TenantMemberStatusActive {

@@ -427,6 +427,9 @@ func (s *agentShareService) GetSharedAgentForTenant(ctx context.Context, tenantI
 	share, err := s.shareRepo.GetShareByAgentIDForTenant(ctx, tenantID, agentID, tenantID)
 	if err != nil {
 		if errors.Is(err, repository.ErrAgentShareNotFound) {
+			if agent := s.publicAgentForTenant(ctx, tenantID, agentID); agent != nil {
+				return agent, nil
+			}
 			return nil, ErrAgentSharePermission
 		}
 		return nil, err
@@ -440,6 +443,51 @@ func (s *agentShareService) GetSharedAgentForTenant(ctx context.Context, tenantI
 	}
 	_ = callerTenantRole
 	return agent, nil
+}
+
+// publicAgentForTenant resolves a system-public agent owned by another
+// workspace as a read-only resource, so agent-scoped routes work for public
+// agents that were never shared into an organization.
+//
+// GetSharedAgentForTenant is the single entry point used by the ?agent_id=
+// knowledge base list, the KB detail check, the document access check and the
+// route guard, while the chat path resolves public agents separately in
+// session/qa.go's resolveAgent. Without this fallback a public agent could be
+// chatted with but its bound knowledge bases returned 403.
+//
+// Own-workspace agents are intentionally not returned here: their callers use
+// the tenant-scoped lookups, and the share query excludes the caller's own
+// tenant anyway.
+func (s *agentShareService) publicAgentForTenant(
+	ctx context.Context, tenantID uint64, agentID string,
+) *types.CustomAgent {
+	if s.agentRepo == nil {
+		return nil
+	}
+	candidate, err := s.agentRepo.GetAgentByIDOnly(ctx, agentID)
+	if err != nil || candidate == nil {
+		return nil
+	}
+	if candidate.Visibility != types.ResourceVisibilityPublic || candidate.TenantID == tenantID {
+		return nil
+	}
+	// Honour the per-tenant "hide this shared agent" switch, matching the
+	// org-share listing path so a disabled agent does not reappear through the
+	// public fallback.
+	if s.disabledRepo != nil {
+		disabledList, listErr := s.disabledRepo.ListByTenantID(ctx, tenantID)
+		if listErr == nil {
+			for _, d := range disabledList {
+				if d != nil && d.AgentID == agentID && d.SourceTenantID == candidate.TenantID {
+					logger.Infof(ctx, "Public agent %s is disabled for tenant %d", agentID, tenantID)
+					return nil
+				}
+			}
+		}
+	}
+	candidate.EnsureDefaults()
+	candidate.ReadOnly = true
+	return candidate
 }
 
 // TenantCanAccessKBViaSomeSharedAgent returns true if the caller's tenant has

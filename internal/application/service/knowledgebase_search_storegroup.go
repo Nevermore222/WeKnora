@@ -157,12 +157,12 @@ func classifyFactoryError(
 	}
 }
 
-// authorizeKBAccess rejects multi-KB searches whose scope includes a KB
-// that the caller is not entitled to read. Same-tenant KBs always pass.
-// Foreign-tenant KBs (Organization-shared) must pass an explicit
-// tenant-scoped permission check via kbShareService.HasTenantKBPermission,
-// applying the 3-D cap (share role + caller's tenant-org role + tenant
-// Viewer cap) introduced in Plan 3 of #1303.
+// authorizeKBAccess rejects multi-KB searches whose scope includes a KB the
+// caller is not entitled to read. The decision is delegated to
+// CanReadKnowledgeBase so retrieval applies exactly the same read rule as the
+// KB route guard, the KB detail handler and the agent scope resolution: own
+// workspace, system-public, organization-shared (against the retrieval tenant or
+// the caller's tenant), agent-scoped, or system administrator.
 //
 // Returning NotFound rather than Forbidden avoids leaking the existence
 // of unauthorized KB IDs that the caller could not otherwise observe.
@@ -178,27 +178,13 @@ func (s *knowledgeBaseService) authorizeKBAccess(
 		return nil
 	}
 
-	callerTenantRole := types.TenantRoleFromContext(ctx)
-	callerUserID, _ := types.UserIDFromContext(ctx)
-	isSystemAdmin := types.IsSystemAdminFromContext(ctx)
-
 	for _, kb := range kbs {
-		if isSystemAdmin {
+		if kb == nil {
 			continue
 		}
-		if kb.TenantID == requestTenantID {
-			if kb.Visibility == types.ResourceVisibilityPrivate && kb.CreatorID != callerUserID {
-				return apperrors.NewNotFoundError("knowledge base not found")
-			}
-			continue
-		}
-		if kb.Visibility == types.ResourceVisibilityPublic {
-			continue
-		}
-		hasPermission, permErr := s.kbShareService.HasTenantKBPermission(
-			ctx, kb.ID, requestTenantID, callerTenantRole, types.OrgRoleViewer)
-		if permErr != nil {
-			logger.ErrorWithFields(ctx, permErr, map[string]interface{}{
+		readable, err := s.CanReadKnowledgeBase(ctx, kb, requestTenantID)
+		if err != nil {
+			logger.ErrorWithFields(ctx, err, map[string]interface{}{
 				"caller_tenant_id": requestTenantID,
 				"kb_tenant_id":     kb.TenantID,
 				"kb_id":            kb.ID,
@@ -206,13 +192,13 @@ func (s *knowledgeBaseService) authorizeKBAccess(
 			})
 			return apperrors.NewInternalServerError("failed to verify knowledge base access")
 		}
-		if !hasPermission {
+		if !readable {
 			logger.WarnWithFields(ctx, logger.Fields{
 				"caller_tenant_id": requestTenantID,
 				"kb_tenant_id":     kb.TenantID,
 				"kb_id":            kb.ID,
-				"reason":           "tenant lacks viewer permission for foreign-tenant KB",
-			}, "search scope rejected: unauthorized foreign-tenant KB")
+				"reason":           "caller cannot read this KB in search scope",
+			}, "search scope rejected: unauthorized knowledge base")
 			return apperrors.NewNotFoundError("knowledge base not found")
 		}
 	}

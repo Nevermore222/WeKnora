@@ -61,8 +61,11 @@ export type MergedKnowledgeBase =
 // component/store imports and remains trivially unit-testable.
 const EDITABLE_PERMS = new Set(['admin', 'editor']);
 
-export function isSharedKbEditable(perm: string | undefined): boolean {
-  return !!perm && EDITABLE_PERMS.has(perm);
+export function isSharedKbEditable(
+  perm: string | undefined,
+  isSystemAdmin = false,
+): boolean {
+  return isSystemAdmin || (!!perm && EDITABLE_PERMS.has(perm));
 }
 
 // Higher rank = more privileged. Unknown permissions rank lowest so they

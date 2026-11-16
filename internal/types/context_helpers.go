@@ -93,6 +93,17 @@ func TenantRoleFromContext(ctx context.Context) TenantRole {
 	return v
 }
 
+// CallerTenantIDFromContext returns the authenticated caller's active tenant.
+// TenantIDContextKey can be rewritten for resource-scoped operations, so this
+// key must be read when choosing a create/copy destination. Legacy contexts
+// without the dedicated key fall back to TenantIDContextKey.
+func CallerTenantIDFromContext(ctx context.Context) (uint64, bool) {
+	if v, ok := ctx.Value(CallerTenantIDContextKey).(uint64); ok && v != 0 {
+		return v, true
+	}
+	return TenantIDFromContext(ctx)
+}
+
 // IsSystemAdminFromContext extracts the system admin flag from ctx.
 // Returns false (fail-closed) when the key is absent.
 func IsSystemAdminFromContext(ctx context.Context) bool {

@@ -59,6 +59,27 @@ func TestRequireCapability_AllowsWhenTrue(t *testing.T) {
 	}
 }
 
+func TestRequireCapability_AllowsSystemAdminForRegisteredCapability(t *testing.T) {
+	w := capabilityHarness(&types.User{
+		ID:                     "root",
+		IsSystemAdmin:          true,
+		CanCreateKnowledgeBase: false,
+	}, RequireCapability(types.CapabilityCreateKnowledgeBase))
+	if w.Code != http.StatusOK {
+		t.Fatalf("system admin must bypass capability gate, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestUserHasCapability_SystemAdminOnlyBypassesRegisteredIDs(t *testing.T) {
+	user := &types.User{ID: "root", IsSystemAdmin: true}
+	if !types.UserHasCapability(user, types.CapabilityCreateKnowledgeBase) {
+		t.Fatalf("system admin must have every registered capability")
+	}
+	if types.UserHasCapability(user, "not_registered") {
+		t.Fatalf("system admin bypass must not make unknown capability IDs valid")
+	}
+}
+
 func TestRequireCapability_DeniesNilUser(t *testing.T) {
 	w := capabilityHarness(nil, RequireCapability(types.CapabilityCreateAgent))
 	if w.Code != http.StatusForbidden {

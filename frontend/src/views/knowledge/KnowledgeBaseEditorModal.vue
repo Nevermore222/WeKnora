@@ -522,6 +522,7 @@ const kbCreatorId = ref<string>('')
 // the buttons disappear instead of failing.
 const canShareKB = computed(() => {
   if (!props.kbId) return false
+  if (authStore.isSystemAdmin) return true
   const userId = authStore.user?.id || ''
   if (kbCreatorId.value && userId && kbCreatorId.value === userId) return true
   return authStore.hasRole('admin')

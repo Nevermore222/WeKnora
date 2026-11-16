@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Tencent/Xelora/internal/application/repository"
 	"github.com/Tencent/Xelora/internal/application/service/retriever"
 	apperrors "github.com/Tencent/Xelora/internal/errors"
 	"github.com/Tencent/Xelora/internal/logger"
@@ -697,10 +698,6 @@ func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id strin
 
 	logger.Infof(ctx, "Deleting knowledge base, ID: %s", id)
 
-	// Get tenant ID from context
-	tenantID := types.MustTenantIDFromContext(ctx)
-	tenantInfo, _ := types.TenantInfoFromContext(ctx)
-
 	// Load the KB before soft-delete so we can snapshot its VectorStoreID
 	// into the async cleanup payload. GORM's soft-delete filter hides the
 	// row from subsequent reads, so this read must happen first.
@@ -711,14 +708,31 @@ func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id strin
 		})
 		return err
 	}
-	var vectorStoreIDSnapshot *string
-	if kb != nil {
-		vectorStoreIDSnapshot = kb.VectorStoreID
+	if kb == nil {
+		return repository.ErrKnowledgeBaseNotFound
 	}
+	resourceTenantID := kb.TenantID
+	resourceCtx := context.WithValue(ctx, types.TenantIDContextKey, resourceTenantID)
+	tenantInfo, _ := types.TenantInfoFromContext(ctx)
+	if tenantInfo == nil || tenantInfo.ID != resourceTenantID {
+		if s.tenantRepo == nil {
+			return errors.New("tenant repository unavailable")
+		}
+		tenantInfo, err = s.tenantRepo.GetTenantByID(resourceCtx, resourceTenantID)
+		if err != nil {
+			return fmt.Errorf("load resource tenant %d: %w", resourceTenantID, err)
+		}
+		if tenantInfo == nil {
+			return fmt.Errorf("tenant %d not found", resourceTenantID)
+		}
+	}
+	resourceCtx = context.WithValue(resourceCtx, types.TenantInfoContextKey, tenantInfo)
+	var vectorStoreIDSnapshot *string
+	vectorStoreIDSnapshot = kb.VectorStoreID
 
 	// Step 1: Delete the knowledge base record first (mark as deleted)
 	logger.Infof(ctx, "Deleting knowledge base from database")
-	err = s.repo.DeleteKnowledgeBase(ctx, id)
+	err = s.repo.DeleteKnowledgeBase(resourceCtx, id)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"knowledge_base_id": id,
@@ -727,18 +741,21 @@ func (s *knowledgeBaseService) DeleteKnowledgeBase(ctx context.Context, id strin
 	}
 
 	// Step 1b: Remove all organization shares for this KB so org settings no longer show them
-	if delErr := s.shareRepo.DeleteByKnowledgeBaseID(ctx, id); delErr != nil {
-		logger.Warnf(ctx, "Failed to delete KB shares for knowledge base %s: %v", id, delErr)
+	if s.shareRepo != nil {
+		if delErr := s.shareRepo.DeleteByKnowledgeBaseID(resourceCtx, id); delErr != nil {
+			logger.Warnf(ctx, "Failed to delete KB shares for knowledge base %s: %v", id, delErr)
+		}
 	}
 
 	// Step 2: Enqueue async task for heavy cleanup operations
 	payload := types.KBDeletePayload{
-		TenantID:         tenantID,
+		SourceTenantID:   resourceTenantID,
+		TenantID:         resourceTenantID,
 		KnowledgeBaseID:  id,
 		EffectiveEngines: tenantInfo.GetEffectiveEngines(),
 		VectorStoreID:    vectorStoreIDSnapshot, // snapshot taken before soft-delete
 	}
-	langfuse.InjectTracing(ctx, &payload)
+	langfuse.InjectTracing(resourceCtx, &payload)
 
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -769,11 +786,20 @@ func (s *knowledgeBaseService) ProcessKBDelete(ctx context.Context, t *asynq.Tas
 		return err
 	}
 
-	tenantID := payload.TenantID
+	tenantID := payload.SourceTenant()
 	kbID := payload.KnowledgeBaseID
 
 	// Set tenant context for downstream services
 	ctx = context.WithValue(ctx, types.TenantIDContextKey, tenantID)
+	tenantInfo, err := s.tenantRepo.GetTenantByID(ctx, tenantID)
+	if err != nil {
+		logger.Errorf(ctx, "Failed to get tenant info: %v", err)
+		return fmt.Errorf("failed to get tenant info: %w", err)
+	}
+	if tenantInfo == nil {
+		return fmt.Errorf("tenant %d not found", tenantID)
+	}
+	ctx = context.WithValue(ctx, types.TenantInfoContextKey, tenantInfo)
 
 	logger.Infof(ctx, "Processing KB delete task for knowledge base: %s", kbID)
 
@@ -976,20 +1002,41 @@ func (s *knowledgeBaseService) SetEmbeddingModel(ctx context.Context, id string,
 func (s *knowledgeBaseService) CopyKnowledgeBase(ctx context.Context,
 	srcKB string, dstKB string,
 ) (*types.KnowledgeBase, *types.KnowledgeBase, error) {
-	tenantID := types.MustTenantIDFromContext(ctx)
-	// Load source KB with tenant scope to prevent cross-tenant cloning
-	sourceKB, err := s.repo.GetKnowledgeBaseByIDAndTenant(ctx, srcKB, tenantID)
+	sourceTenantID := types.MustTenantIDFromContext(ctx)
+	callerTenantID, ok := types.CallerTenantIDFromContext(ctx)
+	if !ok || callerTenantID == 0 {
+		callerTenantID = sourceTenantID
+	}
+	isSystemAdmin := types.IsSystemAdminFromContext(ctx)
+	var (
+		sourceKB *types.KnowledgeBase
+		err      error
+	)
+	if isSystemAdmin {
+		sourceKB, err = s.repo.GetKnowledgeBaseByID(ctx, srcKB)
+	} else {
+		sourceKB, err = s.repo.GetKnowledgeBaseByIDAndTenant(ctx, srcKB, sourceTenantID)
+	}
 	if err != nil {
 		logger.Errorf(ctx, "Get source knowledge base failed: %v", err)
 		return nil, nil, err
 	}
+	if sourceKB == nil {
+		return nil, nil, repository.ErrKnowledgeBaseNotFound
+	}
 	sourceKB.EnsureDefaults()
 	var targetKB *types.KnowledgeBase
 	if dstKB != "" {
-		// Load target KB with tenant scope so we only clone into the caller's tenant
-		targetKB, err = s.repo.GetKnowledgeBaseByIDAndTenant(ctx, dstKB, tenantID)
+		if isSystemAdmin {
+			targetKB, err = s.repo.GetKnowledgeBaseByID(ctx, dstKB)
+		} else {
+			targetKB, err = s.repo.GetKnowledgeBaseByIDAndTenant(ctx, dstKB, callerTenantID)
+		}
 		if err != nil {
 			return nil, nil, err
+		}
+		if targetKB == nil {
+			return nil, nil, repository.ErrKnowledgeBaseNotFound
 		}
 
 		// Defense 1: embedding model must match. Mixing incompatible
@@ -1040,7 +1087,7 @@ func (s *knowledgeBaseService) CopyKnowledgeBase(ctx context.Context,
 			Name:                  sourceKB.Name,
 			Type:                  sourceKB.Type,
 			Description:           sourceKB.Description,
-			TenantID:              tenantID,
+			TenantID:              callerTenantID,
 			ChunkingConfig:        sourceKB.ChunkingConfig,
 			ImageProcessingConfig: sourceKB.ImageProcessingConfig,
 			EmbeddingModelID:      sourceKB.EmbeddingModelID,
@@ -1050,6 +1097,9 @@ func (s *knowledgeBaseService) CopyKnowledgeBase(ctx context.Context,
 			StorageConfig:         sourceKB.StorageConfig,
 			FAQConfig:             faqConfig,
 			VectorStoreID:         sourceKB.VectorStoreID,
+		}
+		if sourceKB.TenantID != callerTenantID {
+			targetKB.VectorStoreID = nil
 		}
 		// The clone is owned by the caller, not the original creator —
 		// otherwise a Contributor copying someone else's KB would still

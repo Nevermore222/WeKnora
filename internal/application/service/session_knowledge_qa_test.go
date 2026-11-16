@@ -11,7 +11,6 @@ import (
 	"github.com/Tencent/Xelora/internal/models/rerank"
 	"github.com/Tencent/Xelora/internal/models/vlm"
 	"github.com/Tencent/Xelora/internal/types"
-	"github.com/Tencent/Xelora/internal/types/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -241,29 +240,6 @@ func TestFilterSharedAgentKnowledgeBases_AllowsCallerWorkspaceKB(t *testing.T) {
 	require.Equal(t, configured, got)
 }
 
-func TestFilterSharedAgentKnowledgeBases_RejectsUnsharedAgentWorkspaceKB(t *testing.T) {
-	agent := &types.CustomAgent{TenantID: 10000}
-	configured := []string{"kb-agent-workspace"}
-	loaded := []*types.KnowledgeBase{{
-		ID:         "kb-agent-workspace",
-		TenantID:   10000,
-		Visibility: types.ResourceVisibilityWorkspace,
-	}}
-
-	got := filterSharedAgentKnowledgeBases(agent, 10007, "wangl", configured, loaded, nil)
-
-	require.Empty(t, got)
-}
-
-type stubSearchTargetKBService struct {
-	interfaces.KnowledgeBaseService
-	kbs []*types.KnowledgeBase
-}
-
-func (s *stubSearchTargetKBService) GetKnowledgeBasesByIDsOnly(_ context.Context, _ []string) ([]*types.KnowledgeBase, error) {
-	return s.kbs, nil
-}
-
 type recordingKBShareService struct {
 	fakeKBShareService
 	lastCallerTenantID uint64
@@ -276,14 +252,11 @@ func (s *recordingKBShareService) HasTenantKBPermission(_ context.Context, kbID 
 
 func TestBuildSearchTargetsForAccess_UsesCallerTenantForSharedWorkspaceKB(t *testing.T) {
 	share := &recordingKBShareService{fakeKBShareService: fakeKBShareService{allowedKBs: map[string]bool{"kb-cross-tenant": true}}}
-	svc := &sessionService{
-		knowledgeBaseService: &stubSearchTargetKBService{kbs: []*types.KnowledgeBase{{
-			ID:         "kb-cross-tenant",
-			TenantID:   10009,
-			Visibility: types.ResourceVisibilityWorkspace,
-		}}},
-		kbShareService: share,
-	}
+	svc := newSearchTargetService([]*types.KnowledgeBase{{
+		ID:         "kb-cross-tenant",
+		TenantID:   10009,
+		Visibility: types.ResourceVisibilityWorkspace,
+	}}, share)
 	ctx := context.WithValue(context.Background(), types.UserIDContextKey, "wangl")
 
 	got, err := svc.buildSearchTargetsForAccess(ctx, 10000, 10007, []string{"kb-cross-tenant"}, nil)
@@ -297,14 +270,11 @@ func TestBuildSearchTargetsForAccess_UsesCallerTenantForSharedWorkspaceKB(t *tes
 
 func TestBuildSearchTargetsForAccess_UsesCallerTenantForCallerWorkspaceKB(t *testing.T) {
 	share := &recordingKBShareService{fakeKBShareService: fakeKBShareService{allowedKBs: map[string]bool{}}}
-	svc := &sessionService{
-		knowledgeBaseService: &stubSearchTargetKBService{kbs: []*types.KnowledgeBase{{
-			ID:         "kb-caller-workspace",
-			TenantID:   10007,
-			Visibility: types.ResourceVisibilityWorkspace,
-		}}},
-		kbShareService: share,
-	}
+	svc := newSearchTargetService([]*types.KnowledgeBase{{
+		ID:         "kb-caller-workspace",
+		TenantID:   10007,
+		Visibility: types.ResourceVisibilityWorkspace,
+	}}, share)
 	ctx := context.WithValue(context.Background(), types.UserIDContextKey, "wangl")
 
 	got, err := svc.buildSearchTargetsForAccess(ctx, 10000, 10007, []string{"kb-caller-workspace"}, nil)

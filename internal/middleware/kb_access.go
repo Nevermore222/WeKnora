@@ -198,9 +198,9 @@ func isResourceNotFound(err error) bool {
 // RequireKBAccess returns a gin.HandlerFunc that resolves KB access
 // (own / org-shared / via shared agent), enforces the minimum required
 // org-level permission, and on success stores the result under
-// KBAccessContextKey AND rewrites c.Request.Context() to carry the
-// effective tenant ID. Handlers downstream just read tenant from
-// context as before.
+// KBAccessContextKey, mirrors the effective tenant ID into the Gin key,
+// and rewrites c.Request.Context(). Handlers downstream can read either
+// tenant location as before.
 //
 // On failure the guard aborts with the appropriate HTTP status (400 /
 // 401 / 404 / 403 / 503). Behaviour matches what each handler's
@@ -284,10 +284,11 @@ func RequireKBAccess(
 		}
 
 		// Stash the resolution and rewrite the request to carry the
-		// effective tenant id. Handlers reading tenant from context now
-		// see the source-tenant for shared KBs (so retrieval queries
-		// hit the right embedding store) without having to know.
+		// effective tenant id in both the Gin keys and request context.
+		// Handlers now see the source tenant for shared KBs (so retrieval
+		// queries hit the right embedding store) without having to know.
 		c.Set(KBAccessContextKey, access)
+		c.Set(types.TenantIDContextKey.String(), access.EffectiveTenantID)
 		newCtx := context.WithValue(ctx, types.TenantIDContextKey, access.EffectiveTenantID)
 		c.Request = c.Request.WithContext(newCtx)
 		c.Next()
@@ -421,6 +422,10 @@ func resolveSharedAgentAccess(
 	kb *types.KnowledgeBase,
 	agentShareService interfaces.AgentShareService,
 ) *KBAccess {
+	if !AgentMayCarryKB(ctx, kb) {
+		logger.Warnf(ctx, "[kb_access] KB %s is private to its creator; no shared agent can carry it", kb.ID)
+		return nil
+	}
 	agentID := c.Query("agent_id")
 	if agentID != "" {
 		agent, err := agentShareService.GetSharedAgentForTenant(ctx, tenantID, callerTenantRole, agentID)
@@ -467,6 +472,25 @@ func resolveSharedAgentAccess(
 		}
 	}
 	return nil
+}
+
+// AgentMayCarryKB reports whether an agent reachable by the caller may grant
+// read access to kb.
+//
+// Private knowledge bases stay creator-only. Agent scope resolution and
+// retrieval both exclude private rows, so granting read here would produce a
+// knowledge base the UI happily opens while the agent can never search it - the
+// "visible but unusable" divergence this rule exists to prevent. The guard and
+// the in-handler resolvers share this helper so they cannot drift apart.
+func AgentMayCarryKB(ctx context.Context, kb *types.KnowledgeBase) bool {
+	if kb == nil {
+		return false
+	}
+	if kb.Visibility != types.ResourceVisibilityPrivate {
+		return true
+	}
+	callerUserID, _ := types.UserIDFromContext(ctx)
+	return callerUserID != "" && kb.CreatorID == callerUserID
 }
 
 var (

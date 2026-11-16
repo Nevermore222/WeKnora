@@ -157,9 +157,10 @@ func (s *stubAgentShareForGuard) CountByOrganizations(context.Context, []string)
 // guardOpts collects optional knobs for runGuard. Keeps the call site
 // readable when most tests only care about a couple of dimensions.
 type guardOpts struct {
-	agentID    string                  // ?agent_id query param
-	agentShare *stubAgentShareForGuard // nil means "no agent-share service"
-	userID     string                  // defaults to u-test
+	agentID     string                  // ?agent_id query param
+	agentShare  *stubAgentShareForGuard // nil means "no agent-share service"
+	userID      string                  // defaults to u-test
+	systemAdmin bool                    // trusted JWT system-admin context flag
 }
 
 // runGuard fires a single request through the guard and returns the
@@ -192,6 +193,7 @@ func runGuard(
 		userID = "u-test"
 	}
 	ctx = context.WithValue(ctx, types.UserIDContextKey, userID)
+	ctx = context.WithValue(ctx, types.SystemAdminContextKey, opts.systemAdmin)
 	c.Request = req.WithContext(ctx)
 
 	kbsvc := &stubKBLookup{kbs: map[string]*types.KnowledgeBase{}}
@@ -267,6 +269,30 @@ func TestRequireKBAccess_PrivateAndPublicScopes(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, uint64(200), access.EffectiveTenantID)
 	require.Equal(t, types.OrgRoleViewer, access.Permission)
+}
+
+func TestRequireKBAccess_SystemAdminCrossTenantWriteRewritesBothTenantLocations(t *testing.T) {
+	_, c := runGuard(t, 100, "kb-private", types.OrgRoleAdmin,
+		&types.KnowledgeBase{
+			ID:         "kb-private",
+			TenantID:   200,
+			CreatorID:  "someone-else",
+			Visibility: types.ResourceVisibilityPrivate,
+		},
+		nil,
+		guardOpts{systemAdmin: true},
+	)
+	require.False(t, c.IsAborted())
+	access, ok := KBAccessFromContext(c)
+	require.True(t, ok)
+	require.Equal(t, uint64(200), access.EffectiveTenantID)
+	require.Equal(t, types.OrgRoleAdmin, access.Permission)
+
+	gotCtx, ok := types.TenantIDFromContext(c.Request.Context())
+	require.True(t, ok)
+	require.Equal(t, uint64(200), gotCtx)
+	require.Equal(t, uint64(200), c.GetUint64(types.TenantIDContextKey.String()),
+		"guard must mirror the effective tenant into the Gin key")
 }
 
 func TestRequireKBAccess_NotFound_Aborts(t *testing.T) {

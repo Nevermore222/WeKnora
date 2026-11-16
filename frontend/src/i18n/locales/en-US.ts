@@ -1174,6 +1174,7 @@ export default {
     parserEngine: 'Parser Engine',
     storageEngine: 'Storage Engine',
     mcpService: 'MCP Service',
+    mcpEndpoint: 'Knowledge MCP Publishing',
     versionInfo: 'Version Info',
     tenantInfo: 'Tenant Info',
     apiInfo: 'API Info',
@@ -4306,6 +4307,53 @@ export default {
     deleteConfirmBody: 'Delete MCP service "{name}"? This action cannot be undone.',
     unnamed: 'Unnamed',
     builtin: 'Built-in'
+  },
+
+  mcpEndpointSettings: {
+    title: 'Knowledge MCP Publishing',
+    description: 'Publish Xelora knowledge bases as an MCP service for Cursor, Claude, IDEs and other applications.',
+    tutorial: {
+      title: 'General usage guide',
+      description: 'Use your knowledge bases as read-only sources for external applications. Client entry names may differ, but the connection details are the same.',
+      configTitle: 'Generic configuration example',
+      copyConfig: 'Copy configuration',
+      configExample: `{
+  "mcpServers": {
+    "knavis-knowledge": {
+      "url": "https://your-knavis.example.com/mcp/<endpoint-id>",
+      "headers": {
+        "Authorization": "Bearer <your-mcp-token>"
+      }
+    }
+  }
+}`,
+      security: 'The access token is shown only once. Save it securely, never commit it to a repository or share it unnecessarily. Rotating the token invalidates the old token immediately.',
+      steps: {
+        create: { title: 'Publish an endpoint', description: 'Click “Publish endpoint” and choose the knowledge bases and read-only tools to expose.' },
+        copy: { title: 'Copy connection details', description: 'Copy the endpoint URL. After creating or rotating a token, copy it immediately from the one-time token notice.' },
+        configure: { title: 'Configure your MCP client', description: 'Enter the URL and Bearer token in Cursor, Claude Desktop, Cherry Studio, or another MCP client.' },
+        use: { title: 'Start querying', description: 'After connecting, external applications can call knowledge retrieval and agent Q&A tools within the endpoint scope.' },
+      },
+    },
+    publishedEndpoints: 'Published MCP endpoints',
+    publishedEndpointsDesc: 'Each endpoint has its own knowledge-base scope and access token.',
+    create: 'Publish endpoint', createTitle: 'Publish knowledge MCP', editTitle: 'Edit knowledge MCP',
+    empty: 'No MCP endpoints published', unnamed: 'Unnamed endpoint', enabled: 'Enabled', disabled: 'Disabled',
+    name: 'Name', namePlaceholder: 'e.g. Engineering knowledge', descriptionLabel: 'Description',
+    descriptionPlaceholder: 'Explain how external applications can use this knowledge source.',
+    enabledLabel: 'Enable endpoint', enabledDesc: 'Disabled endpoints cannot be called by external applications.',
+    knowledgeBases: 'Knowledge-base scope', knowledgeBasesDesc: 'Empty means all knowledge bases visible in the current workspace.',
+    knowledgeBasesPlaceholder: 'Select knowledge bases', allKnowledgeBasesOption: 'Allow all visible knowledge bases',
+    allKnowledgeBases: 'All visible knowledge bases', scopedKnowledgeBases: '{count} knowledge bases selected',
+    defaultAgent: 'Default agent', defaultAgentDesc: 'Agent used by the ask tool; optional.', defaultAgentPlaceholder: 'No agent Q&A',
+    tools: 'Exposed tools', toolsDesc: 'Read-only tools are enabled by default; enable write tools carefully.', writeTool: 'Write',
+    toolsCount: '{count} tools', rateLimit: 'Calls per minute', rateLimitDesc: 'Set 0 to use the server default.', tokenHint: 'Token: {hint}',
+    tokenShownOnce: 'MCP access token (shown once)', tokenCopyHint: 'Copy and save it now; it cannot be viewed again after leaving this page.',
+    copyToken: 'Copy token', rotateToken: 'Rotate token', rotateConfirm: 'The old token will stop working immediately. Continue?',
+    deleteConfirm: 'Delete MCP endpoint “{name}”?', groups: { retrieve: 'Knowledge retrieval', chat: 'Agent Q&A', wiki: 'Wiki', ingest: 'Content writing' },
+    nameRequired: 'Enter an endpoint name', toolRequired: 'Select at least one MCP tool', loadFailed: 'Failed to load MCP endpoints',
+    saveFailed: 'Failed to save MCP endpoint', created: 'MCP endpoint published', updated: 'MCP endpoint updated', rotated: 'MCP token rotated',
+    rotateFailed: 'Failed to rotate MCP token', deleted: 'MCP endpoint deleted', deleteFailed: 'Failed to delete MCP endpoint', copied: 'Copied', copyFailed: 'Copy failed',
   },
   // New: Model Settings
   modelSettings: {

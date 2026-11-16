@@ -269,6 +269,7 @@ const isViaShare = computed(() => !!currentSharedKb.value);
 // hasRole('contributor') is intentionally NOT here — being a Contributor
 // in a tenant does not by itself grant edit on someone else's KB.
 const canEdit = computed(() => {
+  if (authStore.isSystemAdmin) return true;
   if (isViaShare.value) return orgStore.canEditKB(kbId.value, false);
   if (isOwner.value) return true;
   if (authStore.hasRole('admin')) return true;
@@ -279,6 +280,7 @@ const canEdit = computed(() => {
 // shared KBs only an 'admin' share grant qualifies — editor/viewer (and
 // even being the creator viewed via share) never grant delete/settings.
 const canManage = computed(() => {
+  if (authStore.isSystemAdmin) return true;
   if (isViaShare.value) return orgStore.canManageKB(kbId.value, false);
   if (isOwner.value) return true;
   if (authStore.hasRole('admin')) return true;
@@ -293,6 +295,7 @@ const canManage = computed(() => {
 // the local tenant role is irrelevant — canEdit already encodes the share
 // grant, so trust it.
 const canMutateKnowledge = computed(() => {
+  if (authStore.isSystemAdmin) return true;
   if (!canEdit.value) return false;
   if (isViaShare.value) return true;
   if (isOwner.value) return true;

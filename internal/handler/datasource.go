@@ -51,7 +51,7 @@ func (h *DataSourceHandler) getOwnedKnowledgeBase(
 		return nil, http.StatusNotFound, "knowledge base not found"
 	}
 
-	if kb.TenantID != tenantID {
+	if kb.TenantID != tenantID && !types.IsSystemAdminFromContext(ctx) {
 		return nil, http.StatusForbidden, "access denied"
 	}
 
@@ -101,13 +101,14 @@ func (h *DataSourceHandler) CreateDataSource(c *gin.Context) {
 		return
 	}
 
-	if _, status, msg := h.getOwnedKnowledgeBase(ctx, tenantID, req.KnowledgeBaseID); status != http.StatusOK {
+	kb, status, msg := h.getOwnedKnowledgeBase(ctx, tenantID, req.KnowledgeBaseID)
+	if status != http.StatusOK {
 		c.JSON(status, gin.H{"error": msg})
 		return
 	}
 
 	// Enforce tenant isolation
-	req.TenantID = tenantID
+	req.TenantID = kb.TenantID
 
 	ds, err := h.service.CreateDataSource(ctx, &req)
 	if err != nil {

@@ -1016,6 +1016,7 @@ export default {
     parserEngine: "파싱 엔진",
     storageEngine: "스토리지 엔진",
     mcpService: "MCP 서비스",
+    mcpEndpoint: "지식 MCP 게시",
     versionInfo: "버전 정보",
     tenantInfo: "테넌트 정보",
     apiInfo: "API 정보",
@@ -4331,6 +4332,10 @@ export default {
     today: "오늘",
     yesterday: "어제",
     daysAgo: "{days}일 전",
+  },
+  mcpEndpointSettings: {
+    tutorial: { title: "일반 사용 안내", description: "지식베이스를 외부 애플리케이션의 읽기 전용 소스로 사용합니다. MCP 클라이언트마다 설정 메뉴 이름은 다를 수 있지만 연결 정보는 동일합니다.", configTitle: "일반 구성 예시", copyConfig: "구성 복사", configExample: "{\n  \"mcpServers\": {\n    \"knavis-knowledge\": {\n      \"url\": \"https://your-knavis.example.com/mcp/<endpoint-id>\",\n      \"headers\": {\n        \"Authorization\": \"Bearer <your-mcp-token>\"\n      }\n    }\n  }\n}", security: "액세스 토큰은 한 번만 표시됩니다. 안전한 곳에 저장하고 저장소에 커밋하거나 불필요한 사람과 공유하지 마세요. 토큰을 교체하면 기존 토큰은 즉시 무효화됩니다.", steps: { create: { title: "엔드포인트 게시", description: "“엔드포인트 게시”를 클릭하고 공개할 지식베이스와 읽기 전용 도구를 선택하세요." }, copy: { title: "연결 정보 복사", description: "엔드포인트 URL을 복사하세요. 토큰을 생성하거나 교체한 뒤 한 번만 표시되는 토큰을 즉시 복사하세요." }, configure: { title: "MCP 클라이언트 구성", description: "Cursor, Claude Desktop, Cherry Studio 또는 다른 MCP 클라이언트에 URL과 Bearer 토큰을 입력하세요." }, use: { title: "검색 시작", description: "연결되면 외부 애플리케이션이 엔드포인트 범위 내 지식 검색과 에이전트 Q&A 도구를 호출할 수 있습니다." } } },
+    title: "지식 MCP 게시", description: "Xelora 지식베이스를 외부 애플리케이션용 MCP 서비스로 게시합니다.", publishedEndpoints: "게시된 MCP 엔드포인트", publishedEndpointsDesc: "엔드포인트별 지식베이스 범위와 토큰을 관리합니다.", create: "엔드포인트 게시", createTitle: "지식 MCP 게시", editTitle: "지식 MCP 편집", empty: "게시된 MCP 엔드포인트가 없습니다", unnamed: "이름 없는 엔드포인트", enabled: "사용", disabled: "사용 안 함", name: "이름", namePlaceholder: "예: 개발 지식베이스", descriptionLabel: "설명", descriptionPlaceholder: "외부 앱 사용 방법", enabledLabel: "엔드포인트 사용", enabledDesc: "끄면 외부 앱에서 호출할 수 없습니다.", knowledgeBases: "지식베이스 범위", knowledgeBasesDesc: "비워 두면 현재 공간에서 보이는 모든 지식베이스를 사용합니다.", knowledgeBasesPlaceholder: "지식베이스 선택", allKnowledgeBasesOption: "모든 공개 지식베이스 허용", allKnowledgeBases: "모든 공개 지식베이스", scopedKnowledgeBases: "{count}개 선택", defaultAgent: "기본 에이전트", defaultAgentDesc: "ask 도구에서 사용할 에이전트(선택 사항)", defaultAgentPlaceholder: "에이전트 Q&A 사용 안 함", tools: "공개 도구", toolsDesc: "기본값은 읽기 전용 도구만 활성화됩니다.", writeTool: "쓰기", toolsCount: "도구 {count}개", rateLimit: "분당 호출 제한", rateLimitDesc: "0이면 서버 기본값을 사용합니다.", tokenHint: "토큰: {hint}", tokenShownOnce: "MCP 액세스 토큰(한 번만 표시)", tokenCopyHint: "페이지를 나가기 전에 복사해 저장하세요.", copyToken: "토큰 복사", rotateToken: "토큰 교체", rotateConfirm: "기존 토큰이 즉시 무효화됩니다. 계속할까요?", deleteConfirm: "MCP 엔드포인트 “{name}”을 삭제할까요?", groups: { retrieve: "지식 검색", chat: "에이전트 Q&A", wiki: "Wiki", ingest: "콘텐츠 쓰기" }, nameRequired: "엔드포인트 이름을 입력하세요", toolRequired: "MCP 도구를 하나 이상 선택하세요", loadFailed: "MCP 엔드포인트를 불러오지 못했습니다", saveFailed: "MCP 엔드포인트를 저장하지 못했습니다", created: "MCP 엔드포인트를 게시했습니다", updated: "MCP 엔드포인트를 업데이트했습니다", rotated: "MCP 토큰을 교체했습니다", rotateFailed: "MCP 토큰 교체에 실패했습니다", deleted: "MCP 엔드포인트를 삭제했습니다", deleteFailed: "MCP 엔드포인트 삭제에 실패했습니다", copied: "복사했습니다", copyFailed: "복사하지 못했습니다"
   },
   // MCP 서비스 대화상자
   mcpServiceDialog: {

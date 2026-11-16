@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"testing"
 )
 
@@ -31,6 +32,27 @@ func TestIsSyntheticUserID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCallerTenantIDFromContext(t *testing.T) {
+	t.Run("preserves caller tenant when operation scope changes", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), TenantIDContextKey, uint64(10000))
+		ctx = context.WithValue(ctx, CallerTenantIDContextKey, uint64(10011))
+
+		got, ok := CallerTenantIDFromContext(ctx)
+		if !ok || got != 10011 {
+			t.Fatalf("CallerTenantIDFromContext() = (%d, %v), want (10011, true)", got, ok)
+		}
+	})
+
+	t.Run("falls back to legacy tenant key", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), TenantIDContextKey, uint64(10011))
+
+		got, ok := CallerTenantIDFromContext(ctx)
+		if !ok || got != 10011 {
+			t.Fatalf("CallerTenantIDFromContext() = (%d, %v), want (10011, true)", got, ok)
+		}
+	})
 }
 
 func TestLanguageLocaleName(t *testing.T) {

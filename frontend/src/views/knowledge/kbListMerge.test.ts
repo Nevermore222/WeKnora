@@ -159,3 +159,8 @@ test('isSharedKbEditable treats admin/editor as editable, others read-only', () 
   assert.equal(isSharedKbEditable('viewer'), false)
   assert.equal(isSharedKbEditable(undefined), false)
 })
+
+test('isSharedKbEditable always allows a system administrator', () => {
+  assert.equal(isSharedKbEditable('viewer', true), true)
+  assert.equal(isSharedKbEditable(undefined, true), true)
+})

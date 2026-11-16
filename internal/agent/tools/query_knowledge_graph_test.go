@@ -13,6 +13,9 @@ import (
 )
 
 type stubKnowledgeBaseService struct {
+	// Embedded so the stub keeps satisfying the interface as it grows; only the
+	// methods this tool actually calls are implemented explicitly below.
+	interfaces.KnowledgeBaseService
 	kb      *types.KnowledgeBase
 	results []*types.SearchResult
 }
@@ -68,6 +71,14 @@ func (s *stubKnowledgeBaseService) HybridSearch(context.Context, string, types.S
 }
 
 func (s *stubKnowledgeBaseService) GetQueryEmbedding(context.Context, string, string) ([]float32, error) {
+	return nil, nil
+}
+
+func (s *stubKnowledgeBaseService) CanReadKnowledgeBase(context.Context, *types.KnowledgeBase, uint64) (bool, error) {
+	return true, nil
+}
+
+func (s *stubKnowledgeBaseService) ListVisibleKnowledgeBases(context.Context) ([]*types.KnowledgeBase, error) {
 	return nil, nil
 }
 

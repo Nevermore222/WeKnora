@@ -3,7 +3,8 @@
 # Generate runtime config and inject environment values into the frontend.
 cat > /usr/share/nginx/html/config.js << EOF
 window.__RUNTIME_CONFIG__ = {
-  MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+  MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50},
+  MCP_PUBLIC_ORIGIN: "${MCP_PUBLIC_ORIGIN:-}"
 };
 EOF
 

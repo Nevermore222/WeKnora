@@ -29,22 +29,44 @@
             <small>按层级定位资源</small>
           </div>
           <div class="classification-tree" role="tree" aria-label="知识库筛选分类">
-            <div v-for="module in classificationModules" :key="module.id" class="classification-module" :class="{ active: selectedClassifications[module.id] }">
-              <button type="button" role="treeitem" class="classification-tree-row classification-module-row" :aria-expanded="isClassificationModuleExpanded(module.id)" @click="toggleClassificationModule(module.id)">
-                <t-icon :name="isClassificationModuleExpanded(module.id) ? 'chevron-down' : 'chevron-right'" size="13px" />
-                <t-icon name="folder-open" size="15px" />
-                <strong>{{ module.name }}</strong>
-                <span class="classification-selected-label">{{ selectedClassificationLabel(module) }}</span>
-              </button>
-              <div v-show="isClassificationModuleExpanded(module.id)" class="classification-tree-children" role="group">
-                <button type="button" role="treeitem" class="classification-tree-row classification-all-row" :aria-selected="!selectedClassifications[module.id]" :class="{ selected: !selectedClassifications[module.id] }" @click="selectClassification(module.id, '')">
-                  <span class="tree-indent"></span><span class="tree-leaf">·</span><span>全部{{ module.name }}</span>
-                  <small>{{ classificationResourceCount }}</small>
-                  <t-icon v-if="!selectedClassifications[module.id]" class="tree-selected-icon" name="check" size="14px" aria-hidden="true" />
-                </button>
-                <ClassificationTreeOption v-for="option in module.options || []" :key="option.id" :option="option" :module-id="module.id" :selected-id="selectedClassifications[module.id] || ''" :expanded-ids="expandedClassificationOptions" @select="selectClassification" @toggle="toggleClassificationOption" />
-              </div>
-            </div>
+            <t-tree
+              v-if="classificationModules.length > 0"
+              ref="classificationTreeRef"
+              :data="classificationTreeData"
+              :keys="{ value: 'value', label: 'label', children: 'children' }"
+              :default-expanded="classificationModuleValues"
+              hover
+              transition
+              :line="true"
+              :expand-on-click-node="false"
+              @click="handleClassificationTreeClick"
+            >
+              <template #label="{ node }">
+                <div
+                  class="cls-tree-row"
+                  :class="{
+                    'is-module': node.data.kind === 'module',
+                    'is-all': node.data.kind === 'all',
+                    'is-selected': isClassificationNodeSelected(node.data),
+                    'is-module-active': node.data.kind === 'module' && !!selectedClassifications[node.data.moduleId],
+                  }"
+                >
+                  <t-icon :name="classificationNodeIcon(node)" size="15px" class="cls-tree-icon" />
+                  <span class="cls-tree-label">{{ node.label }}</span>
+                  <span v-if="node.data.kind === 'module'" class="cls-tree-meta">
+                    {{ moduleSelectedLabel(node.data.moduleId) }}
+                  </span>
+                  <t-icon
+                    v-else-if="isClassificationNodeSelected(node.data)"
+                    name="check"
+                    size="14px"
+                    class="cls-tree-check"
+                    aria-hidden="true"
+                  />
+                </div>
+              </template>
+            </t-tree>
+            <div v-else class="classification-tree-empty">暂无筛选分类</div>
           </div>
           <t-button v-if="authStore.isSystemAdmin" variant="outline" size="small" class="classification-manage-btn" @click="handleManageClassification">
             <template #icon><t-icon name="setting-1" /></template>
@@ -65,6 +87,7 @@
             <template #prefix-icon><t-icon name="search" /></template>
           </t-input>
         </section>
+        <div class="kb-list-results">
         <!-- creator filter intentionally removed from chrome: every card
              already shows its creator via ResourceOriginBadge / avatar, so
              a dedicated horizontal switch added more noise than signal.
@@ -733,6 +756,7 @@
           <span class="empty-txt">{{ $t('knowledgeList.empty.sharedTitle') }}</span>
           <span class="empty-desc">{{ $t('knowledgeList.empty.sharedDescription') }}</span>
         </div>
+        </div>
       </div>
     </div>
 
@@ -904,7 +928,6 @@ import { mergeAllScopeKnowledgeBases, type OwnedKnowledgeBase, type SharedKnowle
 import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
-import ClassificationTreeOption from '@/components/ClassificationTreeOption.vue'
 import { listClassifications, createClassificationModule, createClassificationOption, updateClassificationModule, updateClassificationOption, deleteClassificationModule, deleteClassificationOption, type ClassificationModule, type ClassificationOption } from '@/api/classification'
 import { isContextualGuideDone, markContextualGuideDone } from '@/config/contextualGuides'
 import { useTenantModelReadiness } from '@/composables/useTenantModelReadiness'
@@ -1018,22 +1041,94 @@ const classificationOptionName = ref('')
 const classificationParentID = ref<string | undefined>()
 const classificationOptionSubmitting = ref(false)
 const classificationManageModule = ref<ClassificationModule | null>(null)
-const expandedClassificationModules = ref<Set<string>>(new Set())
-const expandedClassificationOptions = ref<Set<string>>(new Set())
+
 
 const loadClassifications = async () => {
   try { const res = await listClassifications('knowledge_base'); classificationModules.value = (res.data || []).filter(m => m.enabled); for (const m of classificationModules.value) selectedClassifications.value[m.id] ||= '' } catch { classificationModules.value = [] }
 }
+
+type ClassificationNodeKind = 'module' | 'all' | 'option'
+interface ClassificationTreeNode {
+  value: string
+  label: string
+  kind: ClassificationNodeKind
+  moduleId: string
+  optionId?: string
+  children?: ClassificationTreeNode[]
+}
+
+const classificationTreeRef = ref<any>(null)
+
+function mapClassificationOptions(moduleId: string, options: ClassificationOption[]): ClassificationTreeNode[] {
+  return options.map(o => ({
+    value: `option:${moduleId}:${o.id}`,
+    label: o.name,
+    kind: 'option' as const,
+    moduleId,
+    optionId: o.id,
+    children: o.children?.length ? mapClassificationOptions(moduleId, o.children) : undefined,
+  }))
+}
+
+const classificationTreeData = computed<ClassificationTreeNode[]>(() =>
+  classificationModules.value.map(module => ({
+    value: `module:${module.id}`,
+    label: module.name,
+    kind: 'module' as const,
+    moduleId: module.id,
+    children: [
+      {
+        value: `all:${module.id}`,
+        label: `全部${module.name}`,
+        kind: 'all' as const,
+        moduleId: module.id,
+        optionId: '',
+      },
+      ...mapClassificationOptions(module.id, module.options || []),
+    ],
+  }))
+)
+
+const classificationModuleValues = computed(() =>
+  classificationModules.value.map(module => `module:${module.id}`)
+)
+
+function handleClassificationTreeClick(ctx: any) {
+  const data = ctx?.node?.data as ClassificationTreeNode | undefined
+  if (!data) return
+  if (data.kind === 'module') {
+    const next = !ctx.node.expanded
+    classificationTreeRef.value?.setItem(data.value, { expanded: next })
+    return
+  }
+  selectClassification(data.moduleId, data.optionId || '')
+}
+
+function isClassificationNodeSelected(data: ClassificationTreeNode | undefined): boolean {
+  if (!data || data.kind === 'module') return false
+  return (selectedClassifications.value[data.moduleId] || '') === (data.optionId || '')
+}
+
+function moduleSelectedLabel(moduleId: string): string {
+  const module = classificationModules.value.find(item => item.id === moduleId)
+  return module ? selectedClassificationLabel(module) : '全部'
+}
+
+function classificationNodeIcon(node: any): string {
+  const kind = node?.data?.kind as ClassificationNodeKind | undefined
+  if (kind === 'module') return 'folder-open'
+  if (kind === 'all') return 'root-list'
+  return node?.children?.length ? 'folder' : 'file'
+}
+
 function flattenOptions(options: ClassificationOption[] = [], prefix: string[] = []): Array<{ label: string; value: string }> {
   return options.flatMap(o => [{ label: [...prefix, o.name].join(' / '), value: o.id }, ...flattenOptions(o.children, [...prefix, o.name])])
 }
 function classificationOptions(module: ClassificationModule) { return [{ label: `${module.name}：全部`, value: '' }, ...flattenOptions(module.options)] }
 function selectedClassificationLabel(module: ClassificationModule) { const selected = selectedClassifications.value[module.id]; return selected ? flattenOptions(module.options).find(option => option.value === selected)?.label.split(' / ').pop() || '已选择' : '全部' }
-const classificationResourceCount = computed(() => kbs.value.length + sharedKbs.value.length)
-function isClassificationModuleExpanded(moduleId: string) { return expandedClassificationModules.value.has(moduleId) }
-function toggleClassificationModule(moduleId: string) { const next = new Set(expandedClassificationModules.value); next.has(moduleId) ? next.delete(moduleId) : next.add(moduleId); expandedClassificationModules.value = next }
-function toggleClassificationOption(optionId: string) { const next = new Set(expandedClassificationOptions.value); next.has(optionId) ? next.delete(optionId) : next.add(optionId); expandedClassificationOptions.value = next }
-function selectClassification(moduleId: string, optionId: string) { selectedClassifications.value = { ...selectedClassifications.value, [moduleId]: optionId }; expandedClassificationModules.value = new Set([...expandedClassificationModules.value, moduleId]) }
+function selectClassification(moduleId: string, optionId: string) {
+  selectedClassifications.value = { ...selectedClassifications.value, [moduleId]: optionId }
+}
 function getSelectedOptionPath(moduleID: string, id: string): string[] { const module = classificationModules.value.find(m => m.id === moduleID); const found = flattenOptions(module?.options).find(o => o.value === id); return found ? [module?.name || '', found.label] : [] }
 function getKnowledgeBaseClassificationEntries(kb: any): ClassificationEntry[] {
   const raw = kb?.classification_tags
@@ -2256,21 +2351,41 @@ const handleUploadFinishedEvent = (event: Event) => {
 /* Classification tree sidebar */
 .kb-list-main {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: clamp(264px, 20vw, 320px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
   gap: 18px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
 }
-.kb-list-main > :not(.kb-classification-panel) { grid-column: 2; min-width: 0; }
+.kb-list-results {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 28px 8px 0;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
 .kb-classification-panel {
   grid-column: 1;
-  grid-row: 1 / span 20;
-  margin: 0;
-  padding: 14px 12px 12px;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  margin: 0 0 8px;
+  padding: 14px 12px 12px;
   border: 1px solid var(--td-component-stroke);
   border-radius: 8px;
   background: var(--td-bg-color-container);
   box-sizing: border-box;
+  overflow: hidden;
 }
 .classification-sidebar-head {
   display: flex;
@@ -2323,113 +2438,97 @@ const handleUploadFinishedEvent = (event: Event) => {
 .classification-tree {
   min-width: 0;
   padding: 2px 0 4px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
 }
-.classification-module {
-  padding-bottom: 4px;
+.classification-tree-empty {
+  padding: 18px 8px;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  text-align: center;
 }
-.classification-module + .classification-module {
-  padding-top: 4px;
-  border-top: 1px solid var(--td-component-stroke);
+.classification-tree :deep(.t-tree__list) {
+  padding: 0;
+  min-width: max-content;
 }
-.kb-classification-panel :deep(.classification-tree-row) {
+.classification-tree :deep(.t-tree__item) {
+  width: max-content;
+  min-width: 100%;
+  padding-left: calc(14px * var(--level));
+}
+.classification-tree :deep(.t-tree__line) {
+  --space: 14px;
+  left: calc(14px * var(--level) - 14px);
+}
+.classification-tree :deep(.t-tree__label) {
+  flex: 1 0 auto;
+  min-width: 0;
+  padding: 0;
+  border-radius: 5px;
+  line-height: 1;
+  overflow: visible;
+  text-overflow: clip;
+}
+.cls-tree-row {
   display: flex;
   width: 100%;
-  min-height: 36px;
+  min-height: 32px;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   padding: 2px 7px;
-  border: 0;
   border-radius: 5px;
-  outline: none;
-  background: transparent;
   color: var(--td-text-color-secondary);
-  font-family: inherit;
   font-size: 13px;
   line-height: 20px;
-  text-align: left;
-  cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease;
 }
-.kb-classification-panel :deep(.classification-tree-row:hover) {
+.cls-tree-row:hover {
   background: var(--td-bg-color-secondarycontainer);
   color: var(--td-text-color-primary);
 }
-.kb-classification-panel :deep(.classification-tree-row:active) {
-  background: var(--td-bg-color-component-active);
+.cls-tree-row.is-module {
+  min-height: 36px;
+  color: var(--td-text-color-primary);
+  font-weight: 600;
 }
-.kb-classification-panel :deep(.classification-tree-row:focus-visible) {
-  box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+.cls-tree-row.is-module-active {
+  color: var(--td-brand-color);
 }
-.kb-classification-panel :deep(.classification-tree-row.selected) {
+.cls-tree-row.is-selected {
   background: var(--td-brand-color-light);
   color: var(--td-brand-color);
   font-weight: 500;
   box-shadow: inset 0 0 0 1px var(--td-brand-color-focus);
 }
-.classification-module-row {
-  min-height: 38px !important;
-  color: var(--td-text-color-primary) !important;
-  font-size: 13px !important;
-}
-.classification-module.active .classification-module-row {
-  color: var(--td-brand-color) !important;
-}
-.kb-classification-panel :deep(.classification-tree-row .t-icon) {
+.cls-tree-icon {
   flex: 0 0 auto;
   color: var(--td-text-color-placeholder);
 }
-.kb-classification-panel :deep(.classification-tree-row.selected .t-icon),
-.classification-module.active :deep(.classification-module-row .t-icon) {
+.cls-tree-row.is-module-active .cls-tree-icon,
+.cls-tree-row.is-selected .cls-tree-icon {
   color: var(--td-brand-color);
 }
-.classification-tree-row strong { font-weight: 600; }
-.classification-selected-label {
-  margin-left: auto;
+.cls-tree-label {
+  flex: 0 0 auto;
+  min-width: max-content;
+  white-space: nowrap;
+}
+.cls-tree-meta {
+  flex: 0 1 46%;
+  min-width: 0;
   overflow: hidden;
   color: var(--td-text-color-placeholder);
   font-size: 11px;
   font-weight: 400;
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.classification-tree-children {
-  margin: 2px 0 0 14px;
-  padding: 2px 0 2px 10px;
-  border-left: 1px solid var(--td-component-stroke);
-}
-.classification-tree-children.nested {
-  margin-left: 18px;
-  padding-left: 8px;
-}
-.classification-option-row { min-height: 34px !important; }
-.classification-option-row > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.classification-all-row small {
-  margin-left: auto;
-  color: var(--td-text-color-placeholder);
-  font-size: 11px;
-}
-.tree-indent { flex: 0 0 6px; }
-.tree-leaf {
-  width: 24px;
-  color: var(--td-text-color-placeholder);
-  text-align: center;
-}
-.tree-selected-icon {
+.cls-tree-check {
   flex: 0 0 auto;
   color: var(--td-brand-color);
-}
-.tree-toggle {
-  display: inline-flex;
-  width: 14px;
-  height: 20px;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 14px;
-  color: var(--td-text-color-placeholder);
 }
 .classification-manage-btn {
   width: 100%;
@@ -2437,21 +2536,33 @@ const handleUploadFinishedEvent = (event: Event) => {
   color: var(--td-brand-color);
   border-style: dashed;
 }
-.kb-classification-panel .classification-path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 34px; margin-top: 14px; padding: 6px 8px; border: 1px solid var(--td-component-stroke); border-radius: 6px; background: var(--td-bg-color-secondarycontainer); }
+.kb-classification-panel .classification-path {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin-top: 14px;
+  padding: 6px 8px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 6px;
+  background: var(--td-bg-color-secondarycontainer);
+}
 .kb-classification-panel .classification-path .path-label { flex: 0 0 100%; }
 .kb-classification-panel .classification-search { width: 100%; margin-top: 10px; }
 @media (max-width: 960px) {
-  .kb-list-main { grid-template-columns: 220px minmax(0, 1fr); gap: 14px; }
+  .kb-list-main { grid-template-columns: 240px minmax(0, 1fr); gap: 14px; }
 }
 @media (max-width: 620px) {
-  .kb-list-main { display: block; }
-  .kb-list-main > :not(.kb-classification-panel) { margin-top: 14px; }
-  .kb-classification-panel { margin-bottom: 14px; }
+  .kb-list-main { display: block; overflow-y: auto; }
+  .kb-list-results { overflow: visible; padding-right: 0; }
+  .kb-classification-panel { margin: 0 0 14px; height: auto; }
   .classification-tree { max-height: 360px; overflow-y: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kb-classification-panel :deep(.classification-tree-row) {
+  .cls-tree-row {
     transition: none;
   }
 }

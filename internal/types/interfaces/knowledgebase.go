@@ -100,6 +100,16 @@ type KnowledgeBaseService interface {
 	//   - Possible errors such as not existing, insufficient permissions, search engine errors, etc.
 	HybridSearch(ctx context.Context, id string, params types.SearchParams) ([]*types.SearchResult, error)
 
+	// CanReadKnowledgeBase reports whether the current caller may read the given
+	// knowledge base, applying the single read rule shared by the KB route guard,
+	// the KB detail handler, retrieval and agent scope resolution: own workspace,
+	// system-public, organization-shared (against the retrieval tenant or the
+	// caller's tenant), agent-scoped, or system administrator.
+	//
+	// retrievalTenantID is the tenant the retrieval runs in - for a shared or
+	// public agent that is the agent's source tenant, not the caller's.
+	CanReadKnowledgeBase(ctx context.Context, kb *types.KnowledgeBase, retrievalTenantID uint64) (bool, error)
+
 	// GetQueryEmbedding computes the query embedding using the embedding model
 	// associated with the given knowledge base. This allows callers to pre-compute
 	// and reuse embeddings across multiple KBs that share the same model.

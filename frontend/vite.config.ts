@@ -154,7 +154,12 @@ export default defineConfig({
         target: DEV_PROXY_TARGET,
         changeOrigin: true,
         secure: false,
-      }
+      },
+      '/mcp': {
+        target: DEV_PROXY_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
     }
   }
 })

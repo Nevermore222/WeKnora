@@ -15,6 +15,12 @@ import {
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useOrganizationStore } from '@/stores/organization'
+import {
+  hasSystemAwareCapability,
+  hasSystemAwareTenantRole,
+  resolveSystemAwareTenantRole,
+  type TenantRole,
+} from '@/utils/systemAdminPermissions'
 
 /** 登出时丢弃 Pinia 内的租户级资源缓存，避免 SPA 重登复用上一账号数据。 */
 function clearSessionResourceCaches() {
@@ -142,26 +148,17 @@ export const useAuthStore = defineStore('auth', () => {
   // authorisation decisions live on the server (auth middleware resolves
   // the role from tenant_members on every request). Never branch
   // security-sensitive logic on this value alone.
-  const currentTenantRole = computed(() => {
-    const tid =
-      selectedTenantId.value !== null && selectedTenantId.value !== undefined
-        ? String(selectedTenantId.value)
-        : tenant.value?.id
-        ? String(tenant.value.id)
-        : ''
-    if (!tid) return ''
-    const match = memberships.value.find((m) => String(m.tenant_id) === tid)
-    if (match?.role) return match.role
-    // Cross-tenant superuser visiting a tenant they're not a member of:
-    // backend auth.go resolveTenantRole step2 grants a temporary Admin
-    // role without writing tenant_members. Mirror that here so mutation
-    // UIs aren't hidden in tenants the superuser switched into. Never
-    // surface Owner — the backend caps the temporary grant at Admin too
-    // (Owner-only ops like tenant deletion stay reserved for a real
-    // Owner inside the target tenant).
-    if (canAccessAllTenants.value) return 'admin'
-    return ''
-  })
+  const currentTenantRole = computed<TenantRole | ''>(() =>
+    resolveSystemAwareTenantRole({
+      isSystemAdmin: isSystemAdmin.value,
+      canAccessAllTenants: canAccessAllTenants.value,
+      tenantId:
+        selectedTenantId.value !== null && selectedTenantId.value !== undefined
+          ? selectedTenantId.value
+          : tenant.value?.id,
+      memberships: memberships.value,
+    }),
+  )
 
   // hasRole answers "is the current tenant role at least <min>?", used by
   // role-aware UI gating across KB / Agent / settings views. The numeric
@@ -172,14 +169,8 @@ export const useAuthStore = defineStore('auth', () => {
   // SECURITY: shares the same caveat as currentTenantRole — derived from
   // localStorage, MUST be treated as UI-rendering-only. Never rely on
   // hasRole() for security decisions; the server is the source of truth.
-  const ROLE_LEVEL: Record<string, number> = {
-    viewer: 10,
-    contributor: 20,
-    admin: 30,
-    owner: 40,
-  }
-  const hasRole = (min: 'viewer' | 'contributor' | 'admin' | 'owner'): boolean => {
-    return (ROLE_LEVEL[currentTenantRole.value] ?? 0) >= ROLE_LEVEL[min]
+  const hasRole = (min: TenantRole): boolean => {
+    return hasSystemAwareTenantRole(min, isSystemAdmin.value, currentTenantRole.value)
   }
 
   // hasCapability gates create-KB / create-agent / bind-model UI entry
@@ -191,14 +182,13 @@ export const useAuthStore = defineStore('auth', () => {
   const hasCapability = (id: UserCapabilityId): boolean => {
     const u = user.value
     if (!u) return false
-    if (u[id] === false) return false
-    if (isPersonalMode.value) {
-      return u.is_client_provisioned === true && u[id] === true
-    }
-    if (u.is_client_provisioned) {
-      return u[id] === true
-    }
-    return u[id] !== false
+    return hasSystemAwareCapability({
+      id,
+      flag: u[id],
+      isSystemAdmin: isSystemAdmin.value,
+      isPersonalMode: isPersonalMode.value,
+      isClientProvisioned: u.is_client_provisioned === true,
+    })
   }
 
   const effectiveTenantId = computed(() => {

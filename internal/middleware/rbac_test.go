@@ -20,12 +20,19 @@ import (
 // Returning the recorder rather than asserting inline keeps each test
 // case focused on the (input -> status) pair it cares about.
 func rbacTestHarness(role types.TenantRole, userID string, mw gin.HandlerFunc) *httptest.ResponseRecorder {
+	return rbacTestHarnessWithSystemAdmin(role, userID, false, mw)
+}
+
+func rbacTestHarnessWithSystemAdmin(
+	role types.TenantRole, userID string, systemAdmin bool, mw gin.HandlerFunc,
+) *httptest.ResponseRecorder {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
 		// Mirror what middleware/auth.go's JWT path sets.
 		ctx := context.WithValue(c.Request.Context(), types.TenantRoleContextKey, role)
 		ctx = context.WithValue(ctx, types.UserIDContextKey, userID)
+		ctx = context.WithValue(ctx, types.SystemAdminContextKey, systemAdmin)
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	})
@@ -130,6 +137,14 @@ func TestRequireRole_CrossTenantSuperuserBypass(t *testing.T) {
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("superuser must bypass Owner role gate, got %d", w.Code)
+	}
+}
+
+func TestRequireRole_SystemAdminBypassesOwnerGate(t *testing.T) {
+	w := rbacTestHarnessWithSystemAdmin(types.TenantRoleViewer, "root", true,
+		RequireRole(types.TenantRoleOwner, cfgRBAC(true)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("system admin must bypass Owner role gate, got %d", w.Code)
 	}
 }
 
@@ -286,6 +301,22 @@ func TestRequireOwnershipOrRole_CrossTenantSuperuserBypass(t *testing.T) {
 	}
 	if calls != 0 {
 		t.Fatalf("superuser bypass must skip lookup, got %d", calls)
+	}
+}
+
+func TestRequireOwnershipOrRole_SystemAdminBypassesLookup(t *testing.T) {
+	calls := 0
+	lookup := func(c *gin.Context) (string, error) {
+		calls++
+		return "", errors.New("must not be called")
+	}
+	w := rbacTestHarnessWithSystemAdmin(types.TenantRoleViewer, "root", true,
+		RequireOwnershipOrRole(types.TenantRoleOwner, lookup, cfgRBAC(true)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("system admin must bypass ownership/role gate, got %d", w.Code)
+	}
+	if calls != 0 {
+		t.Fatalf("system admin bypass must skip lookup, got %d calls", calls)
 	}
 }
 

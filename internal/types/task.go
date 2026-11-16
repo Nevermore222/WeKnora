@@ -161,10 +161,27 @@ type SummaryGenerationPayload struct {
 // KBClonePayload represents the knowledge base clone task payload
 type KBClonePayload struct {
 	TracingContext
-	TenantID uint64 `json:"tenant_id"`
+	SourceTenantID uint64 `json:"source_tenant_id,omitempty"`
+	TargetTenantID uint64 `json:"target_tenant_id,omitempty"`
+	// TenantID is the legacy fallback for tasks already in flight.
+	TenantID uint64 `json:"tenant_id,omitempty"`
 	TaskID   string `json:"task_id"`
 	SourceID string `json:"source_id"`
 	TargetID string `json:"target_id"`
+}
+
+func (p KBClonePayload) SourceTenant() uint64 {
+	if p.SourceTenantID != 0 {
+		return p.SourceTenantID
+	}
+	return p.TenantID
+}
+
+func (p KBClonePayload) TargetTenant() uint64 {
+	if p.TargetTenantID != 0 {
+		return p.TargetTenantID
+	}
+	return p.SourceTenant()
 }
 
 // IndexDeletePayload represents the index delete task payload
@@ -185,13 +202,22 @@ type IndexDeletePayload struct {
 // KBDeletePayload represents the knowledge base delete task payload
 type KBDeletePayload struct {
 	TracingContext
-	TenantID         uint64                  `json:"tenant_id"`
+	SourceTenantID uint64 `json:"source_tenant_id,omitempty"`
+	// TenantID is the legacy fallback for tasks already in flight.
+	TenantID         uint64                  `json:"tenant_id,omitempty"`
 	KnowledgeBaseID  string                  `json:"knowledge_base_id"`
 	EffectiveEngines []RetrieverEngineParams `json:"effective_engines"`
 	// VectorStoreID is the bound store snapshot taken at enqueue time (before
 	// soft-delete) so the async worker can resolve the right store. nil means
 	// the KB had no binding — falls back to EffectiveEngines.
 	VectorStoreID *string `json:"vector_store_id,omitempty"`
+}
+
+func (p KBDeletePayload) SourceTenant() uint64 {
+	if p.SourceTenantID != 0 {
+		return p.SourceTenantID
+	}
+	return p.TenantID
 }
 
 // KnowledgeListDeletePayload represents the batch knowledge delete task payload
@@ -204,12 +230,30 @@ type KnowledgeListDeletePayload struct {
 // KnowledgeMovePayload represents the knowledge move task payload
 type KnowledgeMovePayload struct {
 	TracingContext
+	SourceTenantID uint64 `json:"source_tenant_id,omitempty"`
+	TargetTenantID uint64 `json:"target_tenant_id,omitempty"`
+	// TenantID is the legacy source-tenant fallback for tasks already in
+	// flight during a rolling deployment. New enqueues set all three fields.
 	TenantID     uint64   `json:"tenant_id"`
 	TaskID       string   `json:"task_id"`
 	KnowledgeIDs []string `json:"knowledge_ids"`
 	SourceKBID   string   `json:"source_kb_id"`
 	TargetKBID   string   `json:"target_kb_id"`
 	Mode         string   `json:"mode"` // "reuse_vectors" or "reparse"
+}
+
+func (p KnowledgeMovePayload) SourceTenant() uint64 {
+	if p.SourceTenantID != 0 {
+		return p.SourceTenantID
+	}
+	return p.TenantID
+}
+
+func (p KnowledgeMovePayload) TargetTenant() uint64 {
+	if p.TargetTenantID != 0 {
+		return p.TargetTenantID
+	}
+	return p.SourceTenant()
 }
 
 // KnowledgeMoveProgress represents the progress of a knowledge move task

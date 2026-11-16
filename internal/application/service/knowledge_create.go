@@ -51,6 +51,18 @@ func (s *knowledgeService) CreateKnowledgeFromFile(ctx context.Context,
 		logger.Errorf(ctx, "Failed to get knowledge base: %v", err)
 		return nil, err
 	}
+	ctx, err = s.withKnowledgeBaseTenantContext(ctx, kb)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err = s.withKnowledgeBaseTenantContext(ctx, kb)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err = s.withKnowledgeBaseTenantContext(ctx, kb)
+	if err != nil {
+		return nil, err
+	}
 
 	// FAQ knowledge bases should not accept file uploads — use the FAQ import API instead
 	if kb.Type == types.KnowledgeBaseTypeFAQ {
@@ -329,6 +341,10 @@ func (s *knowledgeService) CreateKnowledgeFromURL(ctx context.Context,
 		logger.Errorf(ctx, "Failed to get knowledge base: %v", err)
 		return nil, err
 	}
+	ctx, err = s.withKnowledgeBaseTenantContext(ctx, kb)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := s.checkStorageEngineConfigured(ctx, kb); err != nil {
 		return nil, err
@@ -523,6 +539,10 @@ func (s *knowledgeService) createKnowledgeFromFileURL(
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, kbID)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to get knowledge base: %v", err)
+		return nil, err
+	}
+	ctx, err = s.withKnowledgeBaseTenantContext(ctx, kb)
+	if err != nil {
 		return nil, err
 	}
 
@@ -739,6 +759,10 @@ func (s *knowledgeService) CreateKnowledgeFromManual(ctx context.Context,
 		logger.Errorf(ctx, "Failed to get knowledge base: %v", err)
 		return nil, err
 	}
+	ctx, err = s.withKnowledgeBaseTenantContext(ctx, kb)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := s.checkStorageEngineConfigured(ctx, kb); err != nil {
 		return nil, err
@@ -834,6 +858,10 @@ func (s *knowledgeService) createKnowledgeFromPassageInternal(ctx context.Contex
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, kbID)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to get knowledge base: %v", err)
+		return nil, err
+	}
+	ctx, err = s.withKnowledgeBaseTenantContext(ctx, kb)
+	if err != nil {
 		return nil, err
 	}
 

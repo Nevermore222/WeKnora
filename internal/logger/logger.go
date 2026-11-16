@@ -512,6 +512,18 @@ func CloneContext(ctx context.Context) context.Context {
 		types.LanguageContextKey,
 		types.SessionTenantIDContextKey,
 		types.EmbedQueryContextKey,
+		// CallerTenantIDContextKey: the authenticated caller's own tenant.
+		// TenantIDContextKey is rewritten to a resource tenant for shared and
+		// public resources, so without this key the retrieval path can no longer
+		// tell the caller's entitlements from the resource owner's - a knowledge
+		// base shared with the caller then becomes unsearchable through a shared
+		// agent.
+		types.CallerTenantIDContextKey,
+		// SystemAdminContextKey: platform admin identity is an authorization
+		// input, and the chat pipeline runs on the cloned context. Dropping it
+		// silently degraded system admins to ordinary callers for retrieval,
+		// agent scope resolution and every admin-aware list.
+		types.SystemAdminContextKey,
 		// Keep the Langfuse trace alive across CloneContext boundaries so
 		// LLM/Embedder/Reranker/VLM/ASR wrappers attach their generations
 		// to the same trace opened by GinMiddleware, instead of each call

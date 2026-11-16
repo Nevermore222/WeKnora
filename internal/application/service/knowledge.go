@@ -356,6 +356,34 @@ func (s *knowledgeService) getParserEngineOverridesFromContext(ctx context.Conte
 	return nil
 }
 
+func (s *knowledgeService) withKnowledgeBaseTenantContext(
+	ctx context.Context, kb *types.KnowledgeBase,
+) (context.Context, error) {
+	if kb == nil {
+		return nil, errors.New("knowledge base tenant is unavailable")
+	}
+	resourceTenantID := kb.TenantID
+	if resourceTenantID == 0 {
+		var ok bool
+		resourceTenantID, ok = types.TenantIDFromContext(ctx)
+		if !ok || resourceTenantID == 0 {
+			return nil, errors.New("knowledge base tenant is unavailable")
+		}
+	}
+	callerTenantID, hasCallerTenant := ctx.Value(types.CallerTenantIDContextKey).(uint64)
+	if !hasCallerTenant {
+		callerTenantID, hasCallerTenant = types.TenantIDFromContext(ctx)
+	}
+	resourceCtx, err := s.withTenantContext(ctx, resourceTenantID)
+	if err != nil {
+		return nil, err
+	}
+	if hasCallerTenant && callerTenantID != 0 {
+		resourceCtx = context.WithValue(resourceCtx, types.CallerTenantIDContextKey, callerTenantID)
+	}
+	return resourceCtx, nil
+}
+
 // GetRepository gets the knowledge repository
 // Parameters:
 //   - ctx: Context with authentication and request information
@@ -539,8 +567,17 @@ func (s *knowledgeService) GetKnowledgeFile(ctx context.Context, id string) (io.
 		return io.NopCloser(strings.NewReader(content)), filename, nil
 	}
 
-	// Resolve KB-level file service with FilePath fallback protection
-	kb, _ := s.kbService.GetKnowledgeBaseByID(ctx, knowledge.KnowledgeBaseID)
+	// Resolve the KB and switch to its tenant before selecting the file
+	// backend. Cross-tenant system-admin downloads must not inherit the
+	// caller's default storage provider.
+	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, knowledge.KnowledgeBaseID)
+	if err != nil {
+		return nil, "", err
+	}
+	ctx, err = s.withKnowledgeBaseTenantContext(ctx, kb)
+	if err != nil {
+		return nil, "", err
+	}
 	file, err := s.resolveFileServiceForPath(ctx, kb, knowledge.FilePath).GetFile(ctx, knowledge.FilePath)
 	if err != nil {
 		return nil, "", err
@@ -618,6 +655,18 @@ func (s *knowledgeService) GetKnowledgeBatchWithSharedAccess(ctx context.Context
 		k, err := s.repo.GetKnowledgeByIDOnly(ctx, id)
 		if err != nil || k == nil || k.KnowledgeBaseID == "" {
 			continue
+		}
+		// A system-public KB is readable from every workspace. The share lookup
+		// below only covers organization shares, so without this branch a
+		// document @-mentioned from a public KB is dropped silently even though
+		// whole-KB retrieval on that same KB is allowed.
+		if s.kbService != nil {
+			if kb, kbErr := s.kbService.GetKnowledgeBaseByID(ctx, k.KnowledgeBaseID); kbErr == nil &&
+				kb != nil && kb.Visibility == types.ResourceVisibilityPublic {
+				foundSet[k.ID] = true
+				ownList = append(ownList, k)
+				continue
+			}
 		}
 		hasPermission, err := s.kbShareService.HasTenantKBPermission(ctx, k.KnowledgeBaseID, tenantID, callerTenantRole, types.OrgRoleViewer)
 		if err != nil || !hasPermission {
@@ -749,43 +798,68 @@ func (s *knowledgeService) UpdateKnowledgeTagBatch(ctx context.Context, authoriz
 
 // SearchKnowledge searches knowledge items by keyword across the tenant and shared knowledge bases.
 // fileTypes: optional list of file extensions to filter by (e.g., ["csv", "xlsx"])
+// buildKnowledgeSearchScopes collects the (tenant, knowledge base) pairs the
+// global document search may look in: every knowledge base visible to the caller
+// (own workspace plus system-public) plus the knowledge bases shared with the
+// caller's tenant.
+//
+// Each scope carries the tenant that actually owns the KB, not the caller's,
+// because public and shared KBs live in other workspaces. Public KBs used to be
+// missing here even though the KB list shows them, so a document the caller could
+// open and quote in chat could not be found by search.
+func (s *knowledgeService) buildKnowledgeSearchScopes(
+	ctx context.Context, tenantID uint64,
+) []types.KnowledgeSearchScope {
+	scopes := make([]types.KnowledgeSearchScope, 0)
+	seen := make(map[string]bool)
+	add := func(scopeTenantID uint64, kb *types.KnowledgeBase) {
+		if kb == nil || kb.ID == "" || seen[kb.ID] {
+			return
+		}
+		if kb.Type != types.KnowledgeBaseTypeDocument {
+			return
+		}
+		seen[kb.ID] = true
+		scopes = append(scopes, types.KnowledgeSearchScope{TenantID: scopeTenantID, KBID: kb.ID})
+	}
+
+	// Visible = own workspace plus system-public. Plan 3 of #1303 keys the share
+	// lookup below on (tenantID, callerTenantRole); userID is no longer
+	// load-bearing for org-share access.
+	if visibleKBs, err := s.kbService.ListVisibleKnowledgeBases(ctx); err == nil {
+		for _, kb := range visibleKBs {
+			if kb != nil {
+				add(kb.TenantID, kb)
+			}
+		}
+	} else {
+		logger.Warnf(ctx, "Global search: failed to list visible knowledge bases: %v", err)
+	}
+
+	if userIDVal := ctx.Value(types.UserIDContextKey); userIDVal != nil && s.kbShareService != nil {
+		if userID, ok := userIDVal.(string); ok && userID != "" {
+			callerTenantRole := types.TenantRoleFromContext(ctx)
+			sharedList, err := s.kbShareService.ListSharedKnowledgeBases(ctx, tenantID, callerTenantRole)
+			if err == nil {
+				for _, info := range sharedList {
+					if info != nil && info.KnowledgeBase != nil {
+						add(info.SourceTenantID, info.KnowledgeBase)
+					}
+				}
+			}
+		}
+	}
+
+	return scopes
+}
+
 func (s *knowledgeService) SearchKnowledge(ctx context.Context, keyword string, offset, limit int, fileTypes []string) ([]*types.Knowledge, bool, error) {
 	tenantID, ok := ctx.Value(types.TenantIDContextKey).(uint64)
 	if !ok {
 		return nil, false, werrors.NewUnauthorizedError("Tenant ID not found in context")
 	}
 
-	scopes := make([]types.KnowledgeSearchScope, 0)
-
-	// Own tenant: document-type knowledge bases
-	ownKBs, err := s.kbService.ListKnowledgeBases(ctx)
-	if err == nil {
-		for _, kb := range ownKBs {
-			if kb != nil && kb.Type == types.KnowledgeBaseTypeDocument {
-				scopes = append(scopes, types.KnowledgeSearchScope{TenantID: tenantID, KBID: kb.ID})
-			}
-		}
-	}
-
-	// Shared knowledge bases (document type only). Plan 3 of #1303 keys
-	// the share lookup on (tenantID, callerTenantRole); userID is no
-	// longer load-bearing for org-share access.
-	if userIDVal := ctx.Value(types.UserIDContextKey); userIDVal != nil {
-		if userID, ok := userIDVal.(string); ok && userID != "" {
-			callerTenantRole := types.TenantRoleFromContext(ctx)
-			sharedList, err := s.kbShareService.ListSharedKnowledgeBases(ctx, tenantID, callerTenantRole)
-			if err == nil {
-				for _, info := range sharedList {
-					if info != nil && info.KnowledgeBase != nil && info.KnowledgeBase.Type == types.KnowledgeBaseTypeDocument {
-						scopes = append(scopes, types.KnowledgeSearchScope{
-							TenantID: info.SourceTenantID,
-							KBID:     info.KnowledgeBase.ID,
-						})
-					}
-				}
-			}
-		}
-	}
+	scopes := s.buildKnowledgeSearchScopes(ctx, tenantID)
 
 	if len(scopes) == 0 {
 		return nil, false, nil

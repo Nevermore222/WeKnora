@@ -114,6 +114,21 @@ func TestIsTenantAccessible_SuperuserPathRequiresFlag(t *testing.T) {
 	}
 }
 
+func TestIsTenantAccessible_SystemAdminBypassesFlagAndMembership(t *testing.T) {
+	ctx := context.WithValue(context.Background(), types.SystemAdminContextKey, true)
+	user := &types.User{ID: "root", TenantID: 1, IsSystemAdmin: true}
+	if !IsTenantAccessible(ctx, user, 99, nil, cfgCrossTenant(false)) {
+		t.Fatalf("system admin must reach any tenant even with cross-tenant flag off")
+	}
+}
+
+func TestIsTenantAccessible_SystemAdminRequiresTrustedContextFlag(t *testing.T) {
+	user := &types.User{ID: "api-key-user", TenantID: 1, IsSystemAdmin: true}
+	if IsTenantAccessible(context.Background(), user, 99, nil, cfgCrossTenant(true)) {
+		t.Fatalf("database user flag alone must not grant cross-tenant access")
+	}
+}
+
 func TestIsTenantAccessible_ActiveMembershipAllows(t *testing.T) {
 	user := &types.User{ID: "u1", TenantID: 1}
 	ms := newFakeMemberService()
@@ -164,6 +179,7 @@ func runCrossTenantHandler(cfg *config.Config, user *types.User) *httptest.Respo
 		if user != nil {
 			ctx := context.WithValue(c.Request.Context(), types.UserContextKey, user)
 			ctx = context.WithValue(ctx, types.UserIDContextKey, user.ID)
+			ctx = context.WithValue(ctx, types.SystemAdminContextKey, user.IsSystemAdmin)
 			c.Request = c.Request.WithContext(ctx)
 		}
 		c.Next()
@@ -182,6 +198,14 @@ func TestRequireCrossTenantAccess_FlagOffBlocksEveryone(t *testing.T) {
 		&types.User{ID: "u1", CanAccessAllTenants: true})
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("flag off must 403 even for superuser, got %d", w.Code)
+	}
+}
+
+func TestRequireCrossTenantAccess_SystemAdminBypassesFlag(t *testing.T) {
+	w := runCrossTenantHandler(cfgCrossTenant(false),
+		&types.User{ID: "root", IsSystemAdmin: true})
+	if w.Code != http.StatusOK {
+		t.Fatalf("system admin must bypass cross-tenant flag, got %d", w.Code)
 	}
 }
 
@@ -224,6 +248,7 @@ func runPathTenantHandler(
 		if user != nil {
 			ctx = context.WithValue(ctx, types.UserContextKey, user)
 			ctx = context.WithValue(ctx, types.UserIDContextKey, user.ID)
+			ctx = context.WithValue(ctx, types.SystemAdminContextKey, user.IsSystemAdmin)
 		}
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
@@ -270,6 +295,15 @@ func TestRequirePathTenantMatch_SuperuserNeedsClusterFlag(t *testing.T) {
 		"/tenants/9")
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("superuser without flag must 403, got %d", w.Code)
+	}
+}
+
+func TestRequirePathTenantMatch_SystemAdminBypassesMismatchAndFlag(t *testing.T) {
+	w := runPathTenantHandler(cfgCrossTenant(false), 7,
+		&types.User{ID: "root", IsSystemAdmin: true},
+		"/tenants/9")
+	if w.Code != http.StatusOK {
+		t.Fatalf("system admin must bypass tenant mismatch, got %d", w.Code)
 	}
 }
 

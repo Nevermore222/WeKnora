@@ -33,11 +33,9 @@ import (
 //     middleware so the route declaration is the single source of
 //     truth.
 //
-// All of these honour cfg.Tenant.EnableCrossTenantAccess: the
-// CanAccessAllTenants attribute on a User row is meaningful only when
-// the cluster-wide flag is on. Reading the attribute alone (without the
-// flag) would let a dormant config grant escalation, which is exactly
-// what bit us during the PR 3 review.
+// System administrators are platform-level identities and bypass these
+// tenant and feature-flag checks. The CanAccessAllTenants attribute for
+// ordinary users remains governed by EnableCrossTenantAccess.
 //
 // Rejections are reported via c.Error(*apperrors.AppError) + c.Abort(),
 // not c.JSON: this keeps the response shape consistent with the
@@ -53,6 +51,9 @@ import (
 // attribute and the cluster-wide flag must be true; either alone is
 // not enough.
 func IsCrossTenantSuperuser(ctx context.Context, cfg *config.Config) bool {
+	if types.IsSystemAdminFromContext(ctx) {
+		return true
+	}
 	if cfg == nil || cfg.Tenant == nil || !cfg.Tenant.EnableCrossTenantAccess {
 		return false
 	}
@@ -67,8 +68,9 @@ func IsCrossTenantSuperuser(ctx context.Context, cfg *config.Config) bool {
 // `targetTenantID`. The decision order is:
 //
 //  1. Home tenant (user.TenantID == targetTenantID): always.
-//  2. Cross-tenant superuser: governed by IsCrossTenantSuperuser.
-//  3. Multi-tenant member: an active tenant_members row in the target
+//  2. System administrator: always, regardless of the cross-tenant flag.
+//  3. Cross-tenant superuser: governed by IsCrossTenantSuperuser.
+//  4. Multi-tenant member: an active tenant_members row in the target
 //     tenant grants access (this is what makes cross-tenant browsing
 //     work for non-superusers added via PR 3's member management).
 //
@@ -85,6 +87,9 @@ func IsTenantAccessible(
 		return false
 	}
 	if user.TenantID == targetTenantID {
+		return true
+	}
+	if types.IsSystemAdminFromContext(ctx) {
 		return true
 	}
 	if cfg != nil && cfg.Tenant != nil && cfg.Tenant.EnableCrossTenantAccess && user.CanAccessAllTenants {
@@ -111,6 +116,10 @@ func IsTenantAccessible(
 func RequireCrossTenantAccess(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
+		if types.IsSystemAdminFromContext(ctx) {
+			c.Next()
+			return
+		}
 		// First the cluster-wide flag — if it's off, nobody gets through,
 		// not even users with CanAccessAllTenants=true. This mirrors the
 		// "must require BOTH" rule that previously lived in tenant.go.
@@ -139,9 +148,8 @@ func RequireCrossTenantAccess(cfg *config.Config) gin.HandlerFunc {
 }
 
 // RequirePathTenantMatch gates a route on the URL :id matching the
-// caller's active tenant context. Cross-tenant superusers bypass the
-// match because their X-Tenant-ID switch was already vetted by the
-// auth middleware.
+// caller's active tenant context. System administrators and cross-tenant
+// superusers bypass the match.
 //
 // The router places this on the /tenants/:id group so every per-tenant
 // endpoint (GetTenant / UpdateTenant / DeleteTenant / ResetAPIKey /

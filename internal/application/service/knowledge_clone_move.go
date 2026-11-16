@@ -363,16 +363,22 @@ func (s *knowledgeService) ProcessKBClone(ctx context.Context, t *asynq.Task) er
 		return fmt.Errorf("failed to unmarshal KB clone payload: %w", err)
 	}
 
-	// Add tenant ID to context
-	ctx = context.WithValue(ctx, types.TenantIDContextKey, payload.TenantID)
-
-	// Get tenant info and add to context
-	tenantInfo, err := s.tenantRepo.GetTenantByID(ctx, payload.TenantID)
-	if err != nil {
-		logger.Errorf(ctx, "Failed to get tenant info: %v", err)
-		return fmt.Errorf("failed to get tenant info: %w", err)
+	sourceTenantID := payload.SourceTenant()
+	targetTenantID := payload.TargetTenant()
+	if sourceTenantID == 0 || targetTenantID == 0 {
+		return errors.New("KB clone payload is missing source or target tenant")
 	}
-	ctx = context.WithValue(ctx, types.TenantInfoContextKey, tenantInfo)
+	sourceCtx, err := s.withTenantContext(ctx, sourceTenantID)
+	if err != nil {
+		logger.Errorf(ctx, "Failed to get source tenant info: %v", err)
+		return fmt.Errorf("failed to get source tenant info: %w", err)
+	}
+	if _, err := s.withTenantContext(ctx, targetTenantID); err != nil {
+		logger.Errorf(ctx, "Failed to get target tenant info: %v", err)
+		return fmt.Errorf("failed to get target tenant info: %w", err)
+	}
+	sourceCtx = context.WithValue(sourceCtx, types.CallerTenantIDContextKey, targetTenantID)
+	ctx = sourceCtx
 
 	// Check if this is the last retry
 	retryCount, _ := asynq.GetRetryCount(ctx)
@@ -408,7 +414,7 @@ func (s *knowledgeService) ProcessKBClone(ctx context.Context, t *asynq.Task) er
 	}
 
 	// Get source and target knowledge bases
-	srcKB, dstKB, err := s.kbService.CopyKnowledgeBase(ctx, payload.SourceID, payload.TargetID)
+	srcKB, dstKB, err := s.kbService.CopyKnowledgeBase(sourceCtx, payload.SourceID, payload.TargetID)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to copy knowledge base: %v", err)
 		handleError(progress, err, "Failed to copy knowledge base configuration")
@@ -837,6 +843,29 @@ func getKnowledgeMoveProgressKey(taskID string) string {
 	return knowledgeMoveProgressKeyPrefix + taskID
 }
 
+func (s *knowledgeService) withTenantContext(ctx context.Context, tenantID uint64) (context.Context, error) {
+	if tenantID == 0 {
+		return nil, errors.New("tenant ID cannot be zero")
+	}
+	previousTenantID, _ := types.TenantIDFromContext(ctx)
+	ctx = context.WithValue(ctx, types.TenantIDContextKey, tenantID)
+	tenantInfo, _ := types.TenantInfoFromContext(ctx)
+	if tenantInfo != nil && (tenantInfo.ID == tenantID || (tenantInfo.ID == 0 && previousTenantID == tenantID)) {
+		return ctx, nil
+	}
+	if s.tenantRepo == nil {
+		return nil, errors.New("tenant repository unavailable")
+	}
+	tenantInfo, err := s.tenantRepo.GetTenantByID(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if tenantInfo == nil {
+		return nil, fmt.Errorf("tenant %d not found", tenantID)
+	}
+	return context.WithValue(ctx, types.TenantInfoContextKey, tenantInfo), nil
+}
+
 func (s *knowledgeService) saveKnowledgeMoveProgress(ctx context.Context, progress *types.KnowledgeMoveProgress) error {
 	key := getKnowledgeMoveProgressKey(progress.TaskID)
 	data, err := json.Marshal(progress)
@@ -876,16 +905,22 @@ func (s *knowledgeService) ProcessKnowledgeMove(ctx context.Context, t *asynq.Ta
 		return fmt.Errorf("failed to unmarshal knowledge move payload: %w", err)
 	}
 
-	// Add tenant ID to context
-	ctx = context.WithValue(ctx, types.TenantIDContextKey, payload.TenantID)
-
-	// Get tenant info and add to context
-	tenantInfo, err := s.tenantRepo.GetTenantByID(ctx, payload.TenantID)
-	if err != nil {
-		logger.Errorf(ctx, "ProcessKnowledgeMove: failed to get tenant info: %v", err)
-		return fmt.Errorf("failed to get tenant info: %w", err)
+	sourceTenantID := payload.SourceTenant()
+	targetTenantID := payload.TargetTenant()
+	if sourceTenantID == 0 || targetTenantID == 0 {
+		return errors.New("knowledge move payload is missing source or target tenant")
 	}
-	ctx = context.WithValue(ctx, types.TenantInfoContextKey, tenantInfo)
+	sourceCtx, err := s.withTenantContext(ctx, sourceTenantID)
+	if err != nil {
+		logger.Errorf(ctx, "ProcessKnowledgeMove: failed to load source tenant info: %v", err)
+		return fmt.Errorf("failed to get source tenant info: %w", err)
+	}
+	targetCtx, err := s.withTenantContext(ctx, targetTenantID)
+	if err != nil {
+		logger.Errorf(ctx, "ProcessKnowledgeMove: failed to load target tenant info: %v", err)
+		return fmt.Errorf("failed to get target tenant info: %w", err)
+	}
+	ctx = sourceCtx
 
 	// Check if this is the last retry
 	retryCount, _ := asynq.GetRetryCount(ctx)
@@ -920,12 +955,12 @@ func (s *knowledgeService) ProcessKnowledgeMove(ctx context.Context, t *asynq.Ta
 	_ = s.saveKnowledgeMoveProgress(ctx, progress)
 
 	// Get source and target knowledge bases
-	sourceKB, err := s.kbService.GetKnowledgeBaseByID(ctx, payload.SourceKBID)
+	sourceKB, err := s.kbService.GetKnowledgeBaseByID(sourceCtx, payload.SourceKBID)
 	if err != nil {
 		handleError(progress, err, "Failed to get source knowledge base")
 		return err
 	}
-	targetKB, err := s.kbService.GetKnowledgeBaseByID(ctx, payload.TargetKBID)
+	targetKB, err := s.kbService.GetKnowledgeBaseByID(targetCtx, payload.TargetKBID)
 	if err != nil {
 		handleError(progress, err, "Failed to get target knowledge base")
 		return err
@@ -945,7 +980,7 @@ func (s *knowledgeService) ProcessKnowledgeMove(ctx context.Context, t *asynq.Ta
 
 	// Process each knowledge item
 	for i, knowledgeID := range payload.KnowledgeIDs {
-		err := s.moveOneKnowledge(ctx, knowledgeID, sourceKB, targetKB, payload.Mode)
+		err := s.moveOneKnowledge(sourceCtx, targetCtx, knowledgeID, sourceKB, targetKB, payload.Mode)
 		if err != nil {
 			logger.Errorf(ctx, "ProcessKnowledgeMove: failed to move knowledge %s: %v", knowledgeID, err)
 			progress.Failed++
@@ -977,15 +1012,15 @@ func (s *knowledgeService) ProcessKnowledgeMove(ctx context.Context, t *asynq.Ta
 
 // moveOneKnowledge moves a single knowledge item from source KB to target KB.
 func (s *knowledgeService) moveOneKnowledge(
-	ctx context.Context,
+	sourceCtx, targetCtx context.Context,
 	knowledgeID string,
 	sourceKB, targetKB *types.KnowledgeBase,
 	mode string,
 ) error {
-	tenantID := ctx.Value(types.TenantIDContextKey).(uint64)
+	tenantID := sourceKB.TenantID
 
 	// Get the knowledge item
-	knowledge, err := s.repo.GetKnowledgeByID(ctx, tenantID, knowledgeID)
+	knowledge, err := s.repo.GetKnowledgeByID(sourceCtx, tenantID, knowledgeID)
 	if err != nil {
 		return fmt.Errorf("failed to get knowledge %s: %w", knowledgeID, err)
 	}
@@ -1009,15 +1044,15 @@ func (s *knowledgeService) moveOneKnowledge(
 
 	// Mark as processing during move
 	knowledge.ParseStatus = types.ParseStatusProcessing
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	if err := s.repo.UpdateKnowledge(sourceCtx, knowledge); err != nil {
 		return fmt.Errorf("failed to mark knowledge as processing: %w", err)
 	}
 
 	switch mode {
 	case "reuse_vectors":
-		return s.moveKnowledgeReuseVectors(ctx, knowledge, sourceKB, targetKB)
+		return s.moveKnowledgeReuseVectors(sourceCtx, targetCtx, knowledge, sourceKB, targetKB)
 	case "reparse":
-		return s.moveKnowledgeReparse(ctx, knowledge, sourceKB, targetKB)
+		return s.moveKnowledgeReparse(sourceCtx, targetCtx, knowledge, sourceKB, targetKB)
 	default:
 		return fmt.Errorf("unknown move mode: %s", mode)
 	}
@@ -1025,11 +1060,11 @@ func (s *knowledgeService) moveOneKnowledge(
 
 // moveKnowledgeReuseVectors moves knowledge by copying vector indices and updating DB references.
 func (s *knowledgeService) moveKnowledgeReuseVectors(
-	ctx context.Context,
+	sourceCtx, targetCtx context.Context,
 	knowledge *types.Knowledge,
 	sourceKB, targetKB *types.KnowledgeBase,
 ) error {
-	tenantID := ctx.Value(types.TenantIDContextKey).(uint64)
+	tenantID := sourceKB.TenantID
 
 	// reuse_vectors copies index entries directly between KBs, which only works
 	// inside the same VectorStore backend (CopyIndices is routed through the
@@ -1045,7 +1080,7 @@ func (s *knowledgeService) moveKnowledgeReuseVectors(
 	}
 
 	// 1. Get old chunk IDs for vector index copy mapping
-	oldChunks, err := s.chunkRepo.ListChunksByKnowledgeID(ctx, tenantID, knowledge.ID)
+	oldChunks, err := s.chunkRepo.ListChunksByKnowledgeID(sourceCtx, tenantID, knowledge.ID)
 	if err != nil {
 		return fmt.Errorf("failed to list chunks: %w", err)
 	}
@@ -1066,18 +1101,18 @@ func (s *knowledgeService) moveKnowledgeReuseVectors(
 			sourceStoreID = sourceKB.VectorStoreID
 		}
 		retrieveEngine, err := retriever.CreateRetrieveEngineForKB(
-			ctx, s.retrieveEngine, s.ownership, tenantID, sourceStoreID)
+			sourceCtx, s.retrieveEngine, s.ownership, tenantID, sourceStoreID)
 		if err != nil {
 			return fmt.Errorf("failed to init retrieve engine: %w", err)
 		}
-		embeddingModel, err := s.modelService.GetEmbeddingModel(ctx, knowledge.EmbeddingModelID)
+		embeddingModel, err := s.modelService.GetEmbeddingModel(sourceCtx, knowledge.EmbeddingModelID)
 		if err != nil {
 			return fmt.Errorf("failed to get embedding model: %w", err)
 		}
 
 		// Copy indices from source KB to target KB
 		knowledgeIDMapping := map[string]string{knowledge.ID: knowledge.ID}
-		if err := retrieveEngine.CopyIndices(ctx, sourceKB.ID, targetKB.ID,
+		if err := retrieveEngine.CopyIndices(sourceCtx, sourceKB.ID, targetKB.ID,
 			knowledgeIDMapping, chunkIDMapping,
 			embeddingModel.GetDimensions(), sourceKB.Type,
 		); err != nil {
@@ -1085,25 +1120,28 @@ func (s *knowledgeService) moveKnowledgeReuseVectors(
 		}
 
 		// Delete indices from source KB
-		if err := retrieveEngine.DeleteByKnowledgeIDList(ctx, []string{knowledge.ID},
+		if err := retrieveEngine.DeleteByKnowledgeIDList(sourceCtx, []string{knowledge.ID},
 			embeddingModel.GetDimensions(), sourceKB.Type,
 		); err != nil {
-			logger.Warnf(ctx, "moveKnowledgeReuseVectors: failed to delete old indices for knowledge %s: %v", knowledge.ID, err)
+			logger.Warnf(sourceCtx, "moveKnowledgeReuseVectors: failed to delete old indices for knowledge %s: %v", knowledge.ID, err)
 			// Non-fatal: indices will be orphaned but won't affect correctness
 		}
 	}
 
 	// 3. Update chunks' knowledge_base_id in DB
-	if err := s.chunkRepo.MoveChunksByKnowledgeID(ctx, tenantID, knowledge.ID, targetKB.ID); err != nil {
+	if err := s.chunkRepo.MoveChunksToKnowledgeBase(
+		sourceCtx, sourceKB.TenantID, targetKB.TenantID, knowledge.ID, targetKB.ID,
+	); err != nil {
 		return fmt.Errorf("failed to move chunks: %w", err)
 	}
 
 	// 4. Update knowledge record
 	knowledge.KnowledgeBaseID = targetKB.ID
+	knowledge.TenantID = targetKB.TenantID
 	knowledge.TagID = "" // Clear tag since tags are KB-scoped
 	knowledge.ParseStatus = types.ParseStatusCompleted
 	knowledge.UpdatedAt = time.Now()
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	if err := s.repo.UpdateKnowledge(targetCtx, knowledge); err != nil {
 		return fmt.Errorf("failed to update knowledge: %w", err)
 	}
 
@@ -1112,20 +1150,21 @@ func (s *knowledgeService) moveKnowledgeReuseVectors(
 
 // moveKnowledgeReparse moves knowledge to target KB and re-parses it with target KB's configuration.
 func (s *knowledgeService) moveKnowledgeReparse(
-	ctx context.Context,
+	sourceCtx, targetCtx context.Context,
 	knowledge *types.Knowledge,
 	_, targetKB *types.KnowledgeBase,
 ) error {
-	tenantID := ctx.Value(types.TenantIDContextKey).(uint64)
+	tenantID := targetKB.TenantID
 
 	// 1. Clean up existing chunks and vector indices
-	if err := s.cleanupKnowledgeResources(ctx, knowledge); err != nil {
-		logger.Warnf(ctx, "moveKnowledgeReparse: cleanup partial error for knowledge %s: %v", knowledge.ID, err)
+	if err := s.cleanupKnowledgeResources(sourceCtx, knowledge); err != nil {
+		logger.Warnf(sourceCtx, "moveKnowledgeReparse: cleanup partial error for knowledge %s: %v", knowledge.ID, err)
 		// Continue - partial cleanup is acceptable
 	}
 
 	// 2. Update knowledge to belong to target KB
 	knowledge.KnowledgeBaseID = targetKB.ID
+	knowledge.TenantID = targetKB.TenantID
 	knowledge.EmbeddingModelID = targetKB.EmbeddingModelID
 	knowledge.TagID = "" // Clear tag since tags are KB-scoped
 	knowledge.ParseStatus = types.ParseStatusPending
@@ -1133,7 +1172,7 @@ func (s *knowledgeService) moveKnowledgeReparse(
 	knowledge.Description = ""
 	knowledge.ProcessedAt = nil
 	knowledge.UpdatedAt = time.Now()
-	if err := s.repo.UpdateKnowledge(ctx, knowledge); err != nil {
+	if err := s.repo.UpdateKnowledge(targetCtx, knowledge); err != nil {
 		return fmt.Errorf("failed to update knowledge: %w", err)
 	}
 
@@ -1143,7 +1182,7 @@ func (s *knowledgeService) moveKnowledgeReparse(
 		if err != nil || meta == nil {
 			return fmt.Errorf("failed to get manual metadata for reparse: %w", err)
 		}
-		s.triggerManualProcessing(ctx, targetKB, knowledge, meta.Content, false)
+		s.triggerManualProcessing(targetCtx, targetKB, knowledge, meta.Content, false)
 		return nil
 	}
 
@@ -1158,7 +1197,7 @@ func (s *knowledgeService) moveKnowledgeReparse(
 			}
 		}
 
-		lang, _ := types.LanguageFromContext(ctx)
+		lang, _ := types.LanguageFromContext(targetCtx)
 		taskPayload := types.DocumentProcessPayload{
 			TenantID:                 tenantID,
 			KnowledgeID:              knowledge.ID,
@@ -1172,7 +1211,7 @@ func (s *knowledgeService) moveKnowledgeReparse(
 			Language:                 lang,
 		}
 
-		langfuse.InjectTracing(ctx, &taskPayload)
+		langfuse.InjectTracing(targetCtx, &taskPayload)
 		payloadBytes, err := json.Marshal(taskPayload)
 		if err != nil {
 			return fmt.Errorf("failed to marshal document process payload: %w", err)
@@ -1184,7 +1223,7 @@ func (s *knowledgeService) moveKnowledgeReparse(
 		if err != nil {
 			return fmt.Errorf("failed to enqueue document process task: %w", err)
 		}
-		logger.Infof(ctx, "moveKnowledgeReparse: enqueued reparse task id=%s for knowledge=%s", info.ID, knowledge.ID)
+		logger.Infof(targetCtx, "moveKnowledgeReparse: enqueued reparse task id=%s for knowledge=%s", info.ID, knowledge.ID)
 	}
 
 	return nil

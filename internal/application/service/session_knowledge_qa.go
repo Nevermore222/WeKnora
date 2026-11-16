@@ -362,12 +362,17 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 		kbIDSet := make(map[string]bool)
 		kbIDs := make([]string, 0, len(allKBs))
 		ownSkipped := 0
+		// For shared agents (session tenant != agent tenant), only use the agent
+		// tenant's own KBs. Including the current user's shared KBs would leak
+		// unrelated KBs from other organisations into the agent's retrieval scope.
+		isSharedAgent := sessionTenantID != 0 && sessionTenantID != customAgent.TenantID
+		sessionUserID, _ := types.UserIDFromContext(ctx)
 		for _, kb := range allKBs {
-			// A public agent running outside its source workspace may only carry
-			// public KBs. This prevents the agent from becoming a read bypass for
-			// private or workspace-only source resources.
-			if sessionTenantID != 0 && sessionTenantID != customAgent.TenantID &&
-				kb.Visibility != types.ResourceVisibilityPublic {
+			// The same rule the KB detail page applies when a KB is opened through
+			// this agent, so every KB the agent exposes is also searchable. Private
+			// rows of other users stay out of scope: they fail retrieval
+			// authorization and used to abort the whole search.
+			if !agentScopeAllowsKB(customAgent, kb, sessionTenantID, sessionUserID, false) {
 				ownSkipped++
 				continue
 			}
@@ -379,10 +384,6 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 			kbIDSet[kb.ID] = true
 		}
 
-		// For shared agents (session tenant != agent tenant), only use the agent
-		// tenant's own KBs. Including the current user's shared KBs would leak
-		// unrelated KBs from other organisations into the agent's retrieval scope.
-		isSharedAgent := sessionTenantID != 0 && sessionTenantID != customAgent.TenantID
 		sharedSkipped := 0
 		if !isSharedAgent {
 			tenantID := types.MustTenantIDFromContext(ctx)
@@ -452,10 +453,10 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 }
 
 // filterSharedAgentKnowledgeBases returns the agent's configured KBs that the
-// current caller is actually allowed to read. A shared agent may reference a
-// KB owned by another tenant when that KB has been explicitly shared with the
-// caller's tenant; such a KB remains read-only but must not be discarded just
-// because its source tenant differs from the agent's tenant.
+// current caller is actually allowed to read, applying agentScopeAllowsKB: the
+// agent's own workspace KBs, system-public KBs, KBs shared with the caller's
+// tenant and the caller's own KBs - never another workspace's unshared rows and
+// never another user's private rows.
 func filterSharedAgentKnowledgeBases(
 	agent *types.CustomAgent,
 	sessionTenantID uint64,
@@ -493,11 +494,7 @@ func filterSharedAgentKnowledgeBases(
 		if kb == nil {
 			continue
 		}
-		allowed := kb.Visibility == types.ResourceVisibilityPublic || sharedByID[id]
-		if kb.TenantID == sessionTenantID {
-			allowed = kb.Visibility != types.ResourceVisibilityPrivate || (sessionUserID != "" && kb.CreatorID == sessionUserID)
-		}
-		if allowed {
+		if agentScopeAllowsKB(agent, kb, sessionTenantID, sessionUserID, sharedByID[id]) {
 			result = append(result, id)
 			seen[id] = true
 		}
@@ -539,8 +536,7 @@ func (s *sessionService) buildSearchTargetsForAccess(
 	// Track which KBs are fully searched
 	fullKBSet := make(map[string]bool)
 
-	// First pass: batch-fetch KBs, then resolve tenant per ID (tenant scope already set by caller)
-	callerTenantRole := types.TenantRoleFromContext(ctx)
+	// First pass: batch-fetch KBs, then resolve tenant per ID (tenant scope already set by caller).
 	if len(knowledgeBaseIDs) > 0 {
 		kbs, _ := s.knowledgeBaseService.GetKnowledgeBasesByIDsOnly(ctx, knowledgeBaseIDs)
 		kbByID := make(map[string]*types.KnowledgeBase, len(kbs))
@@ -549,24 +545,38 @@ func (s *sessionService) buildSearchTargetsForAccess(
 				kbByID[kb.ID] = kb
 			}
 		}
-		userID, _ := types.UserIDFromContext(ctx)
+		// accessTenantID is the caller's own tenant while tenantID is the tenant the
+		// retrieval runs in (a shared agent's source tenant). Carry the caller
+		// explicitly so the shared read rule checks the caller's entitlements too.
+		accessCtx := ctx
+		if accessTenantID != 0 {
+			accessCtx = context.WithValue(ctx, types.CallerTenantIDContextKey, accessTenantID)
+		}
 		for _, kbID := range knowledgeBaseIDs {
 			fullKBSet[kbID] = true
 			kb := kbByID[kbID]
 			if kb == nil {
 				kbTenantMap[kbID] = tenantID
-			} else if kb.TenantID == tenantID || kb.TenantID == accessTenantID || kb.Visibility == types.ResourceVisibilityPublic {
-				kbTenantMap[kbID] = kb.TenantID
-			} else if s.kbShareService != nil && userID != "" {
-				hasAccess, _ := s.kbShareService.HasTenantKBPermission(ctx, kbID, accessTenantID, callerTenantRole, types.OrgRoleViewer)
-				if hasAccess {
-					kbTenantMap[kbID] = kb.TenantID
-				} else {
-					kbTenantMap[kbID] = tenantID
-				}
-			} else {
-				kbTenantMap[kbID] = tenantID
+				targets = append(targets, &types.SearchTarget{
+					Type:            types.SearchTargetTypeKnowledgeBase,
+					KnowledgeBaseID: kbID,
+					TenantID:        kbTenantMap[kbID],
+				})
+				continue
 			}
+			readable, readErr := s.knowledgeBaseService.CanReadKnowledgeBase(accessCtx, kb, tenantID)
+			if readErr != nil || !readable {
+				// Drop the KB instead of searching it under a substituted tenant. The
+				// previous fallback kept the target and pointed it at the retrieval
+				// tenant, so the pipeline queried another tenant's index for a KB that
+				// lives elsewhere: no hits, no error, and no way to tell a permission
+				// problem from an empty knowledge base.
+				logger.Warnf(ctx,
+					"Dropping KB %s from search scope: not readable (owner tenant %d, visibility %s, retrieval tenant %d, caller tenant %d, err=%v)",
+					kbID, kb.TenantID, kb.Visibility, tenantID, accessTenantID, readErr)
+				continue
+			}
+			kbTenantMap[kbID] = kb.TenantID
 			targets = append(targets, &types.SearchTarget{
 				Type:            types.SearchTargetTypeKnowledgeBase,
 				KnowledgeBaseID: kbID,

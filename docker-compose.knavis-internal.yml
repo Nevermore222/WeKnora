@@ -12,6 +12,8 @@ services:
 
   frontend:
     image: ${XELORA_FRONTEND_IMAGE:-wechatopenai/xelora-ui:knavis-internal-local}
+    environment:
+      - MCP_PUBLIC_ORIGIN=${MCP_PUBLIC_ORIGIN:-http://192.168.9.177}
     volumes:
       - ${CLIENT_RELEASES_HOST_PATH:-./dist/client-releases}:/usr/share/nginx/html/downloads:ro
 

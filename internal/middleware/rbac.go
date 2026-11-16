@@ -48,12 +48,10 @@ type CreatorLookup func(c *gin.Context) (creatorID string, err error)
 // HTTP 403 unless the caller's TenantRole (set by the auth middleware
 // in TenantRoleContextKey) is at least min.
 //
-// Cross-tenant superusers (User.CanAccessAllTenants) automatically
-// satisfy any role gate. Otherwise rolling out tenant-RBAC would silently
-// break organisation-level operators who own no tenant_members row in
-// the tenant they're administering. The escape hatch is bounded by the
-// existing canAccessTenant gate in auth.go; this middleware does not
-// grant extra reach, only honours what was already approved.
+// System administrators automatically satisfy every tenant-role gate.
+// Cross-tenant superusers (User.CanAccessAllTenants) also satisfy any
+// role gate, bounded by the cross-tenant access switch and the existing
+// canAccessTenant gate in auth.go.
 //
 // When cfg.Tenant.EnableRBAC is false, the middleware logs the would-be
 // rejection but lets the request through — preserving today's behaviour
@@ -68,6 +66,10 @@ func RequireRole(min types.TenantRole, cfg *config.Config) gin.HandlerFunc {
 	warnOnNilConfig(cfg)
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
+		if types.IsSystemAdminFromContext(ctx) {
+			c.Next()
+			return
+		}
 		role := types.TenantRoleFromContext(ctx)
 		if role.HasPermission(min) {
 			c.Next()
@@ -182,33 +184,40 @@ func RequireOwnershipOrSystemAdmin(lookup CreatorLookup) gin.HandlerFunc {
 // user ID (see CreatorLookup for the return-value contract).
 //
 // Decision order:
-//  1. role >= min -> allow without running lookup.
-//  2. cross-tenant superuser -> allow without running lookup.
-//  3. enforcement off -> log, allow without running lookup. This is the
+//  1. system administrator -> allow without running lookup.
+//  2. role >= min -> allow without running lookup.
+//  3. cross-tenant superuser -> allow without running lookup.
+//  4. enforcement off -> log, allow without running lookup. This is the
 //     critical rollout-safety guarantee: when EnableRBAC is false, the
 //     lookup is NEVER invoked, so dormant mode incurs zero extra DB
 //     roundtrips on hot per-resource mutation paths.
-//  4. lookup returns ErrResourceNotFound -> pass through; let the
+//  5. lookup returns ErrResourceNotFound -> pass through; let the
 //     handler issue the proper 404.
-//  5. lookup returns other error -> 503 (transient/unexpected fault).
+//  6. lookup returns other error -> 503 (transient/unexpected fault).
 //     Preserves observability instead of disguising server errors as 403.
-//  6. lookup returns the caller's user ID -> allow (ownership match).
-//  7. lookup returns "" (tenant-owned, no human creator) -> 403 (we
+//  7. lookup returns the caller's user ID -> allow (ownership match).
+//  8. lookup returns "" (tenant-owned, no human creator) -> 403 (we
 //     already know role < min from step 1).
-//  8. lookup returns a non-empty creator that is not the caller -> 403.
+//  9. lookup returns a non-empty creator that is not the caller -> 403.
 func RequireOwnershipOrRole(min types.TenantRole, lookup CreatorLookup, cfg *config.Config) gin.HandlerFunc {
 	warnOnNilConfig(cfg)
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		role := types.TenantRoleFromContext(ctx)
 
-		// 1. Fast path: role meets the bar.
+		// 1. Platform administrators are not constrained by tenant roles.
+		if types.IsSystemAdminFromContext(ctx) {
+			c.Next()
+			return
+		}
+
+		// 2. Fast path: role meets the bar.
 		if role.HasPermission(min) {
 			c.Next()
 			return
 		}
 
-		// 2. Cross-tenant superuser bypass — same reasoning as RequireRole.
+		// 3. Cross-tenant superuser bypass — same reasoning as RequireRole.
 		if IsCrossTenantSuperuser(ctx, cfg) {
 			c.Next()
 			return
@@ -216,7 +225,7 @@ func RequireOwnershipOrRole(min types.TenantRole, lookup CreatorLookup, cfg *con
 
 		uid, _ := types.UserIDFromContext(ctx)
 
-		// 3. Fail-open shortcut: when enforcement is off, do NOT run the
+		// 4. Fail-open shortcut: when enforcement is off, do NOT run the
 		//    lookup. Running it would add a hidden DB roundtrip on every
 		//    mutating request during the rollout window — see #1318 review.
 		if !rbacEnforcementEnabled(cfg) {
@@ -231,12 +240,12 @@ func RequireOwnershipOrRole(min types.TenantRole, lookup CreatorLookup, cfg *con
 		creator, err := lookup(c)
 		switch {
 		case errors.Is(err, ErrResourceNotFound):
-			// 4. Hand off to the handler so the client sees a real 404
+			// 5. Hand off to the handler so the client sees a real 404
 			//    rather than a fake "no permission" 403.
 			c.Next()
 			return
 		case err != nil:
-			// 5. Genuine failure — surface it as 5xx so monitoring catches it.
+			// 6. Genuine failure — surface it as 5xx so monitoring catches it.
 			logger.Errorf(ctx,
 				"[rbac] creator lookup failed: user=%s path=%s err=%v",
 				uid, c.Request.URL.Path, err)
@@ -247,14 +256,14 @@ func RequireOwnershipOrRole(min types.TenantRole, lookup CreatorLookup, cfg *con
 			return
 		}
 
-		// 6. Ownership match wins even when role is below min — that's the
+		// 7. Ownership match wins even when role is below min — that's the
 		//    whole point: Contributors can edit their own resources.
 		if creator != "" && creator == uid {
 			c.Next()
 			return
 		}
 
-		// 7-8. Tenant-owned (creator=="") or non-creator with insufficient role.
+		// 8-9. Tenant-owned (creator=="") or non-creator with insufficient role.
 		logger.Warnf(ctx,
 			"[rbac] ownership/role insufficient: user=%s have=%s need=%s creator=%q path=%s",
 			uid, role, min, creator, c.Request.URL.Path)
